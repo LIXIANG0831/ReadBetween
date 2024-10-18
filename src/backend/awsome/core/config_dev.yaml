@@ -7,6 +7,21 @@ storage:
   database_url: ""
   redis_url: ""
 
-logger_conf:
+logger:
   base_log_path: "/Users/lixiang/Desktop"
 
+openai:
+  base_url: "http://10.193.22.13:9997/v1"
+  api_key: "xxx"
+
+minio:
+  scheme: false         # 是否支持 https
+  cert_check: false         # 是否校验 http证书
+  minio_endpoint: "localhost:9001"       # 这个地址用来写请求, 使用同一个docker-compose 启动，能通过容器名访问
+  minio_sharepoint: "localhost:9001"      # 确保和nginx的代理地址一致。同一个docker-compose启动可以直接使用默认值
+  minio_access_key: "minioadmin"
+  minio_secret_key: "minioadmin"
+
+milvus:
+  host: "localhost"
+  port: "19530"

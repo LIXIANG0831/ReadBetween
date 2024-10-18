@@ -60,7 +60,7 @@ class LoggerClient:
 
 
 # 获取日志文件路径配置
-base_log_path = get_config("logger_conf.base_log_path")
+base_log_path = get_config("logger.base_log_path")
 # 创建 MyLogger 的实例并获取 logger
 logger_client = LoggerClient(log_file_path=base_log_path).get_logger()
 
