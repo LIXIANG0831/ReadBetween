@@ -15,10 +15,9 @@ openai_client = OpenAI(
 )
 
 # 获取Milvus配置信息
-MILVUS_HOST = get_config("milvus.host")
-MILVUS_PORT = get_config("milvus.port")
+MILVUS_URI = get_config("milvus.uri")
 COLLECTION_NAME = 'test_milvus'
-milvus_client = MilvusClient(uri=f"http://{MILVUS_HOST}:{MILVUS_PORT}")
+milvus_client = MilvusClient(uri=MILVUS_URI)
 
 
 

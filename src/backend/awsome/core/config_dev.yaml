@@ -23,5 +23,6 @@ minio:
   minio_secret_key: "minioadmin"
 
 milvus:
+  uri: "http://localhost:19530"
   host: "localhost"
   port: "19530"
