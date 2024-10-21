@@ -1,6 +1,8 @@
+from awsome.settings import get_config
+tavily_api_key = get_config("api.tavily.api_key")
 def _tavily_search():
     from tavily import TavilyClient
-    tavily_client = TavilyClient(api_key="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")
+    tavily_client = TavilyClient(api_key=tavily_api_key)
     # 1. Executing a simple search query
     response_1 = tavily_client.search("今天西安天气怎么样？")
     # 2. Executing a context search query

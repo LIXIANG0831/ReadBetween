@@ -4,25 +4,39 @@ app:
   port: 8080
 
 storage:
-  database_url: ""
-  redis_url: ""
+  mysql:
+    uri: ""
+  redis:
+    uri: ""
+  minio:
+    scheme: false         # 是否支持 https
+    cert_check: false         # 是否校验 http证书
+    minio_endpoint: "localhost:9001"       # 这个地址用来写请求, 使用同一个docker-compose 启动，能通过容器名访问
+    minio_sharepoint: "localhost:9001"      # 确保和nginx的代理地址一致。同一个docker-compose启动可以直接使用默认值
+    minio_access_key: "minioadmin"
+    minio_secret_key: "minioadmin"
+  milvus:
+    uri: "http://localhost:19530"
+    host: "localhost"
+    port: "19530"
+
+api:
+  openai:
+    base_url: "http://10.193.22.13:9997/v1"
+    api_key: "sk-sHpOGnzSPI2kfHEF261aF5646975434fA18bF4Bb4b94E083"
+  tavily:
+    api_key: "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"
+  azure:
+    openai:
+      api_key: "e039c617fe164dec8a7821fb1fc55cac"
+      azure_deployment: "gpt-4o-mini"
+      azure_endpoint: "https://cosmo-chatgpt.openai.azure.com/"
+      api_version: "2024-08-01-preview"
+    embedding:
+      api_key: "e039c617fe164dec8a7821fb1fc55cac"
+      azure_deployment: "text-embedding-ada-002"
+      azure_endpoint: "https://cosmo-chatgpt.openai.azure.com/"
+      api_version: "2023-05-15"
 
 logger:
   base_log_path: "/Users/lixiang/Desktop"
-
-openai:
-  base_url: "http://10.193.22.13:9997/v1"
-  api_key: "xxx"
-
-minio:
-  scheme: false         # 是否支持 https
-  cert_check: false         # 是否校验 http证书
-  minio_endpoint: "localhost:9001"       # 这个地址用来写请求, 使用同一个docker-compose 启动，能通过容器名访问
-  minio_sharepoint: "localhost:9001"      # 确保和nginx的代理地址一致。同一个docker-compose启动可以直接使用默认值
-  minio_access_key: "minioadmin"
-  minio_secret_key: "minioadmin"
-
-milvus:
-  uri: "http://localhost:19530"
-  host: "localhost"
-  port: "19530"

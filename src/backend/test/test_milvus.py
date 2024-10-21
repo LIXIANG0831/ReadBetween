@@ -5,8 +5,8 @@ from pymilvus import MilvusClient
 from pymilvus.milvus_client.milvus_client import IndexParams
 
 # 获取OpenAI配置信息
-openai_api_key = get_config("openai.api_key")
-openai_base_url = get_config("openai.base_url")
+openai_api_key = get_config("api.openai.api_key")
+openai_base_url = get_config("api.openai.base_url")
 
 # 创建OpenAI连接
 openai_client = OpenAI(
@@ -15,7 +15,7 @@ openai_client = OpenAI(
 )
 
 # 获取Milvus配置信息
-MILVUS_URI = get_config("milvus.uri")
+MILVUS_URI = get_config("storage.milvus.uri")
 COLLECTION_NAME = 'test_milvus'
 milvus_client = MilvusClient(uri=MILVUS_URI)
 
