@@ -8,4 +8,6 @@ search = BingSearchAPIWrapper(bing_subscription_key=BING_SUBSCRIPTION_KEY,
                               k=4)
 
 result = search.run("西安的天气怎么样？")
-print(result)
+origin = search.results("西安的天气怎么样？")
+print(result) # 结果信息
+print(origin) # 溯源信息
