@@ -4,6 +4,7 @@ from fastapi.responses import ORJSONResponse
 from contextlib import asynccontextmanager
 from settings import get_config
 from core.init_app import init_database
+from middleware import log_access
 
 
 @asynccontextmanager
@@ -13,7 +14,7 @@ async def _LIFESPAN(app: FastAPI):
 
 
 _EXCEPTION_HANDLERS = {
-
+    # 添加自定义异常处理器
 }
 
 
@@ -33,8 +34,10 @@ def create_app():
         allow_headers=["*"],
     )
 
-    from api.router import v1_router
-    app.include_router(v1_router)
+    app.middleware("http")(log_access)
+
+    from api.router import root_router
+    app.include_router(root_router)
 
     return app
 
