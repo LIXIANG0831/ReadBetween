@@ -84,5 +84,5 @@ class DatabaseClient:
         logger_client.debug('创建数据库和表成功')  # 记录成功创建数据库和表的信息
 
 
-database_url = get_config("storage.database_url")
+database_url = get_config("storage.mysql.uri")
 database_client: 'DatabaseClient' = DatabaseClient(database_url)

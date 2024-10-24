@@ -109,5 +109,5 @@ class RedisClient:
 
 
 # 获取 Redis 连接 URL，并初始化 RedisClient
-redis_url = get_config("storage.redis_url")  # 修正为正确的配置项名称
+redis_url = get_config("storage.redis.uri")  # 修正为正确的配置项名称
 redis_client = RedisClient(url=redis_url)
