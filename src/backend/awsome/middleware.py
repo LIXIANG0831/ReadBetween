@@ -9,7 +9,7 @@ async def log_access(request: Request, call_next):
     path = request.url.path
 
     # 过滤无需记录路径
-    filter_path_list = ['/docs','/favicon.ico','/openapi.json']
+    filter_path_list = ['/docs','/favicon.ico','/openapi.json','/health']
     for filter_path in filter_path_list:
         if path.startswith(f"{filter_path}"):
             return await call_next(request)

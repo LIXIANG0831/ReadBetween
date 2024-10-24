@@ -69,7 +69,7 @@ class DatabaseClient:
 
     def create_db_and_tables(self):
         """创建数据库和表。"""
-        logger_client.debug('创建数据库和表')
+        logger_client.debug('检查并创建数据表')
 
         # 遍历所有表并尝试创建
         for table in SQLModel.metadata.sorted_tables:
@@ -78,10 +78,10 @@ class DatabaseClient:
             except OperationalError as oe:
                 logger_client.warning(f'Table {table} already exists, skipping. Exception: {oe}')  # 表已存在的警告
             except Exception as exc:
-                logger_client.error(f'Error creating table {table}: {exc}')  # 记录创建表时的错误
-                raise RuntimeError(f'Error creating table {table}') from exc  # 抛出运行时异常
+                logger_client.error(f'建表异常 {table}: {exc}')  # 记录创建表时的错误
+                raise RuntimeError(f'建表异常 {table}') from exc  # 抛出运行时异常
 
-        logger_client.debug('创建数据库和表成功')  # 记录成功创建数据库和表的信息
+        logger_client.debug('创建数据库表成功')  # 记录成功创建数据库和表的信息
 
 
 database_url = get_config("storage.mysql.uri")
