@@ -28,7 +28,7 @@ def _tavily_search():
 current_api_key_index = 0
 
 
-async def search_with_retry(query: str, retries: int = 3) -> list[dict[str, Any]]:
+async def search_with_retry(query: str, retries: int = 1) -> dict[str, Any]:
     global current_api_key_index
     for attempt in range(retries):
         try:
@@ -39,29 +39,34 @@ async def search_with_retry(query: str, retries: int = 3) -> list[dict[str, Any]
                 topic="general",
                 search_depth="advanced",
                 days=3,
-                max_results=3,
+                max_results=2,
                 include_raw_content=False,
                 include_images=False,
                 include_answer=True,
             )
             search_results = search_resp.get("results", [])
-            target_url = []
+            target_url = [] # 二级页面抓取列表
+            origin_list = [] # 溯源信息
             for result in search_results:
+                print("\033[31m000 一级网页抓取内容 000\033[0m")
+                print(result)
                 target_url.append(result.get("url", ""))
+                origin_list.append({
+                    "url": result.get("url", ""),
+                    "title": result.get("title", ""),
+                })
             # 抓取二级网页
             extract_resp = tavily_client.extract(target_url)
             extract_results = extract_resp.get("results", [])
-            tavily_results = []
+            tavily_results_list = []
             for result in extract_results:
-                url = result.get("url", "")
-                raw_content = result.get("raw_content", "")
-                tavily_dict = {
-                    "url": url,
-                    "raw_content": raw_content,
-                }
-                tavily_results.append(tavily_dict)
+                tavily_results_list.append(result.get("raw_content", ""))
 
-            return tavily_results
+            result = {
+                "results": tavily_results_list,
+                "origins": origin_list,
+            }
+            return result
         except UsageLimitExceededError:
             # 切换到下一个 API 密钥
             current_api_key_index = (current_api_key_index + 1) % len(tavily_api_keys)
@@ -79,15 +84,19 @@ openai_client = openai.Client(
 
 
 async def tavily_search_with_llm(query: str):
-    tavily_results = await search_with_retry(query)
+    try:
+        tavily_results = await search_with_retry(query)
+    except Exception:
+        # 吞异常
+        tavily_results = [{"origins": [],"results": ["未检索到相关内容"]}]
 
     context_list = []  # 网络检索上下文
-    url_list = []  # 溯源信息
+    origin_list = tavily_results.get("origins",[])
     messages = []  # 模型接收信息
 
-    for result in tavily_results:
-        url_list.append(result.get("url", ""))
-        context_list.append(result.get("raw_content", ""))
+    for result in tavily_results.get("results", []):
+        context_list.append(result)
+
     messages.append(
         {
             "role": "user",
@@ -109,11 +118,11 @@ async def tavily_search_with_llm(query: str):
     for context in context_list:
         print(context)
     print("\033[31m=== 网络溯源信息 ===\033[0m")
-    for url in url_list:
-        print(url)
+    for origin in origin_list:
+        print(origin)
     print("\033[31m=== 模型回答信息 ===\033[0m")
     print(response.choices[0].message.content)
 
 
 # _tavily_search()
-asyncio.run(tavily_search_with_llm("今天西安的天气怎么样？"))
+asyncio.run(tavily_search_with_llm("给我提供一些经典的海子的诗词名句？"))
