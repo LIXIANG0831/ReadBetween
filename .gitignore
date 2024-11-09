@@ -1,6 +1,7 @@
 # Byte-compiled / optimized / DLL files
 /src/backend/awsome/core/config_dev.yaml
 /src/backend/awsome/core/config_prod.yaml
+node_modules
 
 __pycache__/
 *.py[cod]
