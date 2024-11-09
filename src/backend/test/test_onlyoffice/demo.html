@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONLYOFFICE 文档编辑器</title>
+</head>
+<body>
+    <!-- 占位符 div 元素 -->
+    <div id="placeholder"></div>
+
+    <!-- ONLYOFFICE Docs JavaScript API -->
+    <script type="text/javascript" src="http://10.193.22.12:8701/web-apps/apps/api/documents/api.js"></script>
+
+    <!-- 初始化 Document Editor -->
+    <script>
+        const docEditor = new DocsAPI.DocEditor("placeholder", {
+            editorConfig: {
+                mode: "view",
+            },
+            document: {
+                fileType: "xls",
+                key: "Khirz6zTPdfd7",
+                title: "Example Document Title",
+                url: "https://oss-xaa.ycpc.com/sgt//tmp/tmpsiemrp2s.xls",
+            },
+            documentType: "cell",
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONLYOFFICE 文档编辑器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
+    <style>
+        html {
+            height: 100%;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        body {
+            height: 100%;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="full-screen">
+    <!-- URL输入框 -->
+    <input type="text" id="urlInput" placeholder="请输入文件URL">
+
+    <!-- 提交按钮 -->
+    <button id="submitBtn">提交</button>
+
+    <!-- 占位符 div 元素 -->
+    <div id="placeholder" style="margin-top: 20px;"></div>
+
+    <!-- ONLYOFFICE Docs JavaScript API -->
+    <script type="text/javascript" src="http://10.193.22.12:8701/web-apps/apps/api/documents/api.js"></script>
+
+    <!-- 包含编译后的TypeScript代码 -->
+    <script type="text/javascript" src="/bundle.js"></script>
+</body>
+<style type="text/css">
+    .full-screen {
+        height: 100%;
+        overflow: hidden;
+    }
+</style>
+</html>

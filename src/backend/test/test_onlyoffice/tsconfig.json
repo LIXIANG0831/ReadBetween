@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist", // 输出目录
+    "sourceMap": true, // 生成 source map
+    "noImplicitAny": true, // 禁止隐式 any 类型
+    "module": "es6", // 目标模块
+    "target": "es5", // 目标 ES 版本
+    "moduleResolution": "node", // 模块解析策略
+    "esModuleInterop": true, // 允许使用 default 和 namespace 导入/导出
+    "allowSyntheticDefaultImports": true, // 允许没有默认导出的模块的默认导入
+    "strict": true, // 严格模式
+    "forceConsistentCasingInFileNames": true // 文件名大小写敏感
+  },
+  "include": ["global.d.ts", "src/**/*"], // 包含的文件
+  "exclude": ["node_modules"] // 排除的文件
+}
