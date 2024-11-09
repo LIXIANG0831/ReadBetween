@@ -48,6 +48,7 @@ def fetch_wbcontent(cursor):
     """生成器函数，逐行获取 """
     query = ("SELECT wbtitle,wbsummary,wbcontent,wbpicurl,wbkeyword,wbdate,wbupdatedate "
              "FROM wbnews "
+             "WHERE wbdate > '2019-01-01'"
              "ORDER BY wbupdatedate desc;")
     cursor.execute(query)
     for row in cursor:
