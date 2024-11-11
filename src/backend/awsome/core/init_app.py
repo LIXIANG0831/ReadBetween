@@ -1,5 +1,5 @@
-from awsome.utils.redis_client import redis_client
-from awsome.utils.database_client import database_client
+from awsome.services.redis_client import redis_client
+from awsome.services.database_client import database_client
 from awsome.utils.logger_client import logger_client
 
 
