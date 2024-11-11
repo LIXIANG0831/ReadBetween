@@ -3,6 +3,7 @@ from sqlmodel import Session
 from awsome.services.database_client import database_client
 from awsome.utils.logger_client import logger_client
 
+
 @contextmanager
 def session_getter() -> Session:
     """轻量级session context"""
@@ -15,6 +16,7 @@ def session_getter() -> Session:
         raise
     finally:
         session.close()
+
 
 @contextmanager
 def file_open(file_name, mode):
