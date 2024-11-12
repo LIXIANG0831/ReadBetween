@@ -14,6 +14,8 @@ async def create_knowledge(knowledge_create: KnowledgeCreate):
     except Exception as e:
         logger_client.error(f"create_knowledge error: {e}")
         return resp_500(message=str(e))
+
+
 @router.post("/knowledge/delete")
 async def delete_knowledge(id: str):
     try:
@@ -21,6 +23,8 @@ async def delete_knowledge(id: str):
     except Exception as e:
         logger_client.error(f"delete_knowledge error: {e}")
         return resp_500(message=str(e))
+
+
 @router.post("/knowledge/update")
 async def update_knowledge(knowledge_update: KnowledgeUpdate):
     try:
@@ -29,6 +33,7 @@ async def update_knowledge(knowledge_update: KnowledgeUpdate):
         logger_client.error(f"update_knowledge error: {e}")
         return resp_500(message=str(e))
 
+
 @router.get("/knowledge/one")
 async def get_knowledge_by_id(kb_id: str):
     try:
@@ -36,6 +41,7 @@ async def get_knowledge_by_id(kb_id: str):
     except Exception as e:
         logger_client.error(f"list_knowledge error: {e}")
         return resp_500(message=str(e))
+
 
 @router.get("/knowledge/list")
 async def list_knowledge_by_page(page: int = 1, size: int = 10):
