@@ -1,6 +1,6 @@
-from awsome.db.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
+from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
 from awsome.services.base import BaseService
-from awsome.db.models.knowledge import KnowledgeDao
+from awsome.models.dao.knowledge import KnowledgeDao
 class KnowledgeService(BaseService):
 
     @classmethod

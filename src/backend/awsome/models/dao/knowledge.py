@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from awsome.db.models.base import AwsomeDBModel
+from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, INT
 from sqlmodel import Field, DateTime, text
 from awsome.utils.context import session_getter

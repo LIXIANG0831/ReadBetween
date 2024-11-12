@@ -1,7 +1,7 @@
 import json
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter
-from awsome.db.v1.chat import Chat
+from awsome.models.v1.chat import Chat
 from awsome.utils.logger_client import logger_client
 from awsome.settings import get_config
 import openai

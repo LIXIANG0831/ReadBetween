@@ -1,4 +1,4 @@
-from awsome.db.models.access_log import AccessLogDao
+from awsome.models.dao.access_log import AccessLogDao
 from fastapi import Request
 
 

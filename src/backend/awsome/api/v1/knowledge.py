@@ -1,8 +1,8 @@
 from fastapi import HTTPException, APIRouter
 from awsome.services.knowledge import KnowledgeService
-from awsome.db.schemas.response import resp_200, resp_500
+from awsome.models.schemas.response import resp_200, resp_500
 from awsome.utils.logger_client import logger_client
-from awsome.db.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
+from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
 
 router = APIRouter(tags=["知识库管理"])
 
