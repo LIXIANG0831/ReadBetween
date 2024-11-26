@@ -13,7 +13,7 @@ class KnowledgeBase(AwsomeDBModel):
     __tablename__ = "knowledge"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="主键ID")
-    name: Optional[str] = Field(..., sa_column=Column(String(255), index=True), description="知识库名称")
+    name: Optional[str] = Field(sa_column=Column(String(255), index=True, nullable=False), description="知识库名称")
     desc: Optional[str] = Field(default=None, sa_column=Column(String(255), index=False), description="知识库描述")
     model: Optional[str] = Field(default=None, sa_column=Column(String(255)), description="向量化模型")
     collection_name: Optional[str] = Field(default=None, sa_column=Column(String(255)), description="Collection 名称")
