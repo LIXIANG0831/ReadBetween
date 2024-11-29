@@ -38,10 +38,10 @@ class MilvusClient:
             results[collection_name] = result
         return results
 
-    def create_index(self, collection_name, field_name, index_name, index_params):
+    def create_index(self, collection_name, field_name, index_params):
 
         collection = Collection(collection_name)
-        collection.create_index(field_name=field_name, index_name=index_name, index_params=index_params)
+        collection.create_index(field_name=field_name, index_params=index_params)
 
     def drop_collection(self, collection_name):
         Collection(collection_name).drop()
