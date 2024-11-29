@@ -10,18 +10,18 @@
 # result2 = embedding_model.embed_query(text[1])
 # print(result2[:5])
 # print(result2[-5:])
+from typing import List
 
-
-import openai
-from openai.types import CreateEmbeddingResponse
-
-text = ['你好啊','你好']
-client = openai.Client(
-    api_key='sk-2HQfMSP2ixV91oQb0788C26b667446FbAd8341Dd3b61F97f',
-    base_url='https://chat-proxy.xaa.ycpc.com/v1'
-)
-response:CreateEmbeddingResponse = client.embeddings.create(input=text,model='text-embedding-ada-002')
-for emb in response.data:
-    print(emb.embedding)
+# import openai
+# from openai.types import CreateEmbeddingResponse
+#
+# text = ['你好啊','你好']
+# client = openai.Client(
+#     api_key='sk-2HQfMSP2ixV91oQb0788C26b667446FbAd8341Dd3b61F97f',
+#     base_url='https://chat-proxy.xaa.ycpc.com/v1'
+# )
+# response:CreateEmbeddingResponse = client.embeddings.create(input=text,model='text-embedding-ada-002')
+# for emb in response.data:
+#     print(emb.embedding)
 
 
