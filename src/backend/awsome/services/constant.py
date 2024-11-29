@@ -1,5 +1,7 @@
 from pymilvus import FieldSchema, DataType
-
+"""
+Milvus 默认配置项
+"""
 milvus_default_fields = [
     FieldSchema(name="bbox", dtype=DataType.VARCHAR, max_length=65535),
     FieldSchema(name="page", dtype=DataType.INT64),
@@ -21,4 +23,13 @@ milvus_default_index_params = {
         "M": 8,
         "efConstruction": 64
     }
+}
+
+
+"""
+ElasticSearch默认配置项
+"""
+es_index_settings = {
+    "number_of_shards": 1,
+    "number_of_replicas": 1
 }
