@@ -4,7 +4,7 @@ from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, INT
 from sqlmodel import Field, DateTime, text
 from awsome.utils.context import session_getter
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_util import logger_util
 from datetime import datetime
 from fastapi import HTTPException
 
@@ -55,7 +55,7 @@ class KnowledgeDao(Knowledge):
             session.add(new_knowledge)
             session.commit()
             session.refresh(new_knowledge)
-            logger_client.info(f"Insert Knowledge: {name}")
+            logger_util.info(f"Insert Knowledge: {name}")
             return new_knowledge
 
     @classmethod
@@ -65,7 +65,7 @@ class KnowledgeDao(Knowledge):
             if delete_knowledge:
                 delete_knowledge.delete = 1
                 session.commit()
-                logger_client.info(f"Deleted Knowledge with id: {id}")
+                logger_util.info(f"Deleted Knowledge with id: {id}")
             else:
                 raise HTTPException(status_code=404, detail="Knowledge not found")
 
@@ -80,7 +80,7 @@ class KnowledgeDao(Knowledge):
                     update_knowledge.desc = desc
                 session.commit()
                 session.refresh(update_knowledge)
-                logger_client.info(f"Updated Knowledge with id: {id}")
+                logger_util.info(f"Updated Knowledge with id: {id}")
                 return update_knowledge
             else:
                 raise HTTPException(status_code=404, detail="Knowledge not found")
@@ -99,5 +99,5 @@ class KnowledgeDao(Knowledge):
                     all_knowledge = query.offset(offset).limit(page_size).all()
                 else:
                     all_knowledge = query.all()
-                logger_client.info("Fetched all Knowledge entries.")
+                logger_util.info("Fetched all Knowledge entries.")
                 return all_knowledge

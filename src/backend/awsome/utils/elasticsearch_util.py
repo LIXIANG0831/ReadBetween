@@ -15,7 +15,7 @@ connections.create_connection(
 )
 
 
-class ElasticSearchClient:
+class ElasticSearchUtil:
     @staticmethod
     async def insert_doc_to_index():
         pass

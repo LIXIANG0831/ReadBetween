@@ -2,11 +2,12 @@ from typing import List
 
 from awsome.models.dao.model_provider_cfg import ModelProviderCfg
 from awsome.services.model_provider_cfg import ModelProviderCfgService
-from awsome.utils.redis_client import redis_client
+from awsome.utils.redis_util import RedisUtil
 from awsome.utils.database_client import database_client
 from awsome.settings import get_config
 from awsome.utils.logger_util import logger_util
 
+redis_client = RedisUtil()
 
 def init_database():
     """初始化数据库"""

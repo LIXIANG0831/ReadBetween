@@ -5,7 +5,7 @@ from awsome.utils.logger_util import logger_util
 from minio import Minio
 from minio.error import S3Error
 
-class MinioClient:
+class MinioUtil:
 
     # 默认桶
     default_bucket_name = get_config("storage.minio.default_bucket")
@@ -67,7 +67,7 @@ class MinioClient:
 
 # 使用示例
 if __name__ == "__main__":
-    minio_client = MinioClient()
+    minio_client = MinioUtil()
     bucket_name = 'test-minio'
     minio_client.create_bucket(bucket_name)
 

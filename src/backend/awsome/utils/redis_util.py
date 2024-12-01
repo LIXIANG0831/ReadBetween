@@ -3,7 +3,7 @@ from redis import ConnectionPool
 from typing import Optional, Any
 from awsome.settings import get_config
 
-class RedisClient:
+class RedisUtil:
     """封装 Redis 操作的工具类"""
 
     def __init__(self, url: str = None, max_connections: int = 10):

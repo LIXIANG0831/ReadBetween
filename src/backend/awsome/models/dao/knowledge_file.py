@@ -4,7 +4,7 @@ from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, INT
 from sqlmodel import Field, DateTime, text
 from awsome.utils.context import session_getter
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_util import logger_util
 from datetime import datetime
 from fastapi import HTTPException
 
@@ -17,7 +17,7 @@ class KnowledgeFileBase(AwsomeDBModel):
     name: Optional[str] = Field(sa_column=Column(String(255), index=True, nullable=False), description="文件名")
     md5: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="文件md5")
     object_name: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="MinIO Object Name")
-    status: int = Field(default=0, sa_column=Column(INT, nullable=False), description="是否完成向量化")
+    status: int = Field(default=0, sa_column=Column(INT, nullable=False), description="是否完成向量化, 0/1/-1/未完成/完成/异常失败")
     extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True), description="冗余字段")
     # 删除标识
     delete: int = Field(index=False, default=0, description="删除标志")
@@ -51,9 +51,24 @@ class KnowledgeFileDao(KnowledgeFile):
         pass
 
     @classmethod
-    def select_by_kb_id(cls):
-        pass
+    def batch_insert(cls, file_insert_list):
+        with session_getter() as session:
+            session.add_all(file_insert_list)
+            session.commit()
+            for file in file_insert_list:  # 刷新得到主键ID
+                session.refresh(file)
+            return file_insert_list
 
+    @classmethod
+    def select_by_kb_id(cls, kb_id: str, page: int = None, size: int = None):
+        with session_getter() as session:
+            query = session.query(KnowledgeFile).where(KnowledgeFile.kb_id == kb_id, KnowledgeFile.delete == 0)
+            if page is not None and size is not None:
+                offset = (page - 1) * size
+                all_knowledge_files = query.offset(offset).limit(size).all()
+            else:
+                all_knowledge_files = query.all()
+            return all_knowledge_files
     @classmethod
     def delete_by_kb_id(cls):
         pass

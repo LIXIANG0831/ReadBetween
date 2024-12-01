@@ -8,7 +8,7 @@ from pymilvus import (
 from awsome.settings import get_config
 
 
-class MilvusClient:
+class MilvusUtil:
     def __init__(self, host=None, port=None):
         host = host or get_config("storage.milvus.host")
         port = port or get_config("storage.milvus.port")
@@ -55,7 +55,7 @@ class MilvusClient:
 
 # 使用示例
 if __name__ == "__main__":
-    milvus_client = MilvusClient()
+    milvus_client = MilvusUtil()
 
     # 创建集合
     fields = [
