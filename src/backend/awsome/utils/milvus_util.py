@@ -9,7 +9,9 @@ from awsome.settings import get_config
 
 
 class MilvusClient:
-    def __init__(self, host='localhost', port='19530'):
+    def __init__(self, host=None, port=None):
+        host = host or get_config("storage.milvus.host")
+        port = port or get_config("storage.milvus.port")
         self.host = host
         self.port = port
         self.connect()
@@ -50,9 +52,6 @@ class MilvusClient:
         connections.disconnect("default")
 
 
-milvus_host = get_config("storage.milvus.host")
-milvus_port = get_config("storage.milvus.port")
-milvus_client = MilvusClient(host=milvus_host, port=milvus_port)
 
 # 使用示例
 if __name__ == "__main__":

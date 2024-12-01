@@ -6,13 +6,14 @@ from awsome.settings import get_config
 class RedisClient:
     """封装 Redis 操作的工具类"""
 
-    def __init__(self, url: str, max_connections: int = 10):
+    def __init__(self, url: str = None, max_connections: int = 10):
         """初始化 Redis 客户端
 
         Args:
             url (str): Redis 服务器的连接 URL
             max_connections (int): 最大连接数
         """
+        url = url or get_config("storage.redis.uri")
         self.pool = ConnectionPool.from_url(url, max_connections=max_connections)
         self.client = redis.StrictRedis(connection_pool=self.pool)
 
@@ -106,8 +107,3 @@ class RedisClient:
         return self.client.flushdb()
 
     # 你可以根据需要添加更多的 Redis 操作方法
-
-
-# 获取 Redis 连接 URL，并初始化 RedisClient
-redis_url = get_config("storage.redis.uri")  # 修正为正确的配置项名称
-redis_client = RedisClient(url=redis_url)
