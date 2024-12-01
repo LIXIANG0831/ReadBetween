@@ -2,7 +2,7 @@ import json
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter
 from awsome.models.v1.chat import Chat
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 from awsome.settings import get_config
 import openai
 
@@ -38,14 +38,14 @@ async def chat(chat_request: Chat):
                             yield output + "\n\n"
                     else:
                         yield chunk.choices[0].delta.json() + "\n\n"
-                logger_client.info(f"\n用户询问:{chat_request.query}\n流式响应:{answer}")
+                logger_util.info(f"\n用户询问:{chat_request.query}\n流式响应:{answer}")
             else:
                 answer = response.choices[0].message.content
                 if chat_request.pretty_print:  # 处理非流式响应
                     yield response.choices[0].message.content + "\n\n"
                 else:
                     yield response.choices[0].message.json() + "\n\n"
-                logger_client.info(f"\n用户询问:{chat_request.query}\n非流式响应:{answer}")
+                logger_util.info(f"\n用户询问:{chat_request.query}\n非流式响应:{answer}")
 
             if chat_request.save_messages:
                 if len(messages) > chat_request.max_messages_cnt:
@@ -57,11 +57,11 @@ async def chat(chat_request: Chat):
                 yield json.dumps(history, ensure_ascii=False) + "\n\n"
         except openai.OpenAIError as e:
             error_message = f"OpenAI API error: {str(e)}"
-            logger_client.error(error_message)
+            logger_util.error(error_message)
             yield f"Error: {error_message}\n\n"
         except Exception as e:
             error_message = f"An unexpected error occurred: {str(e)}"
-            logger_client.error(error_message)
+            logger_util.error(error_message)
             yield f"Error: {error_message}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

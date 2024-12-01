@@ -5,7 +5,7 @@ from awsome.services.model_provider_cfg import ModelProviderCfgService
 from awsome.utils.redis_client import redis_client
 from awsome.utils.database_client import database_client
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 
 
 def init_database():
@@ -23,7 +23,7 @@ def init_database():
             ModelProviderCfgService.batch_insert_provider(default_model_provider)
 
         except Exception as e:
-            logger_client.error(e)
+            logger_util.error(e)
             raise RuntimeError('创建数据库和表错误') from e
         finally:
             redis_client.delete('init_database')

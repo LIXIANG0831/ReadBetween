@@ -4,7 +4,7 @@ from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String
 from sqlmodel import Field, DateTime, text
 from awsome.utils.context import session_getter
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 from datetime import datetime
 
 class AccessLogBase(AwsomeDBModel):
@@ -47,9 +47,9 @@ class AccessLogDao(AccessLog):
                 session.add(new_access_log)
                 session.commit()
                 session.refresh(new_access_log)
-                logger_client.info(f"Access log added: {new_access_log}")
+                logger_util.info(f"Access log added: {new_access_log}")
                 return new_access_log
             except SQLAlchemyError as e:
                 session.rollback()  # 发生错误时回滚事务
-                logger_client.error(f"Error inserting access log: {e}")
+                logger_util.error(f"Error inserting access log: {e}")
                 return None

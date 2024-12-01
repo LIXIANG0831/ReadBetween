@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 from minio import Minio
 from minio.error import S3Error
 
@@ -17,7 +17,7 @@ class MinioClient:
         try:
             return self.client.bucket_exists(bucket_name)
         except S3Error as e:
-            logger_client.error(f"Error checking bucket existence: {e}")
+            logger_util.error(f"Error checking bucket existence: {e}")
             return False
 
     def create_bucket(self, bucket_name: str):
@@ -25,9 +25,9 @@ class MinioClient:
         if not self.bucket_exists(bucket_name):
             try:
                 self.client.make_bucket(bucket_name)
-                logger_client.info(f"Bucket '{bucket_name}' created.")
+                logger_util.info(f"Bucket '{bucket_name}' created.")
             except S3Error as e:
-                logger_client.error(f"Error creating bucket: {e}")
+                logger_util.error(f"Error creating bucket: {e}")
 
     def upload_file(self, file_path: str, object_name: str, bucket_name: str = default_bucket_name):
         """上传文件到 MinIO"""
@@ -35,16 +35,16 @@ class MinioClient:
             with open(file_path, 'rb') as file_data:
                 file_stat = os.stat(file_path)
                 self.client.put_object(bucket_name, object_name, file_data, file_stat.st_size)
-                logger_client.info(f"File '{file_path}' uploaded to bucket '{bucket_name}' as '{object_name}'.")
+                logger_util.info(f"File '{file_path}' uploaded to bucket '{bucket_name}' as '{object_name}'.")
         except S3Error as e:
-            logger_client.error(f"Error uploading file: {e}")
+            logger_util.error(f"Error uploading file: {e}")
 
     def get_presigned_url(self, object_name: str, expires: int = 3600, bucket_name: str = default_bucket_name) -> str:
         """获取文件的预签名 URL"""
         try:
             return self.client.presigned_get_object(bucket_name, object_name, expires=timedelta(seconds=expires))
         except S3Error as e:
-            logger_client.error(f"Error generating presigned URL: {e}")
+            logger_util.error(f"Error generating presigned URL: {e}")
             return ""
 
     def get_object_md5(self, object_name: str, bucket_name: str = default_bucket_name) -> str:
@@ -53,7 +53,7 @@ class MinioClient:
             stat = self.client.stat_object(bucket_name, object_name)
             return stat.etag  # ETag 是对象的 MD5 值
         except S3Error as e:
-            logger_client.error(f"Error getting MD5 for object '{object_name}' in bucket '{bucket_name}': {e}")
+            logger_util.error(f"Error getting MD5 for object '{object_name}' in bucket '{bucket_name}': {e}")
             return ""
 
 

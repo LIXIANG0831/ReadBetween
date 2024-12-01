@@ -1,6 +1,6 @@
 import asyncio
 import json
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 import openai
 from awsome.settings import get_config
 from pydantic import BaseModel, field_validator
@@ -50,14 +50,14 @@ async def chat(chat_request: Chat):
                         output and print(output)
                     else:
                         print(chunk.choices[0].delta.json())
-                logger_client.info(f"\n用户询问:{chat_request.query}\n流式响应:{answer}")
+                logger_util.info(f"\n用户询问:{chat_request.query}\n流式响应:{answer}")
             else:
                 answer = response.choices[0].message.content
                 if chat_request.pretty_print: # 处理非流式响应
                     print(response.choices[0].message.content)
                 else:
                     print(response.choices[0].message.json())
-                logger_client.info(f"\n用户询问:{chat_request.query}\n非流式响应:{answer}")
+                logger_util.info(f"\n用户询问:{chat_request.query}\n非流式响应:{answer}")
 
 
             if chat_request.save_messages:
@@ -69,7 +69,7 @@ async def chat(chat_request: Chat):
                 }
                 print(json.dumps(history, ensure_ascii=False))
         except Exception as e:
-            logger_client.error(f"An error occurred: {e}")
+            logger_util.error(f"An error occurred: {e}")
 
     await generate()
 

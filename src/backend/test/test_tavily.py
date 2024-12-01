@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Dict, Any
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 from tavily import TavilyClient
 from tavily.errors import UsageLimitExceededError
 from fastapi import HTTPException
@@ -70,9 +70,9 @@ async def search_with_retry(query: str, retries: int = 1) -> dict[str, Any]:
         except UsageLimitExceededError:
             # 切换到下一个 API 密钥
             current_api_key_index = (current_api_key_index + 1) % len(tavily_api_keys)
-            logger_client.warning(f"使用限制超出，切换到 API 密钥索引: {current_api_key_index}")
+            logger_util.warning(f"使用限制超出，切换到 API 密钥索引: {current_api_key_index}")
         except Exception as e:
-            logger_client.error(f"搜索过程中发生错误: {str(e)}")
+            logger_util.error(f"搜索过程中发生错误: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
     raise HTTPException(status_code=503, detail="所有 API 密钥均已超出使用限制。")
 

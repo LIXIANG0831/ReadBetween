@@ -5,7 +5,7 @@ from sqlalchemy import Column, String, INT
 from sqlmodel import Field, DateTime, text
 
 from awsome.utils.context import session_getter
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 from datetime import datetime
 from fastapi import HTTPException
 

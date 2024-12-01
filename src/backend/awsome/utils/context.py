@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from sqlmodel import Session
 from awsome.utils.database_client import database_client
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 
 
 @contextmanager
@@ -11,7 +11,7 @@ def session_getter() -> Session:
         session = Session(database_client.engine)
         yield session
     except Exception as e:
-        logger_client.info('Session rollback because of exception:{}', e)
+        logger_util.info('Session rollback because of exception:{}', e)
         session.rollback()
         raise
     finally:

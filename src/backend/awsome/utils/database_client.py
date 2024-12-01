@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_client
+from awsome.utils.logger_client import logger_util
 from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -52,7 +52,7 @@ class DatabaseClient:
             traceback: 异常回溯。
         """
         if exc_type is not None:  # 如果发生了异常
-            logger_client.error(f'Session rollback because of exception: {exc_type.__name__} {exc_value}')
+            logger_util.error(f'Session rollback because of exception: {exc_type.__name__} {exc_value}')
             self._session.rollback()  # 回滚事务
         else:
             self._session.commit()  # 提交事务
@@ -69,19 +69,19 @@ class DatabaseClient:
 
     def create_db_and_tables(self):
         """创建数据库和表。"""
-        logger_client.debug('检查并创建数据表')
+        logger_util.debug('检查并创建数据表')
 
         # 遍历所有表并尝试创建
         for table in SQLModel.metadata.sorted_tables:
             try:
                 table.create(self.engine, checkfirst=True)  # 创建表，如果已存在则跳过
             except OperationalError as oe:
-                logger_client.warning(f'Table {table} already exists, skipping. Exception: {oe}')  # 表已存在的警告
+                logger_util.warning(f'Table {table} already exists, skipping. Exception: {oe}')  # 表已存在的警告
             except Exception as exc:
-                logger_client.error(f'建表异常 {table}: {exc}')  # 记录创建表时的错误
+                logger_util.error(f'建表异常 {table}: {exc}')  # 记录创建表时的错误
                 raise RuntimeError(f'建表异常 {table}') from exc  # 抛出运行时异常
 
-        logger_client.debug('创建数据库表成功')  # 记录成功创建数据库和表的信息
+        logger_util.debug('创建数据库表成功')  # 记录成功创建数据库和表的信息
 
 
 database_url = get_config("storage.mysql.uri")
