@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_util
+from awsome.utils.logger_util import logger_util
 from minio import Minio
 from minio.error import S3Error
 

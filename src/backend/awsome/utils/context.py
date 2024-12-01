@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from sqlmodel import Session
 from awsome.utils.database_client import database_client
-from awsome.utils.logger_client import logger_util
+from awsome.utils.logger_util import logger_util
 
 
 @contextmanager

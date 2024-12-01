@@ -1,6 +1,6 @@
 import asyncio
 import json
-from awsome.utils.logger_client import logger_util
+from awsome.utils.logger_util import logger_util
 import openai
 from awsome.settings import get_config
 from pydantic import BaseModel, field_validator

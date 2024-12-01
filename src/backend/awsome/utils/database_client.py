@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_util
+from awsome.utils.logger_util import logger_util
 from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, SQLModel, create_engine
 

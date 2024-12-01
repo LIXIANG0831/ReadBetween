@@ -5,7 +5,7 @@ from awsome.services.model_provider_cfg import ModelProviderCfgService
 from awsome.utils.redis_client import redis_client
 from awsome.utils.database_client import database_client
 from awsome.settings import get_config
-from awsome.utils.logger_client import logger_util
+from awsome.utils.logger_util import logger_util
 
 
 def init_database():
