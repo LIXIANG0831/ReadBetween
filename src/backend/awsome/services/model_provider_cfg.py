@@ -6,9 +6,18 @@ from awsome.models.dao.model_provider_cfg import ModelProviderCfgDao, ModelProvi
 
 class ModelProviderCfgService(BaseService):
 
-    """
-    批量插入模型供应商配置
-    """
     @classmethod
     def batch_insert_provider(cls, model_provider_list: List[ModelProviderCfg]):
         return ModelProviderCfgDao.batch_insert(model_provider_list)
+
+    @classmethod
+    def search_provider(cls, model_provider):
+        return ModelProviderCfgDao.search(model_provider)
+
+    @classmethod
+    def insert_provider(cls, model_provider):
+        return ModelProviderCfgDao.insert(model_provider)
+
+    @classmethod
+    def select_providers(cls):
+        return ModelProviderCfgDao.select_all()

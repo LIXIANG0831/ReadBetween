@@ -1,12 +1,13 @@
 from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
 from awsome.services.base import BaseService
 from awsome.models.dao.knowledge import KnowledgeDao
-from awsome.utils.milvus_util import milvus_client
+from awsome.utils.milvus_util import MilvusUtil
 from awsome.services.constant import milvus_default_index_params, milvus_default_fields
 from fastapi import HTTPException
 import uuid
 
-
+# 实例化milvus
+milvus_client = MilvusUtil()
 class KnowledgeService(BaseService):
 
     @classmethod

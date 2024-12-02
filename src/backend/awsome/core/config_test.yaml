@@ -5,9 +5,9 @@ app:
 
 storage:
   mysql:
-    uri: "mysql+pymysql://root:Ycpc#1234@localhost:3306/awsome?charset=utf8mb4"
+    uri: "mysql+pymysql://root:FYX961227@123.207.199.199:3306/awsome?charset=utf8mb4"
   redis:
-    uri: "redis://localhost:6379/10"
+    uri: "redis://:FYX961227@123.207.199.199:6379/10"
   postgres:
     uri: "postgresql://postgres:postgres@localhost:5432/ycpc-web"
   minio:

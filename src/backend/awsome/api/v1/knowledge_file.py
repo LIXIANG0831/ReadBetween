@@ -1,16 +1,16 @@
 import os
 import tempfile
 from pathlib import Path
-from fastapi import HTTPException, APIRouter, UploadFile, File
+from fastapi import HTTPException, APIRouter, UploadFile, File, BackgroundTasks
 from awsome.models.v1.knowledge_file import KnowledgeFileExecute
 from awsome.settings import get_config
-from awsome.utils.minio_util import minio_client
+from awsome.utils.minio_util import MinioUtil
 from awsome.models.schemas.response import resp_200, resp_500
 from awsome.utils.logger_util import logger_util
 from awsome.services.knowledge_file import KnowledgeFileService
 from awsome.services.knowledge import KnowledgeService
-
-
+# 实例化minio
+minio_client = MinioUtil()
 router = APIRouter(tags=["知识库文件管理"])
 
 
@@ -53,18 +53,23 @@ async def upload_knowledge_file(file: UploadFile = File(...)):
 
 
 @router.post("/knowledge_file/execute")
-async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute):
+async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
+                                 background_tasks: BackgroundTasks):
 
     file_object_names = knowledge_file_execute.file_object_names
     target_kb_id = knowledge_file_execute.kb_id
     if knowledge_file_execute.auto is False:
+        # 不进行自动解析
+        # TODO 需要实现单个文件开启解析接口
         return resp_200(KnowledgeFileService.upload_files_to_kb(file_object_names, target_kb_id))
-
-    # TODO 如果auto为true 启动后台任务解析
-    # 1.找到kb_id对应collection_name
-    # 2.自身切片
-    # 3.自身向量化 组织数据结构
-    # 4.插入milvus
+    else:
+        # TODO auto为True 启动后台任务自动解析
+        background_tasks.add_task()
+        # 1.找到kb_id对应collection_name
+        # 2.自身切片
+        # 3.自身向量化 组织数据结构
+        # 4.插入milvus
+        pass
 
 
 @router.get("/knowledge_file/list")

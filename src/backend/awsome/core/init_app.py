@@ -21,7 +21,11 @@ def init_database():
             for model_provider in default_model_provider_cfg:
                 for provider, mark in model_provider.items():
                     default_model_provider.append(ModelProviderCfg(provider=provider, mark=mark))
-            ModelProviderCfgService.batch_insert_provider(default_model_provider)
+            for model_provider in default_model_provider:
+                if ModelProviderCfgService.search_provider(model_provider) is False: # 供应商已存在
+                    logger_util.debug(f"模型供应商:{model_provider.provider}已存在")
+                    continue
+                ModelProviderCfgService.insert_provider(model_provider)
 
         except Exception as e:
             logger_util.error(e)
