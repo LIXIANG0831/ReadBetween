@@ -1,0 +1,62 @@
+app:
+  author: LIXIANG
+  version: v1.0
+  port: 8080
+
+storage:
+  mysql:
+    uri: "mysql+pymysql://root:Ycpc#1234@localhost:3306/awsome?charset=utf8mb4"
+  redis:
+    uri: "redis://localhost:6379/10"
+  postgres:
+    uri: "postgresql://postgres:postgres@localhost:5432/ycpc-web"
+  minio:
+    secure: false         # 是否支持 https
+    cert_check: false         # 是否校验 http证书
+    minio_endpoint: "localhost:9000"       # 这个地址用来写请求, 使用同一个docker-compose 启动，能通过容器名访问
+    minio_access_key: "minioadmin"
+    minio_secret_key: "minioadmin"
+    default_bucket: "awsome"
+  milvus:
+    uri: "http://localhost:19530"
+    host: "localhost"
+    port: "19530"
+  es:
+    hosts: ["http://localhost:9200"]
+    timeout: 200
+    http_auth: None # 格式 ('user', 'password')
+
+api:
+  openai:
+    base_url: "https://chat-proxy.xaa.ycpc.com/v1"
+    api_key: "sk-2HQfMSP2ixV91oQb0788C26b667446FbAd8341Dd3b61F97f"
+  tavily:
+    api_key: "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"
+    api_keys: ['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','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','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','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','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']
+  azure:
+    openai:
+      api_key: "e039c617fe164dec8a7821fb1fc55cac"
+      azure_deployment: "gpt-4o-mini"
+      azure_endpoint: "https://cosmo-chatgpt.openai.azure.com/"
+      api_version: "2024-08-01-preview"
+    embedding:
+      api_key: "e039c617fe164dec8a7821fb1fc55cac"
+      azure_deployment: "text-embedding-ada-002"
+      azure_endpoint: "https://cosmo-chatgpt.openai.azure.com/"
+      api_version: "2023-05-15"
+  bing:
+    endpoint: "https://api.bing.microsoft.com" # 源地址
+#    endpoint: "https://api.wlai.vip" # 代理地址
+    api_key: "2f5e01f8e88540df9a12c9f405dc7864"
+
+extra:
+  salt: "awsome" # 加密盐
+
+logger:
+  base_log_path: "/Users/lixiang/Desktop/awsome_log"
+
+system:
+  default_model_provider:
+    - OpenAI: openai
+    - OpenAI-Compatible: openai-compatible
+    - vLLM: hosted_vllm
