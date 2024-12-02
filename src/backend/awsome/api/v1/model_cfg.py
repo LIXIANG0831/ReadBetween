@@ -8,6 +8,7 @@ from awsome.services.model_cfg import ModelCfgService
 
 router = APIRouter(tags=["模型配置管理"])
 
+encryption_tool = EncryptionTool()
 
 @router.get("/model_cfg/providers")
 async def get_model_cfg_providers():
@@ -22,7 +23,7 @@ async def get_model_cfg_providers():
 @router.post("/model_cfg/create")
 async def create_model_cfg(model_cfg_create: ModelCfgCreate):
     try:
-        model_cfg_create.api_key = EncryptionTool.decrypt(model_cfg_create.api_key) # 加密
+        model_cfg_create.api_key = encryption_tool.encrypt(model_cfg_create.api_key) # 加密
         new_model_cfg = ModelCfgService.create_model_cfg(model_cfg_create)
         return resp_200(new_model_cfg)
     except Exception as e:

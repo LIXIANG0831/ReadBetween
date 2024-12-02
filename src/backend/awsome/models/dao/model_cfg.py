@@ -8,8 +8,9 @@ from awsome.models.dao.model_provider_cfg import ModelProviderCfg
 from awsome.utils.context import session_getter
 from awsome.utils.logger_util import logger_util
 from datetime import datetime
-
 from awsome.utils.tools import EncryptionTool
+
+encryption_tool = EncryptionTool()
 
 
 class ModelCfgWithProvider(BaseModel):
@@ -86,11 +87,13 @@ class ModelCfgDao(ModelCfgBase):
                 .all()
 
             final_results = []
+            print(results)
             for model_cfg, model_provider_cfg in results:
+                print(model_cfg, model_provider_cfg)
                 model_cfg_with_provider = ModelCfgWithProvider(
                     f_model_class=model_cfg.f_model_class,
                     f_model_name=model_cfg.f_model_name,
-                    api_key=EncryptionTool.encrypt(model_cfg.api_key), # 解密
+                    api_key=encryption_tool.decrypt(model_cfg.api_key), # 解密
                     base_url=model_cfg.base_url,
                     mark=model_provider_cfg.mark,
                 )

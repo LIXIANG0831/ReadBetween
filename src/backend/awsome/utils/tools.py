@@ -3,7 +3,6 @@ from awsome.settings import get_config
 from cryptography.fernet import Fernet
 import hashlib
 
-
 class EncryptionTool:
     def __init__(self):
         # 从配置中获取盐值并编码为字节
@@ -17,14 +16,12 @@ class EncryptionTool:
         # 使用 SHA-256 哈希函数生成密钥
         return base64.urlsafe_b64encode(hashlib.sha256(self.SALT).digest())
 
-    @staticmethod
     def encrypt(self, password: str) -> str:
         """加密密码"""
         password_bytes = password.encode()
         encrypted_password = self.cipher.encrypt(password_bytes)
         return encrypted_password.decode()
 
-    @staticmethod
     def decrypt(self, encrypted_password: str) -> str:
         """解密密码"""
         encrypted_bytes = encrypted_password.encode()
@@ -34,11 +31,12 @@ class EncryptionTool:
 
 # 示例使用
 if __name__ == "__main__":
+    encryption_tool = EncryptionTool()  # 创建实例
     # 加密密码
     password = "你好"
-    encrypted = EncryptionTool.encrypt(password)
+    encrypted = encryption_tool.encrypt(password)
     print(f"Encrypted: {encrypted}")
 
     # 解密密码
-    decrypted = EncryptionTool.decrypt(encrypted)
+    decrypted = encryption_tool.decrypt(encrypted)
     print(f"Decrypted: {decrypted}")
