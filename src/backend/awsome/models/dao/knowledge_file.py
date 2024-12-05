@@ -18,7 +18,7 @@ class KnowledgeFileBase(AwsomeDBModel):
     md5: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="文件md5")
     object_name: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="MinIO Object Name")
     status: int = Field(default=0, sa_column=Column(INT, nullable=False), description="是否完成向量化, 0/1/-1/未完成/完成/异常失败")
-    extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True), description="冗余字段")
+    extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True), description="为空未开始向量化|不为空为向量化异常信息")
     # 删除标识
     delete: int = Field(index=False, default=0, description="删除标志")
     # 创建时间

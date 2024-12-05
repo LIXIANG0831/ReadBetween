@@ -1,3 +1,4 @@
+from elasticsearch import Elasticsearch
 from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
 from awsome.services.base import BaseService
 from awsome.models.dao.knowledge import KnowledgeDao
@@ -6,8 +7,13 @@ from awsome.services.constant import milvus_default_index_params, milvus_default
 from fastapi import HTTPException
 import uuid
 
+
 # 实例化milvus
 milvus_client = MilvusUtil()
+# 实例化es
+# es_client = Elasticsearch()
+
+
 class KnowledgeService(BaseService):
 
     @classmethod
@@ -25,16 +31,23 @@ class KnowledgeService(BaseService):
                                        milvus_default_index_params)  # 索引参数
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"创建Milvus集合异常: {str(e)}")
-        knowledge_create.collection_name = new_milvus_collection_name  # 数据表记录Milvus-CollectionName
+
+        # 数据表记录Milvus-CollectionName
+        knowledge_create.collection_name = new_milvus_collection_name
+
         # TODO 同时创建ES索引
         try:
+            # es_client.
 
 
 
             pass
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"创建ElasticSearch索引异常: {str(e)}")
-        knowledge_create.index_name = new_elastic_index_name  # 数据表记录ES-IndexName
+
+        # 数据表记录ES-IndexName
+        knowledge_create.index_name = new_elastic_index_name
+
         return KnowledgeDao.insert(knowledge_create.name,
                                    knowledge_create.desc,
                                    knowledge_create.model,

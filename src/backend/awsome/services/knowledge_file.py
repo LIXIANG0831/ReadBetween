@@ -1,5 +1,6 @@
 from typing import List
 
+from awsome.models.dao.knowledge import KnowledgeDao
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.v1.knowledge_file import UploadFileInfo
 from awsome.services.base import BaseService
