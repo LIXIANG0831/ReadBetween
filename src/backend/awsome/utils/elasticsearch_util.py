@@ -32,12 +32,12 @@ class ElasticSearchUtil:
             if Index(index_name).exists():
                 # 删除索引
                 Index(index_name).delete()
-                logger_util.info(f"索引 {index_name} 已删除。")
+                logger_util.info(f"索引{index_name}已删除。")
             else:
-                logger_util.warning(f"索引 {index_name} 不存在，无需删除。")
+                logger_util.warning(f"索引{index_name}不存在，无需删除。")
         except Exception as e:
-            logger_util.error(f"删除索引 {index_name} 时发生错误: {e}")
-            raise Exception(f"删除索引 {index_name} 时发生错误: {e}")
+            logger_util.error(f"删除索引{index_name}时发生错误: {e}")
+            raise Exception(f"删除索引{index_name}时发生错误: {e}")
 
     @staticmethod
     def search_doc_from_index(index_name):
