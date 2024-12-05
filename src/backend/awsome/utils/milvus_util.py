@@ -3,54 +3,83 @@ from pymilvus import (
     Collection,
     FieldSchema,
     CollectionSchema,
-    DataType
+    DataType, MilvusException
 )
 from awsome.settings import get_config
-
+from awsome.utils.logger_util import logger_util
 
 class MilvusUtil:
     def __init__(self, host=None, port=None):
-        host = host or get_config("storage.milvus.host")
-        port = port or get_config("storage.milvus.port")
-        self.host = host
-        self.port = port
-        self.connect()
+        try:
+            host = host or get_config("storage.milvus.host")
+            port = port or get_config("storage.milvus.port")
+            self.host = host
+            self.port = port
+            self.connect()
+        except Exception as e:
+            logger_util.error(f"初始化MilvusUtil失败：{e}")
+            raise Exception(f"初始化MilvusUtil失败：{e}")
 
     def connect(self):
-        connections.connect("default", host=self.host, port=self.port)
+        try:
+            connections.connect("default", host=self.host, port=self.port)
+        except MilvusException as e:
+            logger_util.error(f"连接到Milvus失败:{e}")
+            raise MilvusException(message=f"连接到Milvus失败:{e}")
 
     def create_collection(self, collection_name, fields):
-        field_schemas = [
-            field
-            for field in fields
-        ]
-        schema = CollectionSchema(fields=field_schemas, description="Collection for storing vectors")
-        Collection(name=collection_name, schema=schema)
+        try:
+            field_schemas = [
+                field
+                for field in fields
+            ]
+            schema = CollectionSchema(fields=field_schemas, description="Collection for storing vectors")
+            Collection(name=collection_name, schema=schema)
+        except MilvusException as e:
+            logger_util.error(f"创建集合{collection_name}失败:{e}")
+            raise MilvusException(message=f"创建集合{collection_name}失败:{e}")
 
     def insert_vectors(self, collection_name, vectors, ids=None):
-        collection = Collection(collection_name)
-        collection.insert(vectors=vectors, ids=ids)
-
+        try:
+            collection = Collection(collection_name)
+            collection.insert(vectors=vectors, ids=ids)
+        except MilvusException as e:
+            logger_util.error(f"向{collection_name}集合插入向量失败:{e}")
+            raise MilvusException(message=f"向{collection_name}集合插入向量失败:{e}")
     def search_vectors(self, query_vectors, collection_names, top_k=5):
         results = {}
-        for collection_name in collection_names:
-            collection = Collection(collection_name)
-            search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
-            result = collection.search(query_vectors, "vector_field_name", search_params, limit=top_k)
-            results[collection_name] = result
-        return results
+        try:
+            for collection_name in collection_names:
+                collection = Collection(collection_name)
+                search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
+                result = collection.search(query_vectors, "vector_field_name", search_params, limit=top_k)
+                results[collection_name] = result
+            return results
+        except MilvusException as e:
+            logger_util.error(f"搜索向量失败：{e}")
+            return {}
 
     def create_index(self, collection_name, field_name, index_params):
-
-        collection = Collection(collection_name)
-        collection.create_index(field_name=field_name, index_params=index_params)
+        try:
+            collection = Collection(collection_name)
+            collection.create_index(field_name=field_name, index_params=index_params)
+        except MilvusException as e:
+            logger_util.error(f"在{collection_name}集合上创建索引失败:{e}")
+            raise MilvusException(message=f"在{collection_name}集合上创建索引失败:{e}")
 
     def drop_collection(self, collection_name):
-        Collection(collection_name).drop()
+        try:
+            Collection(collection_name).drop()
+        except MilvusException as e:
+            logger_util.error(f"删除集合{collection_name}失败：{e}")
+            raise MilvusException(message=f"删除集合{collection_name}失败：{e}")
 
     def close(self):
-        connections.disconnect("default")
-
+        try:
+            connections.disconnect("default")
+        except MilvusException as e:
+            logger_util.error(f"断开与Milvus的连接失败：{e}")
+            raise MilvusException(message=f"断开与Milvus的连接失败：{e}")
 
 
 # 使用示例
