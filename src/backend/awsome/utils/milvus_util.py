@@ -28,7 +28,7 @@ class MilvusUtil:
             logger_util.error(f"连接到Milvus失败:{e}")
             raise MilvusException(message=f"连接到Milvus失败:{e}")
 
-    @staticmethod
+    @classmethod
     def has_collection(self, collection_name):
         try:
             Collection(name=collection_name)
@@ -36,7 +36,7 @@ class MilvusUtil:
         except MilvusException as e:
             return False
 
-    @staticmethod
+    @classmethod
     def create_collection(self, collection_name, fields):
         try:
             field_schemas = [
@@ -49,7 +49,7 @@ class MilvusUtil:
             logger_util.error(f"创建集合{collection_name}失败:{e}")
             raise MilvusException(message=f"创建集合{collection_name}失败:{e}")
 
-    @staticmethod
+    @classmethod
     def insert_data(self, collection_name, insert_data: list, ids=None):
         try:
             collection = Collection(collection_name)
@@ -59,7 +59,7 @@ class MilvusUtil:
             logger_util.error(f"向{collection_name}集合插入向量失败:{e}")
             raise MilvusException(message=f"向{collection_name}集合插入向量失败:{e}")
 
-    @staticmethod
+    @classmethod
     def search_by_vectors(self, query_vectors, collection_names, top_k=5):
         results = {}
         try:
@@ -73,7 +73,7 @@ class MilvusUtil:
             logger_util.error(f"搜索向量失败：{e}")
             return {}
 
-    @staticmethod
+    @classmethod
     def create_index_on_field(self, collection_name, field_name, index_params):
         try:
             collection = Collection(collection_name)
@@ -82,7 +82,7 @@ class MilvusUtil:
             logger_util.error(f"在{collection_name}集合上字段{field_name}创建索引失败:{e}")
             raise MilvusException(message=f"在{collection_name}集合上字段{field_name}创建索引失败:{e}")
 
-    @staticmethod
+    @classmethod
     def drop_collection(self, collection_name):
         try:
             if self.has_collection(collection_name):
