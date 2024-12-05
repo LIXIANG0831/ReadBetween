@@ -33,7 +33,8 @@ class MinioUtil:
                 self.client.make_bucket(bucket_name)
                 logger_util.info(f"Bucket '{bucket_name}' created.")
             except S3Error as e:
-                logger_util.error(f"Error creating bucket: {e}")
+                logger_util.error(f"Bucket创建失败:{e}")
+                raise S3Error(code=500, message=f"Bucket创建失败:{e}")
 
     def upload_file(self, file_path: str, object_name: str, bucket_name: str = default_bucket_name):
         """上传文件到 MinIO"""
@@ -43,7 +44,8 @@ class MinioUtil:
                 self.client.put_object(bucket_name, object_name, file_data, file_stat.st_size)
                 logger_util.info(f"File '{file_path}' uploaded to bucket '{bucket_name}' as '{object_name}'.")
         except S3Error as e:
-            logger_util.error(f"Error uploading file: {e}")
+            logger_util.error(f"上传文件失败:{e}")
+            raise S3Error(code=500, message=f"上传文件失败:{e}")
 
     def get_presigned_url(self, object_name: str, expires: int = 3600, bucket_name: str = default_bucket_name) -> str:
         """获取文件的预签名 URL"""
