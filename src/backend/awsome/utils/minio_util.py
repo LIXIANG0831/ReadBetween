@@ -1,4 +1,5 @@
 import os
+import tempfile
 from datetime import timedelta
 from awsome.settings import get_config
 from awsome.utils.logger_util import logger_util
@@ -61,6 +62,18 @@ class MinioUtil:
             logger_util.error(f"Error getting MD5 for object '{object_name}' in bucket '{bucket_name}': {e}")
             return ""
 
+    def download_file_to_temp(self, object_name: str, bucket_name: str = default_bucket_name):
+        """同步从 MinIO 下载文件到本地临时文件夹，并返回文件路径"""
+        try:
+            # 创建临时文件
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                # 下载文件
+                self.client.fget_object(bucket_name, object_name, tmp_file.name)
+                logger_util.info(f"File '{object_name}' downloaded to '{tmp_file.name}'.")
+                return tmp_file.name
+        except S3Error as e:
+            logger_util.error(f"Error downloading file: {e}")
+            return None
 
 
 
