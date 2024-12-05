@@ -25,6 +25,7 @@ class PdfExtractTool:
             chunk_bboxes = []
             chunk = ""  # chunk 内容
             repeat_chunk = ""  # 重叠内容
+            chunk_index_cnt = 1  # 分片索引记数器
 
             for page_layout in extract_pages(file):
                 page_number = page_layout.pageid
@@ -43,15 +44,18 @@ class PdfExtractTool:
                         if len(chunk) >= self.chunk_size + self.repeat_size:
                             results.append({
                                 "start_page": start_page,
+                                "chunk_index": chunk_index_cnt,
                                 "chunk_bboxes": chunk_bboxes,
                                 "chunk": file_name + ":" + repeat_chunk + chunk,
                             })
+                            chunk_index_cnt += 1
                             repeat_chunk = copy.deepcopy(chunk[self.repeat_size:])
                             chunk = ""
                             chunk_bboxes = []
             if len(chunk) > 0:
                 results.append({
                     "start_page": start_page,
+                    "chunk_index": chunk_index_cnt,
                     "chunk_bboxes": chunk_bboxes,
                     "chunk": repeat_chunk + chunk
                 })

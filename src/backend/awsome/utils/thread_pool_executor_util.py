@@ -36,7 +36,7 @@ class ThreadPoolExecutorUtil:
             try:
                 # 获取任务结果
                 result = future.result()
-                logger_util.info(f"任务完成：{future} 结果：{result}")
+                logger_util.info(f"任务完成:{future} 结果:{result}")
             except Exception as e:
                 # 处理异常
                 logger_util.error(f"任务执行异常: {e}", exc_info=True)
