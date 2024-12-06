@@ -2,7 +2,6 @@ import asyncio
 import litellm
 
 
-
 class ModelFactory:
     """
     工厂类，根据模型类型创建不同的客户端实例
@@ -28,11 +27,12 @@ class LLMFactory:
         self.model_name = model_name
         self.base_url = base_url or ""
         self.api_key = api_key
+        self.response = None
 
     async def completion(self, messages, stream=False, temperature=0.1):
         # OpenAI-Compatible
         if self.mark == 'openai-compatible':
-            response = litellm.completion(
+            local_response = litellm.completion(
                 model=f"openai/{self.model_name}",
                 api_key=self.api_key,
                 base_url=self.base_url,
@@ -40,8 +40,19 @@ class LLMFactory:
                 stream=stream,
                 temperature=temperature
             )
-            return response
+        elif self.mark == 'openai':
+            local_response = litellm.completion(
+                model=f"{self.model_name}",
+                api_key=self.api_key,
+                messages=messages,
+                stream=stream,
+                temperature=temperature
+            )
+        else:
+            local_response = None
 
+        self.response = local_response
+        return self.response
 
 
 class EmbeddingFactory:
@@ -55,14 +66,30 @@ class EmbeddingFactory:
         self.model_name = model_name
         self.base_url = base_url or ""
         self.api_key = api_key
+        self.response = None
 
-    def get_client(self):
-        pass
+    async def embedding(self, inputs=None, dimensions=1024):
+        if self.mark == 'openai-compatible':
+            local_response = litellm.embedding(
+                model=f"openai/{self.model_name}",
+                api_key=self.api_key,
+                base_url=self.base_url,
+            )
+        elif self.mark == 'openai':
+            local_response = litellm.embedding(
+                model=f"{self.model_name}",
+                api_key=self.api_key,
+            )
+
+        self.response = local_response
+        return self.response
+
 
 if __name__ == '__main__':
     messages = [{"content": "介绍一下你自己。", "role": "user"}]
 
     fatory = ModelFactory()
-    resp = asyncio.run(fatory.create_client("openai-compatible", "llm", "qwen-long", "sk-3fbbebdfbdc04d9284621238b6967ba9", "https://dashscope.aliyuncs.com/compatible-mode/v1").completion(messages=messages))
+    resp = asyncio.run(
+        fatory.create_client("openai-compatible", "llm", "qwen-long", "sk-3fbbebdfbdc04d9284621238b6967ba9",
+                             "https://dashscope.aliyuncs.com/compatible-mode/v1").completion(messages=messages))
     print(resp)
-
