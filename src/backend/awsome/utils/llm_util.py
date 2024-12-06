@@ -80,6 +80,8 @@ class EmbeddingFactory:
                 model=f"{self.model_name}",
                 api_key=self.api_key,
             )
+        else:
+            local_response = None
 
         self.response = local_response
         return self.response
