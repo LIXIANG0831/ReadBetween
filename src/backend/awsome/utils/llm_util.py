@@ -69,16 +69,21 @@ class EmbeddingFactory:
         self.response = None
 
     async def embedding(self, inputs=None, dimensions=1024):
+        # litellm 只支持 openai模型的 dimensions 的配置
         if self.mark == 'openai-compatible':
             local_response = litellm.embedding(
                 model=f"openai/{self.model_name}",
                 api_key=self.api_key,
-                base_url=self.base_url,
+                api_base=self.base_url,
+                input=inputs,
+                # dimensions=dimensions
             )
         elif self.mark == 'openai':
             local_response = litellm.embedding(
                 model=f"{self.model_name}",
                 api_key=self.api_key,
+                input=inputs,
+                dimensions=dimensions
             )
         else:
             local_response = None
@@ -91,7 +96,20 @@ if __name__ == '__main__':
     messages = [{"content": "介绍一下你自己。", "role": "user"}]
 
     fatory = ModelFactory()
+    # resp = asyncio.run(
+    #     fatory.create_client("openai-compatible",
+    #                          "llm",
+    #                          "qwen-long",
+    #                          "sk-3fbbebdfbdc04d9284621238b6967ba9",
+    #                          "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    #     .completion(messages=messages))
+    # print(resp)
     resp = asyncio.run(
-        fatory.create_client("openai-compatible", "llm", "qwen-long", "sk-3fbbebdfbdc04d9284621238b6967ba9",
-                             "https://dashscope.aliyuncs.com/compatible-mode/v1").completion(messages=messages))
+        fatory.create_client("openai-compatible",
+                             "embedding",
+                             "text-embedding-v3",
+                             "sk-3fbbebdfbdc04d9284621238b6967ba9",
+                             "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        .embedding("最近天气咋样？"))
     print(resp)
+    print(len(resp.data[0].get('embedding')))
