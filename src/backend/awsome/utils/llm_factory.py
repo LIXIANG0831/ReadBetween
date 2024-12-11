@@ -116,8 +116,9 @@ class AnotherEmbeddingModel(BaseEmbeddingModel):
 # 工厂类
 class ModelFactory:
     @staticmethod
-    def get_model(model_class, mark, api_key, **kwargs):
+    def get_model(model_class, mark, **kwargs):
         # kwargs 取值
+        api_key = kwargs.get("api_key")
         model = kwargs.get("model")
         base_url = kwargs.get("base_url")
 
@@ -143,14 +144,14 @@ if __name__ == '__main__':
     # messages = [{"content": "介绍一下你自己。", "role": "user"}]
     # llm_model = ModelFactory.get_model("llm",
     #                                    "qwen",
-    #                                    "sk-3fbbebdfbdc04d9284621238b6967ba9",
+    #                                    api_key="sk-3fbbebdfbdc04d9284621238b6967ba9",
     #                                    model="qwen-long")
     # response = llm_model.generate_text(messages)
     # print(response)
 
     embedding_model = ModelFactory.get_model("embedding",
                                              "qwen",
-                                             "sk-3fbbebdfbdc04d9284621238b6967ba9",
+                                             api_key="sk-3fbbebdfbdc04d9284621238b6967ba9",
                                              model="text-embedding-v3")
     response = embedding_model.get_embeddings("今天天气怎么样")
     print(response)
