@@ -87,6 +87,7 @@ class MilvusUtil:
         try:
             if self.has_collection(collection_name):
                 Collection(collection_name).drop()
+                logger_util.info(f"集合{collection_name}已删除")
             else:
                 logger_util.warning(f"集合{collection_name}不存在无需删除")
         except MilvusException as e:

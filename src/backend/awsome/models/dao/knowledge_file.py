@@ -17,8 +17,10 @@ class KnowledgeFileBase(AwsomeDBModel):
     name: Optional[str] = Field(sa_column=Column(String(255), index=True, nullable=False), description="文件名")
     md5: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="文件md5")
     object_name: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="MinIO Object Name")
-    status: int = Field(default=0, sa_column=Column(INT, nullable=False), description="是否完成向量化, 0/1/-1/未完成/完成/异常失败")
-    extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True), description="为空未开始向量化|不为空为向量化异常信息")
+    status: int = Field(default=0, sa_column=Column(INT, nullable=False),
+                        description="是否完成向量化, 0/1/-1/未完成/完成/异常失败")
+    extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True),
+                                 description="为空未开始向量化|不为空为向量化异常信息")
     # 删除标识
     delete: int = Field(index=False, default=0, description="删除标志")
     # 创建时间
@@ -69,6 +71,7 @@ class KnowledgeFileDao(KnowledgeFile):
             else:
                 all_knowledge_files = query.all()
             return all_knowledge_files
+
     @classmethod
     def delete_by_kb_id(cls):
         pass
@@ -76,3 +79,24 @@ class KnowledgeFileDao(KnowledgeFile):
     @classmethod
     def delete_by_id(cls):
         pass
+
+    @classmethod
+    def select_by_file_id(cls, file_id: str):
+        with session_getter() as session:
+            query = session.query(KnowledgeFile).where(KnowledgeFile.id == file_id, KnowledgeFile.delete == 0)
+            file_info = query.all()
+            return file_info
+
+    @classmethod
+    def update_file(cls, file_info: KnowledgeFile):
+        with session_getter() as session:
+            # 查询数据库中对应的记录
+            file = session.query(KnowledgeFile).filter(KnowledgeFile.id == file_info.id,
+                                                       KnowledgeFile.delete == 0).first()
+            if file:
+                file.status = file_info.status
+                file.extra = file_info.extra or None
+                session.commit()
+                return file
+            else:
+                raise Exception("记录不存在")

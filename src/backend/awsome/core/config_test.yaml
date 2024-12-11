@@ -57,6 +57,7 @@ logger:
 
 system:
   default_model_provider:
+    - Qwen: qwen
     - OpenAI: openai
     - OpenAI-Compatible: openai-compatible
     - vLLM: hosted_vllm

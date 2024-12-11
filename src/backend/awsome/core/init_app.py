@@ -9,6 +9,7 @@ from awsome.utils.logger_util import logger_util
 
 redis_client = RedisUtil()
 
+
 def init_database():
     """初始化数据库"""
     if redis_client.setNX('init_database', '1'):
@@ -20,9 +21,10 @@ def init_database():
             default_model_provider = []
             for model_provider in default_model_provider_cfg:
                 for provider, mark in model_provider.items():
+                    logger_util.debug(f"初始化模型供应商:{provider=}|{mark=}")
                     default_model_provider.append(ModelProviderCfg(provider=provider, mark=mark))
             for model_provider in default_model_provider:
-                if ModelProviderCfgService.search_provider(model_provider) is False: # 供应商已存在
+                if ModelProviderCfgService.search_provider(model_provider) is False:  # 供应商已存在
                     logger_util.debug(f"模型供应商:{model_provider.provider}已存在")
                     continue
                 ModelProviderCfgService.insert_provider(model_provider)

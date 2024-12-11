@@ -16,8 +16,13 @@ class KnowledgeFileService(BaseService):
     """
 
     @classmethod
-    def select_files_list_by_kb_id(cls, kb_id: str, page: int, size: int):
-        return KnowledgeFileDao.select_by_kb_id(kb_id, page, size)
+    def select_files_list_by_kb_id(cls, kb_id: str, page: int = None, size: int = None):
+        if size is None and page is None:
+            # 查询全部
+            return KnowledgeFileDao.select_by_kb_id(kb_id)
+        else:
+            # 分页查询
+            return KnowledgeFileDao.select_by_kb_id(kb_id, page, size)
 
     """
     删除文件及已向量化内容
@@ -52,3 +57,15 @@ class KnowledgeFileService(BaseService):
             file_insert_list.append(new_knowledge_file)
 
         return KnowledgeFileDao.batch_insert(file_insert_list)
+
+    """
+    查询上传文件
+    """
+    @classmethod
+    def select_by_file_id(cls, file_id: str):
+        return KnowledgeFileDao.select_by_file_id(file_id)
+
+
+    @classmethod
+    def update_file(cls, file_info: KnowledgeFile):
+        return KnowledgeFileDao.update_file(file_info)
