@@ -16,7 +16,7 @@ class PdfExtractTool:
         self.chunk_size = chunk_size
         self.repeat_size = repeat_size
 
-    async def extract(self):
+    def extract(self):
         file_name = os.path.basename(self.pdf_file)
         results = []
 

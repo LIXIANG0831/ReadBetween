@@ -10,9 +10,12 @@ from awsome.services.constant import (milvus_default_fields,  # 默认字段
                                       milvus_default_index_params  # 默认索引配置
                                       )
 from awsome.services.knowledge_file import KnowledgeFileService
+from awsome.core.celery_app import celery
 
 
-async def bg_text_vectorize(knowledge_file_vectorize_task: KnowledgeFileVectorizeTasks):
+@celery.task
+def celery_text_vectorize(task_json):
+    knowledge_file_vectorize_task = KnowledgeFileVectorizeTasks.parse_obj(task_json)
     file_vectorize_err_msg = ""  # 记录异常信息
     try:
         # 实例化minio_client
@@ -49,7 +52,7 @@ async def bg_text_vectorize(knowledge_file_vectorize_task: KnowledgeFileVectoriz
                 pdf_extractor = PdfExtractTool(file_save_path,
                                                chunk_size=knowledge_file_vectorize_task.chunk_size,
                                                repeat_size=knowledge_file_vectorize_task.repeat_size)
-                extract_results = await pdf_extractor.extract()  # pdf切片结果返回
+                extract_results = pdf_extractor.extract()  # pdf切片结果返回
 
             """
             插入ES
@@ -72,7 +75,7 @@ async def bg_text_vectorize(knowledge_file_vectorize_task: KnowledgeFileVectoriz
                 save_document.metadata.knowledge_id = target_kb_id
 
                 # 创建索引
-                await es_client.insert_doc_to_index(save_document)
+                es_client.insert_doc_to_index(save_document)
             logger_util.debug("====》ES插入完成")
             """
             插入Milvus
@@ -98,7 +101,8 @@ async def bg_text_vectorize(knowledge_file_vectorize_task: KnowledgeFileVectoriz
                 for m_extract_result in extract_results
             ]
             milvus_client.insert_data(target_collection_name, insert_data)
-            milvus_client.create_index_on_field(target_collection_name, "vector", milvus_default_index_params)
+            # Desperate 创建Collection时已完成索引创建
+            # milvus_client.create_index_on_field(target_collection_name, "vector", milvus_default_index_params)
             logger_util.debug("====》Milvus插入完成")
 
             # 完成向量化修改状态
@@ -115,7 +119,7 @@ async def bg_text_vectorize(knowledge_file_vectorize_task: KnowledgeFileVectoriz
             file_vectorize_err_msg += f"文件{file_name}解析异常:{e}\n"
 
             # 回写异常信息
-            update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)
+            update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)[0]
             update_file.status = -1
             update_file.extra = file_vectorize_err_msg
             KnowledgeFileService.update_file(update_file)

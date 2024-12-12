@@ -18,7 +18,7 @@ connections.create_connection(
 
 class ElasticSearchUtil:
     @staticmethod
-    async def insert_doc_to_index(save_document: BaseDocument):
+    def insert_doc_to_index(save_document: BaseDocument):
         try:
             save_document.save()
         except Exception as e:

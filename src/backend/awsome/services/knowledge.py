@@ -7,9 +7,10 @@ from awsome.services.constant import milvus_default_index_params, milvus_default
 from fastapi import HTTPException
 import uuid
 
-
 # 实例化milvus
 milvus_client = MilvusUtil()
+
+
 # 实例化es
 # es_client = Elasticsearch()
 
@@ -26,9 +27,9 @@ class KnowledgeService(BaseService):
             milvus_client.create_collection(new_milvus_collection_name,  # 集合名
                                             milvus_default_fields)  # 属性
             # 创建MilvusIndex
-            milvus_client.create_index(new_milvus_collection_name,  # 集合名
-                                       "vector",  # 创建索引的属性
-                                       milvus_default_index_params)  # 索引参数
+            milvus_client.create_index_on_field(new_milvus_collection_name,  # 集合名
+                                                "vector",  # 创建索引的属性
+                                                milvus_default_index_params)  # 索引参数
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"创建Milvus集合异常: {str(e)}")
 
@@ -38,8 +39,6 @@ class KnowledgeService(BaseService):
         # TODO 同时创建ES索引
         try:
             # es_client.
-
-
 
             pass
         except Exception as e:

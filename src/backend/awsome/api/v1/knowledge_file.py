@@ -8,7 +8,7 @@ from fastapi import HTTPException, APIRouter, UploadFile, File, BackgroundTasks
 from awsome.models.dao.knowledge import Knowledge
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.v1.knowledge_file import KnowledgeFileExecute, KnowledgeFileVectorizeTasks
-from awsome.services.tasks import bg_text_vectorize
+from awsome.services.tasks import celery_text_vectorize #bg_text_vectorize
 from awsome.settings import get_config
 from awsome.utils.minio_util import MinioUtil
 from awsome.models.schemas.response import resp_200, resp_500
@@ -131,8 +131,15 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
                                                    repeat_size=knowledge_file_execute.repeat_size,
                                                    separator=knowledge_file_execute.separator,
                                                    enable_layout=enable_layout_flag)
-            background_tasks.add_task(bg_text_vectorize, new_task)
-            return result
+
+            # Desperate 后台执行任务
+            # background_tasks.add_task(bg_text_vectorize, new_task)
+
+            # celery执行任务
+            new_task_dict = new_task.dict()
+            celery_text_vectorize.delay(new_task_dict)
+
+            return resp_200(result)
     except Exception as e:
         logger_util.error(f"知识库文件解析异常:{e}")
         return resp_500(message=f"知识库文件解析异常:{e}")
