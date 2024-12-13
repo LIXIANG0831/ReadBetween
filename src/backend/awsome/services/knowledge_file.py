@@ -14,9 +14,9 @@ class KnowledgeFileService(BaseService):
     """
     分页查询文件列表通过知识库ID
     """
-
+    # TODO 数据库查询接口修改为异步
     @classmethod
-    def select_files_list_by_kb_id(cls, kb_id: str, page: int = None, size: int = None):
+    async def select_files_list_by_kb_id(cls, kb_id: str, page: int = None, size: int = None):
         if size is None and page is None:
             # 查询全部
             return KnowledgeFileDao.select_by_kb_id(kb_id)
@@ -27,7 +27,6 @@ class KnowledgeFileService(BaseService):
     """
     删除文件及已向量化内容
     """
-
     @classmethod
     def delete_file_by_id(cls):
         # 1. 文件是否已经向量化？
@@ -36,7 +35,6 @@ class KnowledgeFileService(BaseService):
     """
     开启文件向量化
     """
-
     @classmethod
     def start_embedding_by_id(cls):
         pass
@@ -44,7 +42,6 @@ class KnowledgeFileService(BaseService):
     """
     根据知识库ID上传文件到知识库
     """
-
     @classmethod
     def upload_files_to_kb(cls, file_object_names: List[UploadFileInfo], target_kb_id):
         file_insert_list = []
