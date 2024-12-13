@@ -1,5 +1,5 @@
 from fastapi import HTTPException, APIRouter
-from awsome.utils.context import session_getter
+from awsome.core.context import session_getter
 from sqlalchemy import text
 
 router = APIRouter(tags=["健康检查"])

@@ -1,12 +1,11 @@
 import uuid
 from typing import Optional
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String, INT
+from sqlalchemy import Column, String
 from sqlmodel import Field, DateTime, text
 from pydantic import BaseModel
 from awsome.models.dao.model_provider_cfg import ModelProviderCfg
-from awsome.utils.context import session_getter
-from awsome.utils.logger_util import logger_util
+from awsome.core.context import session_getter
 from datetime import datetime
 from awsome.utils.tools import EncryptionTool
 

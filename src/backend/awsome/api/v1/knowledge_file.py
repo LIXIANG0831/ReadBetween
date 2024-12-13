@@ -83,7 +83,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
         else:
             # TODO auto为True 启动后台任务自动解析
             # 根据kb_id获取collection_name/index_name
-            target_knowledge = KnowledgeService.get_knowledge_by_id(target_kb_id)
+            target_knowledge = await KnowledgeService.get_knowledge_by_id(target_kb_id)
             target_collection_name = target_knowledge.collection_name
             target_index_name = target_knowledge.index_name
 

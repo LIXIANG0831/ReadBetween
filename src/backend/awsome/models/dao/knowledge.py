@@ -1,12 +1,13 @@
 import uuid
 from typing import Optional
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String, INT
+from sqlalchemy import Column, String, INT, select
 from sqlmodel import Field, DateTime, text
-from awsome.utils.context import session_getter
+from awsome.core.context import session_getter, async_session_getter
 from awsome.utils.logger_util import logger_util
 from datetime import datetime
 from fastapi import HTTPException
+
 
 
 class KnowledgeBase(AwsomeDBModel):
@@ -47,57 +48,63 @@ class Knowledge(KnowledgeBase, table=True):
 
 class KnowledgeDao(Knowledge):
     @classmethod
-    def insert(cls, name, desc, model, collection_name, index_name, enable_layout):
-        with session_getter() as session:
+    async def insert(cls, name, desc, model, collection_name, index_name, enable_layout):
+        async with async_session_getter() as session:
             new_knowledge = Knowledge(name=name, desc=desc, model=model, collection_name=collection_name,
                                       index_name=index_name,
                                       enable_layout=enable_layout)
             session.add(new_knowledge)
-            session.commit()
-            session.refresh(new_knowledge)
+            await session.commit()
+            await session.refresh(new_knowledge)
             logger_util.info(f"Insert Knowledge: {name}")
             return new_knowledge
 
     @classmethod
-    def delete_by_id(cls, id):
-        with session_getter() as session:
-            delete_knowledge = session.query(Knowledge).filter(Knowledge.id == id).first()
+    async def delete_by_id(cls, kb_id):
+        async with (async_session_getter() as session):
+            stmt = select(Knowledge).filter(Knowledge.id == kb_id)
+            delete_knowledge = await session.execute(stmt)
+            delete_knowledge = delete_knowledge.scalar_one_or_none()
             if delete_knowledge:
                 delete_knowledge.delete = 1
-                session.commit()
-                logger_util.info(f"Deleted Knowledge with id: {id}")
+                await session.commit()
+                logger_util.info(f"Deleted Knowledge with id: {kb_id}")
             else:
                 raise HTTPException(status_code=404, detail="Knowledge not found")
 
     @classmethod
-    def update(cls, id, name, desc):
-        with session_getter() as session:
-            update_knowledge = session.query(Knowledge).filter(Knowledge.id == id).first()
+    async def update(cls, kb_id, name, desc):
+        async with async_session_getter() as session:
+            query_stmt = select(Knowledge).where(Knowledge.id == kb_id)
+            update_knowledge = await session.execute(query_stmt)
+            update_knowledge = update_knowledge.scalar_one_or_none()
             if update_knowledge:
                 if name is not None:
                     update_knowledge.name = name
                 if desc is not None:
                     update_knowledge.desc = desc
-                session.commit()
-                session.refresh(update_knowledge)
-                logger_util.info(f"Updated Knowledge with id: {id}")
+                await session.commit()
+                await session.refresh(update_knowledge)
+                logger_util.info(f"Updated Knowledge with id: {kb_id}")
                 return update_knowledge
             else:
                 raise HTTPException(status_code=404, detail="Knowledge not found")
 
     @classmethod
-    def select(cls, id=None, page=None, page_size=None):
-        with session_getter() as session:
-            if id is not None:  # 查特定记录
-                knowledge = session.query(Knowledge).where(Knowledge.delete == 0).filter(Knowledge.id == id).first()
+    async def select(cls, kb_id=None, page=None, page_size=None):
+        async with (async_session_getter() as session):
+            stmt = select(Knowledge).where(Knowledge.delete == 0)
+            if kb_id is not None:  # 查特定记录
+                knowledge = await session.execute(stmt.filter(Knowledge.id == kb_id))
+                knowledge = knowledge.scalar_one_or_none()
                 return knowledge
             else:  # 分页查询全部
-                query = session.query(Knowledge).where(Knowledge.delete == 0)
                 if page is not None and page_size is not None:
-                    # 计算偏移量
                     offset = (page - 1) * page_size
-                    all_knowledge = query.offset(offset).limit(page_size).all()
+                    result = await session.execute(stmt.offset(offset).limit(page_size))
                 else:
-                    all_knowledge = query.all()
+                    result = await session.execute(stmt)
+
+                all_knowledge = result.scalars().all()
                 logger_util.info("Fetched all Knowledge entries.")
                 return all_knowledge

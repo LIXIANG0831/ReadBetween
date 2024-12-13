@@ -3,6 +3,7 @@ from awsome.settings import get_config
 from awsome.utils.logger_util import logger_util
 from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, SQLModel, create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -19,6 +20,8 @@ class DatabaseClient:
         """
         self.database_url = database_url
         self.engine = self._create_engine()
+        self.async_database_url = self.database_url.replace("pymysql","aiomysql")  # 支持异步的数据库链接
+        self.async_engine = self._create_async_engine()  # 创建异步引擎
 
     def _create_engine(self) -> 'Engine':
         """创建数据库引擎。
@@ -33,6 +36,24 @@ class DatabaseClient:
             connect_args = {}
         # 创建数据库引擎
         return create_engine(self.database_url, connect_args=connect_args, pool_size=100, max_overflow=20, pool_pre_ping=True)
+
+    def _create_async_engine(self) -> 'AsyncEngine':
+        """创建异步数据库引擎。
+
+        Returns:
+            AsyncEngine: 异步数据库引擎实例。
+        """
+        # 创建异步数据库引擎
+        return create_async_engine(self.async_database_url, echo=True)
+
+    def __enter__(self):
+        """进入上下文时创建数据库会话。
+
+        Returns:
+            Session: 数据库会话实例。
+        """
+        self._session = Session(self.engine)
+        return self._session
 
     def __enter__(self):
         """进入上下文时创建数据库会话。

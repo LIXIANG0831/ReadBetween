@@ -7,7 +7,7 @@ import copy
 import os
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextBox, LTTextLine
-from awsome.utils.context import file_open
+from awsome.core.context import file_open
 
 
 class PdfExtractTool:

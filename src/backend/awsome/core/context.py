@@ -1,16 +1,36 @@
 from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from sqlmodel import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from awsome.utils.database_client import database_client
 from awsome.utils.logger_util import logger_util
-import asyncio
 import aiofiles
+
+
+@asynccontextmanager
+async def async_session_getter() -> AsyncSession:
+    """异步上下文管理器，用于创建和管理异步数据库会话。
+
+    Yields:
+        AsyncSession: 异步数据库会话实例。
+    """
+    session = AsyncSession(database_client.async_engine)
+    try:
+        yield session
+    except Exception as e:
+        logger_util.info('Async session rollback because of exception: %s', e)
+        await session.rollback()
+        raise
+    finally:
+        await session.close()
+        logger_util.info('Async session closed')
 
 
 @contextmanager
 def session_getter() -> Session:
     """轻量级session context"""
+    session = Session(database_client.engine)
     try:
-        session = Session(database_client.engine)
         yield session
     except Exception as e:
         logger_util.info('Session rollback because of exception:{}', e)

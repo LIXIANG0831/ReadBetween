@@ -3,7 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String
 from sqlmodel import Field, DateTime, text
-from awsome.utils.context import session_getter
+from awsome.core.context import session_getter
 from awsome.utils.logger_util import logger_util
 from datetime import datetime
 

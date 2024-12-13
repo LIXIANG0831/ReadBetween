@@ -3,10 +3,8 @@ from typing import Optional
 from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, INT
 from sqlmodel import Field, DateTime, text
-from awsome.utils.context import session_getter
-from awsome.utils.logger_util import logger_util
+from awsome.core.context import session_getter
 from datetime import datetime
-from fastapi import HTTPException
 
 
 class KnowledgeFileBase(AwsomeDBModel):
