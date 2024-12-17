@@ -19,5 +19,3 @@ async def get_token():
         room="my-room",
     ))
     return {"token": token.to_jwt()}
-
-# uvicorn server:app --reload
