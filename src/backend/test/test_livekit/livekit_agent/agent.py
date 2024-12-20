@@ -11,6 +11,8 @@ from livekit.agents import (
     cli,
     llm,
     metrics,
+    JobRequest,
+    WorkerType,
 )
 from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import openai, silero, deepgram, cartesia
@@ -21,6 +23,16 @@ logger = logging.getLogger("voice-assistant")
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
+
+
+async def request_fnc(req: JobRequest):
+    # accept the job request
+    await req.accept(
+        # the agent's name (Participant.name), defaults to ""
+        name="LIXIANG's 个人助理",
+        # the agent's identity (Participant.identity), defaults to "agent-<jobid>"
+        identity=f"{req.id}",
+    )
 
 
 async def entrypoint(ctx: JobContext):
@@ -38,7 +50,7 @@ async def entrypoint(ctx: JobContext):
 
     # wait for the first participant to connect
     participant = await ctx.wait_for_participant()
-    logger.info(f"starting voice assistant for participant {participant.identity}")
+    logger.info(f"starting voice assistant for participant : {participant.name=} | {participant.identity=}")
 
     agent = VoicePipelineAgent(
         vad=ctx.proc.userdata["vad"],
@@ -90,5 +102,7 @@ if __name__ == "__main__":
         WorkerOptions(
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
+            request_fnc=request_fnc,
+            worker_type=WorkerType.ROOM,  # 每个房间一个新的Agent示例
         ),
     )

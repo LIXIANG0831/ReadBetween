@@ -3,13 +3,15 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { encodePassphrase } from '@/lib/client-utils';
+import '../../styles/Form.modeule.css';
+
 
 export default function FormPage() {
-  const [formData, setFormData] = useState({ name: '' });
-  const router = useRouter();
+const [formData, setFormData] = useState({ name: '', room: '' }); // 添加状态
+const router = useRouter();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData({ ...formData, [e.target.name]: e.target.value }); // 更新 handleChange 以处理 room
   };
 
   const handleSubmit = async (e) => {
@@ -18,7 +20,7 @@ export default function FormPage() {
       // 从环境变量中读取基础 URL
       const serverBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
       // 构建完整的 URL
-      const tokenUrl = `${serverBaseUrl}/getToken?name=${encodeURIComponent(formData.name)}`;
+      const tokenUrl = `${serverBaseUrl}/getToken?name=${encodeURIComponent(formData.name)}&room=${encodeURIComponent(formData.room)}`;
       const response = await fetch(tokenUrl, {
         method: 'GET',
       });
@@ -40,12 +42,18 @@ export default function FormPage() {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
-        Name:
-        <input type="text" name="name" value={formData.name} onChange={handleChange} />
-      </label>
-      <button type="submit">提交</button>
-    </form>
+    <div className="form-container">
+      <form onSubmit={handleSubmit} className="form">
+        <label>
+          Name:
+          <input type="text" name="name" value={formData.name} onChange={handleChange} />
+        </label>
+        <label>
+          Room:
+          <input type="text" name="room" value={formData.room} onChange={handleChange} />
+        </label>
+        <button type="submit">提交</button>
+      </form>
+    </div>
   );
 }
