@@ -17,9 +17,17 @@ from livekit.agents import (
 from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import openai, silero, deepgram, cartesia
 
+from awsome.settings import get_config
 load_dotenv()
-logger = logging.getLogger("voice-assistant")
 
+logger = logging.getLogger("voice-assistant")
+deepgram_api_key = get_config("api.deepgram.api_key")
+cartesia_api_key = get_config("api.cartesia.api_key")
+llm_base_url = get_config("api.openai.base_url")
+llm_api_key = get_config("api.openai.api_key")
+livekit_url = get_config("api.livekit.livekit_url")
+livekit_api_secret = get_config("api.livekit.livekit_api_secret")
+livekit_api_key = get_config("api.livekit.livekit_api_key")
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
@@ -56,7 +64,7 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         # stt=openai.STT(),
         stt=deepgram.STT(language="zh-CN"),
-        llm=openai.LLM(model="ycpc-gpt"),
+        llm=openai.LLM(model="COSMO-GPT"),
         # llm=openai.LLM(),
         # tts=openai.TTS(),
         tts=cartesia.TTS(language="zh"),
@@ -65,18 +73,18 @@ async def entrypoint(ctx: JobContext):
 
     agent.start(ctx.room, participant)
 
-    usage_collector = metrics.UsageCollector()
+    # usage_collector = metrics.UsageCollector()
 
-    @agent.on("metrics_collected")
-    def _on_metrics_collected(mtrcs: metrics.AgentMetrics):
-        metrics.log_metrics(mtrcs)
-        usage_collector.collect(mtrcs)
+    # @agent.on("metrics_collected")
+    # def _on_metrics_collected(mtrcs: metrics.AgentMetrics):
+    #     metrics.log_metrics(mtrcs)
+    #     usage_collector.collect(mtrcs)
 
-    async def log_usage():
-        summary = usage_collector.get_summary()
-        logger.info(f"Usage: ${summary}")
+    # async def log_usage():
+    #     summary = usage_collector.get_summary()
+    #     logger.info(f"Usage: ${summary}")
 
-    ctx.add_shutdown_callback(log_usage)
+    # ctx.add_shutdown_callback(log_usage)
 
     # listen to incoming chat messages, only required if you'd like the agent to
     # answer incoming messages from Chat
@@ -98,11 +106,32 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(
-        WorkerOptions(
+    # cli.run_app(
+    #     WorkerOptions(
+    #         entrypoint_fnc=entrypoint,
+    #         prewarm_fnc=prewarm,
+    #         request_fnc=request_fnc,
+    #         worker_type=WorkerType.ROOM,  # 每个房间一个新的Agent示例
+    #     ),
+    # )
+    from livekit.agents.cli.cli import run_worker, proto
+
+    opts = WorkerOptions(
+            ws_url=livekit_url,
+            api_key=livekit_api_key,
+            api_secret=livekit_api_secret,
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
             request_fnc=request_fnc,
             worker_type=WorkerType.ROOM,  # 每个房间一个新的Agent示例
-        ),
+        )
+    args = proto.CliArgs(
+        opts=opts,
+        log_level="INFO",
+        devmode=False,
+        asyncio_debug=False,
+        watch=False,
+        drain_timeout=60,
     )
+
+    run_worker(args)

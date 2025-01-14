@@ -20,7 +20,7 @@ const router = useRouter();
       // 从环境变量中读取基础 URL
       const serverBaseUrl = process.env.NEXT_PUBLIC_BASE_URL;
       // 构建完整的 URL
-      const tokenUrl = `${serverBaseUrl}/getToken?name=${encodeURIComponent(formData.name)}&room=${encodeURIComponent(formData.room)}`;
+      const tokenUrl = `${serverBaseUrl}/api/v1/get_token?name=${encodeURIComponent(formData.name)}&room=${encodeURIComponent(formData.room)}`;
       const response = await fetch(tokenUrl, {
         method: 'GET',
       });
