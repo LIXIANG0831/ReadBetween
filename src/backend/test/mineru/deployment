@@ -1,9 +1,0 @@
-# CPU部署
-conda create -n MinerU python=3.10
-conda activate MinerU
-pip install -U magic-pdf"[full]" --extra-index-url https://wheels.myhloli.com -i https://mirrors.aliyun.com/pypi/simple
-
-# 下载所需模型
-pip install modelscope
-wget https://gitee.com/myhloli/MinerU/raw/master/scripts/download_models.py -O download_models.py
-python download_models.py
