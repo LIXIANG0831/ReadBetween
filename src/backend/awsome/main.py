@@ -14,13 +14,13 @@ async def _LIFESPAN(app: FastAPI):
     init_database()
 
     # 启动 Celery worker
-    # celery_command = f"celery -A awsome.core.celery_app worker --loglevel=info"  # 替换为你的模块路径
-    # process = subprocess.Popen(celery_command, shell=True)
+    celery_command = f"celery -A awsome.core.celery_app worker --loglevel=info"  # 替换为你的模块路径
+    process = subprocess.Popen(celery_command, shell=True)
 
     yield  # yield 前为程序启动前 后为程序关闭后
 
     # 关闭 Celery worker
-    # process.terminate()
+    process.terminate()
 
 
 _EXCEPTION_HANDLERS = {

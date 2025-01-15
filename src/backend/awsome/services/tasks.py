@@ -46,6 +46,7 @@ def celery_text_vectorize(task_json):
             # 文档切片向量化 组织数据结构
             extract_results = []
             if enable_layout_flag == 1:  # 布局识别
+                # TODO 启用布局识别
                 pass
             elif enable_layout_flag == 0:  # 不进行布局识别
                 # 实例化pdf工具

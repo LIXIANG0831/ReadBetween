@@ -13,8 +13,9 @@ encryption_tool = EncryptionTool()
 
 
 class ModelCfgWithProvider(BaseModel):
-    f_model_class: str
-    f_model_name: str
+    id: str
+    # f_model_class: str
+    # f_model_name: str
     api_key: str
     base_url: str
     mark: str
@@ -26,8 +27,8 @@ class ModelCfgBase(AwsomeDBModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="模型ID")
 
     provider_id: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型供应商ID")
-    f_model_class: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型种类")
-    f_model_name: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型名称")
+    # f_model_class: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型种类")
+    # f_model_name: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型名称")
     api_key: str = Field(sa_column=Column(String(255), index=False, nullable=False), description="模型API_KEY")
     base_url: str = Field(sa_column=Column(String(255), index=False, nullable=True), description="模型BASE_URL")
 
@@ -58,10 +59,6 @@ class ModelCfg(ModelCfgBase, table=True):
 class ModelCfgDao(ModelCfgBase):
     @classmethod
     def insert(cls, model_cfg: ModelCfg):
-        # model_name唯一
-        insert_model_cfg = cls.select_one_by_model_name(model_cfg.f_model_name)
-        if insert_model_cfg is not None:
-            return insert_model_cfg
         with session_getter() as session:
             session.add(model_cfg)
             session.commit()
@@ -86,13 +83,12 @@ class ModelCfgDao(ModelCfgBase):
                 .all()
 
             final_results = []
-            print(results)
             for model_cfg, model_provider_cfg in results:
-                print(model_cfg, model_provider_cfg)
                 model_cfg_with_provider = ModelCfgWithProvider(
-                    f_model_class=model_cfg.f_model_class,
-                    f_model_name=model_cfg.f_model_name,
-                    api_key=encryption_tool.decrypt(model_cfg.api_key), # 解密
+                    id=model_cfg.id,
+                    # f_model_class=model_cfg.f_model_class,
+                    # f_model_name=model_cfg.f_model_name,
+                    api_key=model_cfg.api_key,
                     base_url=model_cfg.base_url,
                     mark=model_provider_cfg.mark,
                 )
@@ -108,3 +104,11 @@ class ModelCfgDao(ModelCfgBase):
     def select_one_by_model_name(cls, model_name: str):
         with session_getter() as session:
             return session.query(ModelCfg).filter(ModelCfg.f_model_name == model_name).first()
+
+    @classmethod
+    def select_one_with_provider(cls, model_cfg_id: str):
+        with session_getter() as session:
+            return session.queryno(ModelCfg.id, ModelCfg.api_key, ModelCfg.base_url, ModelProviderCfg.mark) \
+                .join(ModelProviderCfg, ModelCfg.provider_id == ModelProviderCfg.id) \
+                .where(ModelCfg.id == model_cfg_id) \
+                .first()
