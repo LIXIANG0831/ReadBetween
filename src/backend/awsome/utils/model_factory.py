@@ -123,15 +123,21 @@ class ModelFactory:
                 try:
                     cls._default_model_cfg = json.loads(default_model_cfg)
                 except json.JSONDecodeError:
-                    raise ValueError("Invalid JSON format in default model config")
+                    raise ValueError("默认模型配置为无效的Json格式")
             else:
-                raise ValueError("Default model config not found in Redis")
+                raise ValueError("Redis中不存在默认模型配置")
         return cls._default_model_cfg
 
     @staticmethod
     def create_client(config=None, **kwargs):
         if config is None:
             config = ModelFactory._get_default_model_config()
+
+        # 默认配置外 程序中可单独指定默认供应商的其他模型
+        if kwargs.get("embedding_name") is not None:
+            config["embedding_name"] = kwargs.get("embedding_name")
+        if kwargs.get("llm_name") is not None:
+            config["llm_name"] = kwargs.get("llm_name")
 
         provider = config.get("provider_mark")
         # config api_key 还原
@@ -154,10 +160,9 @@ if __name__ == '__main__':
     #     "embedding_name": "text-embedding-004"
     # }
 
-    client = ModelFactory.create_client()
-
-
     async def main():
+        # client = ModelFactory.create_client()
+
         messages = [
             {"role": "system", "content": "你是一个有帮助的 AI 助手。"},
             {"role": "user", "content": "为什么海水在阳光下是蓝色的。"}
@@ -166,11 +171,21 @@ if __name__ == '__main__':
         # llm_resp = await client.generate_text(messages=messages)
         # print(llm_resp)
         # 流式返回
+        # llm_stream_resp = await client.generate_text(messages=messages, stream=True)
+        # for chunk in llm_stream_resp:
+        #     print(chunk.choices[0].delta.content or '', end='')
+        # embedding_resp = await client.get_embeddings(inputs="天王盖地虎，宝塔镇河妖。")
+        # print(embedding_resp)
+
+        #-------------------------------------------------------
+        client = ModelFactory.create_client(llm_name="gemini-1.5-flash-8b", embedding_name="embedding-001")
+        # 单独指定llm
         llm_stream_resp = await client.generate_text(messages=messages, stream=True)
         for chunk in llm_stream_resp:
             print(chunk.choices[0].delta.content or '', end='')
-        # embedding_resp = await client.get_embeddings(inputs="天王盖地虎，宝塔镇河妖。")
-        # print(embedding_resp)
+        # 单独指定embedding
+        embedding_resp = await client.get_embeddings(inputs="天王盖地虎，宝塔镇河妖。")
+        print(embedding_resp)
 
 
     asyncio.run(main())

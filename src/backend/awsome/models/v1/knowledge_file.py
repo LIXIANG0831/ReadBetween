@@ -29,3 +29,4 @@ class KnowledgeFileVectorizeTasks(BaseModel):
     repeat_size: int
     separator: str
     enable_layout: int
+    embedding_name: str

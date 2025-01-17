@@ -70,11 +70,12 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
         file_object_names = knowledge_file_execute.file_object_names
         target_kb_id = knowledge_file_execute.kb_id
         # 校验target_kb_id是否存在
-        is_kb_exist: Knowledge = KnowledgeService.get_knowledge_by_id(target_kb_id)
-        if not is_kb_exist:
+        target_knowledge: Knowledge = await KnowledgeService.get_knowledge_by_id(target_kb_id)
+        if not target_knowledge:
             raise Exception(f"知识库{target_kb_id}不存在")
         # 上传文件列表到对应知识库
-        enable_layout_flag = is_kb_exist.enable_layout
+        enable_layout_flag = target_knowledge.enable_layout
+        embedding_name = target_knowledge.model
         result: List[KnowledgeFile] = KnowledgeFileService.upload_files_to_kb(file_object_names, target_kb_id)
         if knowledge_file_execute.auto is False:
             # 不进行自动解析
@@ -83,7 +84,6 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
         else:
             # TODO auto为True 启动后台任务自动解析
             # 根据kb_id获取collection_name/index_name
-            target_knowledge = await KnowledgeService.get_knowledge_by_id(target_kb_id)
             target_collection_name = target_knowledge.collection_name
             target_index_name = target_knowledge.index_name
 
@@ -130,7 +130,8 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
                                                    chunk_size=knowledge_file_execute.chunk_size,
                                                    repeat_size=knowledge_file_execute.repeat_size,
                                                    separator=knowledge_file_execute.separator,
-                                                   enable_layout=enable_layout_flag)
+                                                   enable_layout=enable_layout_flag,
+                                                   embedding_name=embedding_name)
 
             # Desperate 后台执行任务
             # background_tasks.add_task(bg_text_vectorize, new_task)

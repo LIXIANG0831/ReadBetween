@@ -5,6 +5,7 @@ from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.minio_util import MinioUtil
 from awsome.utils.logger_util import logger_util
+from awsome.utils.model_factory import ModelFactory
 from awsome.utils.tools import PdfExtractTool
 from awsome.services.constant import (milvus_default_fields,  # 默认字段
                                       milvus_default_index_params  # 默认索引配置
@@ -24,6 +25,8 @@ def celery_text_vectorize(task_json):
         milvus_client = MilvusUtil()
         # 实例化es
         es_client = ElasticSearchUtil()
+        # 获取默认模型配置客户端
+        client = ModelFactory.create_client(embedding_name=knowledge_file_vectorize_task.embedding_name)
     except Exception as e:
         file_vectorize_err_msg += f"实例化异常:{e}\n"
         logger_util.exception(file_vectorize_err_msg)
@@ -97,12 +100,12 @@ def celery_text_vectorize(task_json):
                     "file_id": file_id,
                     "knowledge_id": target_kb_id,
                     "text": m_extract_result.get("chunk", ""),
-                    "vector": [float(i) for i in range(1024)]
+                    "vector": client.get_embeddings(inputs=m_extract_result.get("chunk", ""))
                 }
                 for m_extract_result in extract_results
             ]
             milvus_client.insert_data(target_collection_name, insert_data)
-            # Desperate 创建Collection时已完成索引创建
+            # Desperate----- 创建Collection时已完成索引创建
             # milvus_client.create_index_on_field(target_collection_name, "vector", milvus_default_index_params)
             logger_util.debug("====》Milvus插入完成")
 

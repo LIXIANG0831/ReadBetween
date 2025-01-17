@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 class KnowledgeCreate(BaseModel):
     name: str = Field(..., examples=["新建知识库1"], description="知识库名称")
     desc: str = Field(None, examples=["知识库描述信息"], description="知识库描述信息")
-    model: str = Field(..., examples=["text-embedding-ada-002"], description="向量化模型")
+    model: str = Field(None, examples=["text-embedding-ada-002"], description="向量化模型")
     collection_name: str = Field(None, examples=[""], description="collection名称")
     index_name: str = Field(None, examples=[""], description="index名称")
     enable_layout: int = Field(0, examples=[0], description="是否开启布局识别")
