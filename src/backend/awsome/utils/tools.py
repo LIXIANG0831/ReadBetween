@@ -10,7 +10,18 @@ from pdfminer.layout import LTTextBox, LTTextLine
 from awsome.core.context import file_open
 
 
-class PdfExtractTool:
+class BaseTool:
+    @staticmethod
+    def calculate_md5(file_path):
+        """计算文件的 MD5 哈希值"""
+        hash_md5 = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+
+
+class PdfExtractTool(BaseTool):
     def __init__(self, pdf_file, chunk_size=1000, repeat_size=200):
         self.pdf_file = pdf_file
         self.chunk_size = chunk_size
@@ -62,7 +73,7 @@ class PdfExtractTool:
         return results
 
 
-class EncryptionTool:
+class EncryptionTool(BaseTool):
     def __init__(self):
         # 从配置中获取盐值并编码为字节
         self.SALT = get_config("extra.salt").encode()

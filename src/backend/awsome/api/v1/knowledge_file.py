@@ -16,6 +16,7 @@ from awsome.utils.logger_util import logger_util
 from awsome.services.knowledge_file import KnowledgeFileService
 from awsome.services.knowledge import KnowledgeService
 from awsome.utils.thread_pool_executor_util import ThreadPoolExecutorUtil
+from awsome.utils.tools import BaseTool
 
 router = APIRouter(tags=["知识库文件管理"])
 
@@ -44,18 +45,28 @@ async def upload_knowledge_file(file: UploadFile = File(...)):
 
         tmp_file_name = Path(tmp_file_path).name
         object_name = f"knowledge_file/{tmp_file_name}"
-        # TODO 上传前使用minio_client校验是否存在当前文件 存在则特殊处理
-        minio_client.upload_file(tmp_file_path, object_name)
+
+        current_file_md5 = BaseTool.calculate_md5(tmp_file_path)
+        exists, existing_object_name, presigned_url = minio_client.object_exists_by_md5(current_file_md5)
+        if not exists:  # 不存在当前上传文件
+            minio_client.upload_file(tmp_file_path, object_name)
+
+            file_path = minio_client.get_presigned_url(object_name)
+
+            upload_file_info = {
+                "file_name": file_name,
+                "object_name": object_name,
+                "file_path": file_path
+            }
+        else:  # 已存在当前上传文件
+            upload_file_info = {
+                "file_name": file_name,
+                "object_name": existing_object_name,
+                "file_path": presigned_url
+            }
+            logger_util.info(f"当前文件已存在MinIO，直接返回预签名链接")
 
         os.remove(tmp_file_path)  # 删除临时文件
-
-        file_path = minio_client.get_presigned_url(object_name)
-
-        upload_file_info = {
-            "file_name": file_name,
-            "object_name": object_name,
-            "file_path": file_path
-        }
 
         return resp_200(data=upload_file_info)
     except Exception as e:

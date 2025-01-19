@@ -77,6 +77,20 @@ class MinioUtil:
             logger_util.error(f"Error downloading file: {e}")
             return None
 
+    def object_exists_by_md5(self, md5_value: str, bucket_name: str = default_bucket_name) -> (bool, str, str, str):
+        """根据 MD5 值检查对象是否存在于桶中，如果存在，返回对象名和预签名 URL"""
+        try:
+            objects = self.client.list_objects(bucket_name, recursive=True)
+            for obj in objects:
+                obj_stat = self.client.stat_object(bucket_name, obj.object_name)
+                if obj_stat.etag.strip('"') == md5_value:
+                    # 生成预签名 URL，固定过期时间为 1 小时
+                    presigned_url = self.get_presigned_url(obj.object_name)
+                    return True, obj.object_name, presigned_url
+            return False, "", ""
+        except S3Error as e:
+            logger_util.error(f"Error checking object by MD5: {e}")
+            return False, "", ""
 
 
 
