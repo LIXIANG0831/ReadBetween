@@ -1,3 +1,5 @@
+import asyncio
+
 from pymilvus import (
     connections,
     Collection,
@@ -7,6 +9,7 @@ from pymilvus import (
 )
 from awsome.settings import get_config
 from awsome.utils.logger_util import logger_util
+from awsome.utils.model_factory import ModelFactory
 
 
 class MilvusUtil:
@@ -52,7 +55,9 @@ class MilvusUtil:
     @classmethod
     def insert_data(self, collection_name, insert_data: list, ids=None):
         try:
+            # ids 用于自定义milvus主键
             collection = Collection(collection_name)
+            print(insert_data)
             collection.insert(insert_data, ids=ids)
             collection.flush()  # 刷新到磁盘
         except MilvusException as e:
@@ -60,13 +65,27 @@ class MilvusUtil:
             raise MilvusException(message=f"向{collection_name}集合插入向量失败:{e}")
 
     @classmethod
-    def search_by_vectors(self, query_vectors, collection_names, top_k=5):
+    def search_by_vectors(self, query_vectors, collection_names, search_params=None, top_k=5, expr=None, output_fields=None):
         results = {}
+
+        if search_params is None:
+            search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
+
         try:
             for collection_name in collection_names:
                 collection = Collection(collection_name)
-                search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
-                result = collection.search(query_vectors, "vector_field_name", search_params, limit=top_k)
+                collection.load()  # 加载集合
+                # 如果用户没有指定输出字段，则默认返回所有字段（除了向量字段本身）
+                if output_fields is None:
+                    output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
+
+                result = collection.search(data=[query_vectors],
+                                           anns_field="vector",
+                                           param=search_params,
+                                           limit=top_k,
+                                           expr=expr, # 条件过滤表达式
+                                           output_fields=output_fields # 指定返回的字段
+                )
                 results[collection_name] = result
             return results
         except MilvusException as e:
@@ -103,10 +122,10 @@ class MilvusUtil:
             raise MilvusException(message=f"断开与Milvus的连接失败：{e}")
 
 
-# 使用示例
-if __name__ == "__main__":
-    # milvus_client = MilvusUtil()
-    #
+async def main():
+    milvus_client = MilvusUtil()
+    model_client = ModelFactory().create_client()
+
     # # 创建集合
     # fields = [
     #     {"name": "id", "dtype": DataType.INT64, "is_primary": True},
@@ -128,9 +147,11 @@ if __name__ == "__main__":
     # milvus_client.create_index("collection_two", "vector_field_name", index_params)
     #
     # # 从多个集合中搜索向量
-    # query_vectors = [[0.1, 0.2, 0.3]]
-    # results = milvus_client.search_by_vectors(query_vectors, ["collection_one", "collection_two"])
-    # print(results)
+    query_vectors = model_client.get_embeddings("卡萨帝热水器").data[0].embedding
+    print(query_vectors)
+    print(len(query_vectors))
+    results = milvus_client.search_by_vectors(query_vectors, ["c_awsome_5bec2a1c51f34c5c879431117151790b"])
+    print(results)
     #
     # # 删除指定集合
     # milvus_client.drop_collection("collection_one")
@@ -138,4 +159,8 @@ if __name__ == "__main__":
     #
     # # 关闭连接
     # milvus_client.close()
-    pass
+
+# 使用示例
+if __name__ == "__main__":
+    asyncio.run(main())
+

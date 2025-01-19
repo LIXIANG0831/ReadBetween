@@ -46,7 +46,7 @@ class PdfExtractTool:
                                 "start_page": start_page,
                                 "chunk_index": chunk_index_cnt,
                                 "chunk_bboxes": chunk_bboxes,
-                                "chunk": file_name + ":" + repeat_chunk + chunk,
+                                "chunk": repeat_chunk + chunk,
                             })
                             chunk_index_cnt += 1
                             repeat_chunk = copy.deepcopy(chunk[self.repeat_size:])

@@ -7,7 +7,7 @@ from awsome.models.dao.knowledge import KnowledgeDao
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.redis_util import RedisUtil
-from awsome.services.constant import milvus_default_index_params, milvus_default_fields
+from awsome.services.constant import milvus_default_index_params, milvus_default_fields_768
 from fastapi import HTTPException
 import uuid
 from awsome.services.constant import redis_default_model_key
@@ -30,13 +30,13 @@ class KnowledgeService(BaseService):
         # TODO 同时创建Milvus-Collection
         new_milvus_collection_name = f"c_awsome_{uuid.uuid4().hex}"
         new_elastic_index_name = f"i_awsome_{uuid.uuid4().hex}"
-        # TODO 允许knowledge_create模型为空 为空获取默认模型
-        if knowledge_create.model is None:
+        # 允许knowledge_create模型为空 为空获取默认模型
+        if knowledge_create.model is None or knowledge_create.model == "":
             knowledge_create.model = json.loads(redis_util.get(redis_default_model_key)).get("embedding_name")
         try:
             # 创建MilvusCollection
             milvus_client.create_collection(new_milvus_collection_name,  # 集合名
-                                            milvus_default_fields)  # 属性
+                                            milvus_default_fields_768)  # 属性
             # 创建MilvusIndex
             milvus_client.create_index_on_field(new_milvus_collection_name,  # 集合名
                                                 "vector",  # 创建索引的属性

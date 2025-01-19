@@ -7,7 +7,7 @@ from awsome.utils.minio_util import MinioUtil
 from awsome.utils.logger_util import logger_util
 from awsome.utils.model_factory import ModelFactory
 from awsome.utils.tools import PdfExtractTool
-from awsome.services.constant import (milvus_default_fields,  # 默认字段
+from awsome.services.constant import (milvus_default_fields_768,  # 默认字段
                                       milvus_default_index_params  # 默认索引配置
                                       )
 from awsome.services.knowledge_file import KnowledgeFileService
@@ -68,6 +68,7 @@ def celery_text_vectorize(task_json):
                 save_document = SaveDocument()
 
                 save_document.index_name = target_index_name  # ***设置索引名称
+                # chunk
                 save_document.text = extra_result.get("chunk", "")
                 save_document.metadata.bbox = extra_result.get("chunk_bboxes", "")
                 save_document.metadata.start_page = extra_result.get("start_page", 0)
@@ -87,10 +88,15 @@ def celery_text_vectorize(task_json):
             """
             if not milvus_client.has_collection(target_collection_name):
                 logger_util.debug(f"新建集合{target_index_name}")
-                milvus_client.create_collection(target_collection_name, milvus_default_fields)
+                milvus_client.create_collection(target_collection_name, milvus_default_fields_768)
                 logger_util.debug(f"完成集合{target_index_name}新建")
-            insert_data = [
-                {
+            # milvus 插入数据
+            insert_data = []
+            for m_extract_result in extract_results:
+                chunk_vector_resp = client.get_embeddings(inputs=m_extract_result.get("chunk", ""))
+                chunk_vector = chunk_vector_resp.data[0].embedding
+                print(chunk_vector)
+                data = {
                     "bbox": str(m_extract_result.get("chunk_bboxes", "")),
                     "start_page": m_extract_result.get("start_page", 0),
                     "source": file_object_name,
@@ -99,11 +105,13 @@ def celery_text_vectorize(task_json):
                     "extra": "",
                     "file_id": file_id,
                     "knowledge_id": target_kb_id,
-                    "text": m_extract_result.get("chunk", ""),
-                    "vector": client.get_embeddings(inputs=m_extract_result.get("chunk", ""))
+                    # title + chunk
+                    "text": file_name + ":" + m_extract_result.get("chunk", ""),
+                    # 调用Embedding模型获取向量数据
+                    "vector": chunk_vector
                 }
-                for m_extract_result in extract_results
-            ]
+                insert_data.append(data)
+
             milvus_client.insert_data(target_collection_name, insert_data)
             # Desperate----- 创建Collection时已完成索引创建
             # milvus_client.create_index_on_field(target_collection_name, "vector", milvus_default_index_params)

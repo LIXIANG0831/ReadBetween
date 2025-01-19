@@ -18,7 +18,7 @@ class BaseModelProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_embeddings(self, inputs=None, **kwargs):
+    def get_embeddings(self, inputs=None, **kwargs):
         pass
 
 
@@ -41,7 +41,7 @@ class OpenAIModelProvider(BaseModelProvider):
         )
         return response
 
-    async def get_embeddings(self, inputs=None, **kwargs):
+    def get_embeddings(self, inputs=None, **kwargs):
         # OpenAI模型的嵌入向量生成逻辑
         response = self.client.embeddings.create(
             input=inputs,
@@ -70,7 +70,7 @@ class CompatibleOpenAIModelProvider(BaseModelProvider):
         )
         return response
 
-    async def get_embeddings(self, inputs=None, **kwargs):
+    def get_embeddings(self, inputs=None, **kwargs):
         # OpenAI模型的嵌入向量生成逻辑
         response = self.client.embeddings.create(
             input=inputs,
@@ -100,7 +100,7 @@ class QwenModelProvider(BaseModelProvider):
         )
         return response
 
-    async def get_embeddings(self, inputs=None, **kwargs):
+    def get_embeddings(self, inputs=None, **kwargs):
         response = dashscope.TextEmbedding.call(
             api_key=self.api_key,
             model=self.embedding_name,
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         for chunk in llm_stream_resp:
             print(chunk.choices[0].delta.content or '', end='')
         # 单独指定embedding
-        embedding_resp = await client.get_embeddings(inputs="天王盖地虎，宝塔镇河妖。")
+        embedding_resp = client.get_embeddings(inputs="天王盖地虎，宝塔镇河妖。")
         print(embedding_resp)
 
 
