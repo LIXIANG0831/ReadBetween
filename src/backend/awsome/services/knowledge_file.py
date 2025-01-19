@@ -66,3 +66,8 @@ class KnowledgeFileService(BaseService):
     @classmethod
     def update_file(cls, file_info: KnowledgeFile):
         return KnowledgeFileDao.update_file(file_info)
+
+
+    @classmethod
+    async def delete_by_kb_id(cls, kb_id):
+        return await KnowledgeFileDao.delete_by_kb_id(kb_id)

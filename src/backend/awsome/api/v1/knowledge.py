@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from awsome.services.knowledge import KnowledgeService
 from awsome.models.schemas.response import resp_200, resp_500
+from awsome.services.knowledge_file import KnowledgeFileService
 from awsome.utils.logger_util import logger_util
 from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
 
@@ -19,6 +20,9 @@ async def create_knowledge(knowledge_create: KnowledgeCreate):
 @router.post("/knowledge/delete")
 async def delete_knowledge(id: str):
     try:
+        # 删除对应文件记录
+        await KnowledgeFileService.delete_by_kb_id(id)
+        logger_util.info(f"delete_knowledge_files done {id=}")
         return resp_200(await KnowledgeService.delete_knowledge(id))
     except Exception as e:
         logger_util.error(f"delete_knowledge error: {e}")

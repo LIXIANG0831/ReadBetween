@@ -1,10 +1,12 @@
 import uuid
-from typing import Optional
+from typing import Optional, List
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String, INT
+from sqlalchemy import Column, String, INT, select, bindparam, Integer
 from sqlmodel import Field, DateTime, text
-from awsome.core.context import session_getter
+from awsome.core.context import session_getter, async_session_getter
 from datetime import datetime
+
+from awsome.utils.logger_util import logger_util
 
 
 class KnowledgeFileBase(AwsomeDBModel):
@@ -20,7 +22,7 @@ class KnowledgeFileBase(AwsomeDBModel):
     extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True),
                                  description="为空未开始向量化|不为空为向量化异常信息")
     # 删除标识
-    delete: int = Field(index=False, default=0, description="删除标志")
+    delete: int = Field(default=0, sa_column=Column(Integer, nullable=False), description="删除标志")
     # 创建时间
     create_time: Optional[datetime] = Field(
         sa_column=Column(
@@ -71,8 +73,16 @@ class KnowledgeFileDao(KnowledgeFile):
             return all_knowledge_files
 
     @classmethod
-    def delete_by_kb_id(cls):
-        pass
+    async def delete_by_kb_id(cls, kb_id: str):
+        async with async_session_getter() as session:
+            query_stmt = select(KnowledgeFile).where(KnowledgeFile.kb_id == bindparam('kb_id', value=kb_id))
+            results = await session.execute(query_stmt)
+            delete_files: List[KnowledgeFile] = results.scalars().all()
+            # 软删除
+            for file in delete_files:
+                file.delete = 1
+            await session.commit()
+            logger_util.info(f"Deleted Knowledge_files with Knowledge_id: {kb_id}")
 
     @classmethod
     def delete_by_id(cls):
