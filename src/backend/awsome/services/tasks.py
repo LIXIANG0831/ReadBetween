@@ -1,3 +1,5 @@
+from celery import shared_task
+
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.schemas.es.save_document import SaveDocument
 from awsome.models.v1.knowledge_file import KnowledgeFileVectorizeTasks
@@ -11,11 +13,17 @@ from awsome.services.constant import (milvus_default_fields_768,  # 默认字段
                                       milvus_default_index_params  # 默认索引配置
                                       )
 from awsome.services.knowledge_file import KnowledgeFileService
-from awsome.core.celery_app import celery
 
 
-@celery.task
-def celery_text_vectorize(task_json):
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),  # 自动重试所有异常
+    max_retries=3,               # 最大重试次数
+    retry_backoff=True,          # 启用退避策略
+    retry_backoff_max=30,        # 最大重试间隔为 30 秒
+    retry_backoff_factor=2       # 退避因子为 2
+)
+def celery_text_vectorize(self, task_json):
     knowledge_file_vectorize_task = KnowledgeFileVectorizeTasks.parse_obj(task_json)
     file_vectorize_err_msg = ""  # 记录异常信息
     try:
@@ -95,7 +103,6 @@ def celery_text_vectorize(task_json):
             for m_extract_result in extract_results:
                 chunk_vector_resp = client.get_embeddings(inputs=m_extract_result.get("chunk", ""))
                 chunk_vector = chunk_vector_resp.data[0].embedding
-                print(chunk_vector)
                 data = {
                     "bbox": str(m_extract_result.get("chunk_bboxes", "")),
                     "start_page": m_extract_result.get("start_page", 0),
@@ -123,10 +130,7 @@ def celery_text_vectorize(task_json):
             KnowledgeFileService.update_file(update_file)
             logger_util.debug("====》数据库数据更新状态")
         except Exception as e:
-            # 清除ES索引
-            # es_client.delete_index(target_index_name)
-            # 清除Milvus集合
-            # milvus_client.drop_collection(target_collection_name)
+            logger_util.error(f"任务失败，正在重试，重试次数：{self.request.retries}")
 
             file_vectorize_err_msg += f"文件{file_name}解析异常:{e}\n"
 

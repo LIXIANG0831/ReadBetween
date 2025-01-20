@@ -57,7 +57,7 @@ class MilvusUtil:
         try:
             # ids 用于自定义milvus主键
             collection = Collection(collection_name)
-            print(insert_data)
+            logger_util.debug(f"插入Milvus向量维度{len(insert_data[0]['vector'])}")
             collection.insert(insert_data, ids=ids)
             collection.flush()  # 刷新到磁盘
         except MilvusException as e:

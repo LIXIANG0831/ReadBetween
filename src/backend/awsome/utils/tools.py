@@ -1,6 +1,8 @@
 import base64
+import binascii
+
 from awsome.settings import get_config
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 import hashlib
 import asyncio
 import copy
@@ -8,6 +10,7 @@ import os
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextBox, LTTextLine
 from awsome.core.context import file_open
+from awsome.utils.logger_util import logger_util
 
 
 class BaseTool:
@@ -94,9 +97,15 @@ class EncryptionTool(BaseTool):
 
     def decrypt(self, encrypted_password: str) -> str:
         """解密密码"""
-        encrypted_bytes = encrypted_password.encode()
-        decrypted_password = self.cipher.decrypt(encrypted_bytes)
-        return decrypted_password.decode()
+        try:
+            # 尝试解密
+            encrypted_bytes = encrypted_password.encode()
+            decrypted_password = self.cipher.decrypt(encrypted_bytes)
+            return decrypted_password.decode()
+        except (InvalidToken, binascii.Error) as e:
+            # 如果解密失败，记录日志并返回原始字符串
+            logger_util.warning(f"解密失败，直接返回原始字符串: {encrypted_password}. 错误信息: {e}")
+            return encrypted_password
 
 
 # 示例使用

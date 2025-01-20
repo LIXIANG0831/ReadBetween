@@ -149,6 +149,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
 
             # celery执行任务
             new_task_dict = new_task.dict()
+            logger_util.info(f"调用任务，参数: {new_task_dict}")
             celery_text_vectorize.delay(new_task_dict)
 
             return resp_200(result)
