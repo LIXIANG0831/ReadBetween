@@ -70,7 +70,7 @@ class KnowledgeService(BaseService):
 
             # 删除MilvusCollection
             drop_collection_name = drop_knowledge.collection_name
-            milvus_client.drop_collection(drop_collection_name)
+            milvus_client.delete_collection(drop_collection_name)
 
             # ES索引存在 同步删除ES索引
             drop_es_index_name = drop_knowledge.index_name

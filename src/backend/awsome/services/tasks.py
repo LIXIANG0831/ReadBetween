@@ -88,13 +88,13 @@ def celery_text_vectorize(self, task_json):
                 save_document.metadata.knowledge_id = target_kb_id
 
                 # 创建索引
-                es_client.insert_doc_to_index(save_document)
+                es_client.save_document(save_document)
             logger_util.debug("====》ES插入完成")
             """
             插入Milvus
             bbox | start_page[chunk片段最小页码] | source | title | chunk_index[分片索引] | extra | file_id | knowledge_id | text | vector | pk[auto_id]
             """
-            if not milvus_client.has_collection(target_collection_name):
+            if not milvus_client.check_collection_exists(target_collection_name):
                 logger_util.debug(f"新建集合{target_index_name}")
                 milvus_client.create_collection(target_collection_name, milvus_default_fields_768)
                 logger_util.debug(f"完成集合{target_index_name}新建")

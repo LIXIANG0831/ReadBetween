@@ -14,6 +14,12 @@ from awsome.utils.model_factory import ModelFactory
 
 class MilvusUtil:
     def __init__(self, host=None, port=None):
+        """
+        初始化 MilvusUtil 实例并建立连接。
+
+        :param host: Milvus 服务的主机地址，默认从配置文件中获取。
+        :param port: Milvus 服务的端口号，默认从配置文件中获取。
+        """
         try:
             host = host or get_config("storage.milvus.host")
             port = port or get_config("storage.milvus.port")
@@ -25,6 +31,11 @@ class MilvusUtil:
             raise Exception(f"初始化MilvusUtil失败：{e}")
 
     def connect(self):
+        """
+        连接到 Milvus 服务。
+
+        :return: None
+        """
         try:
             connections.connect("default", host=self.host, port=self.port)
         except MilvusException as e:
@@ -32,7 +43,13 @@ class MilvusUtil:
             raise MilvusException(message=f"连接到Milvus失败:{e}")
 
     @classmethod
-    def has_collection(self, collection_name):
+    def check_collection_exists(self, collection_name):
+        """
+        检查指定的集合是否存在。
+
+        :param collection_name: 集合名称。
+        :return: 如果集合存在返回 True，否则返回 False。
+        """
         try:
             Collection(name=collection_name)
             return True
@@ -41,6 +58,13 @@ class MilvusUtil:
 
     @classmethod
     def create_collection(self, collection_name, fields):
+        """
+        创建一个新的集合。
+
+        :param collection_name: 集合名称。
+        :param fields: 字段定义列表，每个字段为一个 FieldSchema 对象。
+        :return: None
+        """
         try:
             field_schemas = [
                 field
@@ -54,6 +78,14 @@ class MilvusUtil:
 
     @classmethod
     def insert_data(self, collection_name, insert_data: list, ids=None):
+        """
+        向指定集合中插入数据。
+
+        :param collection_name: 集合名称。
+        :param insert_data: 要插入的数据列表，每个元素为一个字典。
+        :param ids: 自定义主键ID列表，可选。
+        :return: None
+        """
         try:
             # ids 用于自定义milvus主键
             collection = Collection(collection_name)
@@ -65,7 +97,18 @@ class MilvusUtil:
             raise MilvusException(message=f"向{collection_name}集合插入向量失败:{e}")
 
     @classmethod
-    def search_by_vectors(self, query_vectors, collection_names, search_params=None, top_k=5, expr=None, output_fields=None):
+    def search_vectors(self, query_vectors, collection_names, search_params=None, top_k=5, expr=None, output_fields=None):
+        """
+        根据向量进行相似性搜索。
+
+        :param query_vectors: 查询向量。
+        :param collection_names: 要搜索的集合名称列表。
+        :param search_params: 搜索参数，如 {"metric_type": "L2", "params": {"nprobe": 10}}。
+        :param top_k: 返回的最相似结果数量，默认为 5。
+        :param expr: 条件过滤表达式，可选。
+        :param output_fields: 指定返回的字段列表，可选。
+        :return: 搜索结果字典，键为集合名称，值为搜索结果。
+        """
         results = {}
 
         if search_params is None:
@@ -94,6 +137,14 @@ class MilvusUtil:
 
     @classmethod
     def create_index_on_field(self, collection_name, field_name, index_params):
+        """
+        在指定字段上创建索引。
+
+        :param collection_name: 集合名称。
+        :param field_name: 字段名称。
+        :param index_params: 索引参数。
+        :return: None
+        """
         try:
             collection = Collection(collection_name)
             collection.create_index(field_name=field_name, index_params=index_params)
@@ -102,9 +153,15 @@ class MilvusUtil:
             raise MilvusException(message=f"在{collection_name}集合上字段{field_name}创建索引失败:{e}")
 
     @classmethod
-    def drop_collection(self, collection_name):
+    def delete_collection(self, collection_name):
+        """
+        删除指定的集合。
+
+        :param collection_name: 集合名称。
+        :return: None
+        """
         try:
-            if self.has_collection(collection_name):
+            if self.check_collection_exists(collection_name):
                 Collection(collection_name).drop()
                 logger_util.info(f"集合{collection_name}已删除")
             else:
@@ -114,7 +171,12 @@ class MilvusUtil:
             raise MilvusException(message=f"删除集合{collection_name}失败：{e}")
 
     @staticmethod
-    def close(self):
+    def close_connection(self):
+        """
+        断开与 Milvus 的连接。
+
+        :return: None
+        """
         try:
             connections.disconnect("default")
         except MilvusException as e:
@@ -150,7 +212,7 @@ async def main():
     query_vectors = model_client.get_embeddings("卡萨帝热水器").data[0].embedding
     print(query_vectors)
     print(len(query_vectors))
-    results = milvus_client.search_by_vectors(query_vectors, ["c_awsome_5bec2a1c51f34c5c879431117151790b"])
+    results = milvus_client.search_vectors(query_vectors, ["c_awsome_5bec2a1c51f34c5c879431117151790b"])
     print(results)
     #
     # # 删除指定集合
