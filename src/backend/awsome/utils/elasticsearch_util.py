@@ -58,10 +58,10 @@ class ElasticSearchUtil:
             logger_util.error(f"删除索引 {index_name} 时发生错误: {e}")
             raise Exception(f"删除索引 {index_name} 时发生错误: {e}")
 
-    def search_documents(self, index_name, query, size=10, fields=None):
+    def search_documents(self, index_names, query, size=10, fields=None):
         """
         在指定的索引中搜索文档，并支持返回字段过滤。
-        :param index_name: 索引名称。
+        :param index_names: 索引名称列表，支持从多个索引中检索。
         :param query: 查询内容，可以是简单的字符串或复杂的查询字典。
         :param size: 返回结果的数量，默认为10。
         :param fields: 返回字段过滤，可以是一个字段列表或排除字段字典。
@@ -69,7 +69,7 @@ class ElasticSearchUtil:
         """
         try:
             # 创建搜索对象
-            s = Search(index=index_name)
+            s = Search(index=index_names)
 
             # 构建查询
             if isinstance(query, str):
@@ -151,7 +151,7 @@ if __name__ == '__main__':
         }
     }
     results_1 = es_util.search_documents(
-        index_name="i_awsome_fba56f730a124d5895db003677734978",
+        index_names=["i_awsome_fba56f730a124d5895db003677734978"],
         query=query_dict,
         size=5,
         fields=["metadata.title", "text"]  # 只返回title text
@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
     query_str = "热水器"
     results_2 = es_util.search_documents(
-        index_name="i_awsome_fba56f730a124d5895db003677734978",
+        index_names=["i_awsome_fba56f730a124d5895db003677734978"],
         query=query_str,
         size=5,
         fields={"excludes": ["metadata"]}  # 只返回 text
