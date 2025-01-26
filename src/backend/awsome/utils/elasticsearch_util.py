@@ -5,7 +5,10 @@ from awsome.utils.logger_util import logger_util
 from awsome.models.schemas.es.base import BaseDocument
 
 
+
+
 class ElasticSearchUtil:
+
     def __init__(self, es_hosts=None, es_timeout=None, es_http_auth=None):
         """
         初始化 Elasticsearch 连接。
@@ -30,7 +33,8 @@ class ElasticSearchUtil:
             logger_util.error(f"Elasticsearch连接失败: {e}")
             raise Exception(f"Elasticsearch连接失败: {e}")
 
-    def save_document(self, save_document: BaseDocument):
+    @classmethod
+    def save_document(cls, save_document: BaseDocument):
         """
         将文档保存到 Elasticsearch 索引中。
         :param save_document: 要保存的文档对象。
@@ -41,7 +45,8 @@ class ElasticSearchUtil:
             logger_util.error(f"保存文档失败: {e}")
             raise Exception(f"保存文档失败: {e}")
 
-    def delete_index(self, index_name):
+    @classmethod
+    def delete_index(cls, index_name):
         """
         删除指定的 Elasticsearch 索引。
         :param index_name: 要删除的索引名称。
@@ -58,7 +63,8 @@ class ElasticSearchUtil:
             logger_util.error(f"删除索引 {index_name} 时发生错误: {e}")
             raise Exception(f"删除索引 {index_name} 时发生错误: {e}")
 
-    def search_documents(self, index_names, query, size=10, fields=None):
+    @classmethod
+    def search_documents(cls, index_names, query, size=10, fields=None):
         """
         在指定的索引中搜索文档，并支持返回字段过滤。
         :param index_names: 索引名称列表，支持从多个索引中检索。
@@ -97,14 +103,23 @@ class ElasticSearchUtil:
             response = s.execute()
 
             # 提取结果
-            results = [hit.to_dict() for hit in response.hits]
+            results = [
+                {
+                    "id": hit.meta.id,
+                    "score": hit.meta.score,
+                    "index_name": hit.meta.index,  # 获取文档所属的索引名称
+                    "document": hit.to_dict()
+                }
+                for hit in response.hits
+            ]
             logger_util.info(f"查询成功，返回结果数量: {len(results)}")
             return results
         except Exception as e:
-            logger_util.error(f"在索引 {index_name} 中搜索文档时发生错误: {e}")
-            raise Exception(f"在索引 {index_name} 中搜索文档时发生错误: {e}")
+            logger_util.error(f"在索引 {index_names} 中搜索文档时发生错误: {e}")
+            raise Exception(f"在索引 {index_names} 中搜索文档时发生错误: {e}")
 
-    def delete_documents(self, index_name, query):
+    @classmethod
+    def delete_documents(cls, index_name, query):
         """
         根据查询条件删除指定索引中的文档。
         :param index_name: 索引名称。
@@ -127,7 +142,8 @@ class ElasticSearchUtil:
             logger_util.error(f"在索引 {index_name} 中删除文档时发生错误: {e}")
             raise Exception(f"在索引 {index_name} 中删除文档时发生错误: {e}")
 
-    def check_connection(self):
+    @classmethod
+    def check_connection(cls):
         """
         检查 Elasticsearch 连接是否正常。
         """
@@ -146,23 +162,23 @@ if __name__ == '__main__':
     query_dict = {  # match 查询必须嵌套在 query 字段下
         "query": {
             "match": {
-                "text": "热水器"
+                "text": "卡萨帝热水器"
             }
         }
     }
-    results_1 = es_util.search_documents(
-        index_names=["i_awsome_fba56f730a124d5895db003677734978"],
-        query=query_dict,
-        size=5,
-        fields=["metadata.title", "text"]  # 只返回title text
-    )
-    print(results_1)
+    # results_1 = es_util.search_documents(
+    #     index_names=["i_awsome_aded292a91db4ec08c9a556392341305", "i_awsome_943eaa8acc564a88b74237f065fc2e5d"],
+    #     query=query_dict,
+    #     size=5,
+    #     fields=["metadata.title", "text"]  # 只返回title text
+    # )
+    # print(results_1)
 
-    query_str = "热水器"
+    query_str = "卡萨帝热水器"
     results_2 = es_util.search_documents(
-        index_names=["i_awsome_fba56f730a124d5895db003677734978"],
+        index_names=["i_awsome_aded292a91db4ec08c9a556392341305", "i_awsome_943eaa8acc564a88b74237f065fc2e5d"],
         query=query_str,
         size=5,
-        fields={"excludes": ["metadata"]}  # 只返回 text
+        # fields={"excludes": ["metadata"]}  # 只返回 text
     )
     print(results_2)

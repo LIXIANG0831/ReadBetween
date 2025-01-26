@@ -1,11 +1,12 @@
 import asyncio
+import json
 
 from pymilvus import (
     connections,
     Collection,
     FieldSchema,
     CollectionSchema,
-    DataType, MilvusException
+    DataType, MilvusException, SearchResult
 )
 from awsome.settings import get_config
 from awsome.utils.logger_util import logger_util
@@ -43,7 +44,7 @@ class MilvusUtil:
             raise MilvusException(message=f"连接到Milvus失败:{e}")
 
     @classmethod
-    def check_collection_exists(self, collection_name):
+    def check_collection_exists(cls, collection_name):
         """
         检查指定的集合是否存在。
 
@@ -57,7 +58,7 @@ class MilvusUtil:
             return False
 
     @classmethod
-    def create_collection(self, collection_name, fields):
+    def create_collection(cls, collection_name, fields):
         """
         创建一个新的集合。
 
@@ -77,7 +78,7 @@ class MilvusUtil:
             raise MilvusException(message=f"创建集合{collection_name}失败:{e}")
 
     @classmethod
-    def insert_data(self, collection_name, insert_data: list, ids=None):
+    def insert_data(cls, collection_name, insert_data: list, ids=None):
         """
         向指定集合中插入数据。
 
@@ -97,7 +98,8 @@ class MilvusUtil:
             raise MilvusException(message=f"向{collection_name}集合插入向量失败:{e}")
 
     @classmethod
-    def search_vectors(self, query_vectors, collection_names, search_params=None, top_k=5, expr=None, output_fields=None):
+    def search_vectors(cls, query_vectors, collection_names, search_params=None, top_k=5, expr=None,
+                       output_fields=None):
         """
         根据向量进行相似性搜索。
 
@@ -107,9 +109,9 @@ class MilvusUtil:
         :param top_k: 返回的最相似结果数量，默认为 5。
         :param expr: 条件过滤表达式，可选。
         :param output_fields: 指定返回的字段列表，可选。
-        :return: 搜索结果字典，键为集合名称，值为搜索结果。
+        :return: 搜索结果。
         """
-        results = {}
+        results = []
 
         if search_params is None:
             search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
@@ -121,22 +123,31 @@ class MilvusUtil:
                 # 如果用户没有指定输出字段，则默认返回所有字段（除了向量字段本身）
                 if output_fields is None:
                     output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
-
-                result = collection.search(data=[query_vectors],
-                                           anns_field="vector",
-                                           param=search_params,
-                                           limit=top_k,
-                                           expr=expr, # 条件过滤表达式
-                                           output_fields=output_fields # 指定返回的字段
+                result: SearchResult = collection.search(
+                    data=[query_vectors],
+                    anns_field="vector",
+                    param=search_params,
+                    limit=top_k,
+                    expr=expr,  # 条件过滤表达式
+                    output_fields=output_fields  # 指定返回的字段
                 )
-                results[collection_name] = result
+
+                # 提取结果中的数据
+                for hits in result:
+                    # <class 'pymilvus.client.abstract.Hits'>
+                    for hit in hits:
+                        result_dict = hit.to_dict()
+                        # 增加collection_name
+                        result_dict["collection_name"] = collection_name
+                        results.append(result_dict)
+
             return results
         except MilvusException as e:
             logger_util.error(f"搜索向量失败：{e}")
-            return {}
+            return []
 
     @classmethod
-    def create_index_on_field(self, collection_name, field_name, index_params):
+    def create_index_on_field(cls, collection_name, field_name, index_params):
         """
         在指定字段上创建索引。
 
@@ -153,7 +164,7 @@ class MilvusUtil:
             raise MilvusException(message=f"在{collection_name}集合上字段{field_name}创建索引失败:{e}")
 
     @classmethod
-    def delete_collection(self, collection_name):
+    def delete_collection(cls, collection_name):
         """
         删除指定的集合。
 
@@ -161,7 +172,7 @@ class MilvusUtil:
         :return: None
         """
         try:
-            if self.check_collection_exists(collection_name):
+            if cls.check_collection_exists(collection_name):
                 Collection(collection_name).drop()
                 logger_util.info(f"集合{collection_name}已删除")
             else:
@@ -210,11 +221,11 @@ async def main():
     #
     # # 从多个集合中搜索向量
     query_vectors = model_client.get_embeddings("卡萨帝热水器").data[0].embedding
-    print(query_vectors)
-    print(len(query_vectors))
-    results = milvus_client.search_vectors(query_vectors, ["c_awsome_5bec2a1c51f34c5c879431117151790b"])
-    print(results)
-    #
+    results = milvus_client.search_vectors(query_vectors, ["c_awsome_6565131da2524faca0e726ec0ffa26d1", "c_awsome_de8ed36a35a444a19cec145308b78b1f"],)
+    print(len(results))
+    for result in results:
+        print(result)
+
     # # 删除指定集合
     # milvus_client.drop_collection("collection_one")
     # milvus_client.drop_collection("collection_two")
@@ -222,7 +233,7 @@ async def main():
     # # 关闭连接
     # milvus_client.close()
 
+
 # 使用示例
 if __name__ == "__main__":
     asyncio.run(main())
-

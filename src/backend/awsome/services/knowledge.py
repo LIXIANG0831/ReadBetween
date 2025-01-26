@@ -32,6 +32,7 @@ class KnowledgeService(BaseService):
         new_elastic_index_name = f"i_awsome_{uuid.uuid4().hex}"
         # 允许knowledge_create模型为空 为空获取默认模型
         if knowledge_create.model is None or knowledge_create.model == "":
+            # TODO 优化获取默认模型配置
             knowledge_create.model = json.loads(redis_util.get(redis_default_model_key)).get("embedding_name")
         try:
             # 创建MilvusCollection
