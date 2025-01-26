@@ -108,7 +108,7 @@ class ModelCfgDao(ModelCfgBase):
     @classmethod
     def select_one_with_provider(cls, model_cfg_id: str):
         with session_getter() as session:
-            return session.queryno(ModelCfg.id, ModelCfg.api_key, ModelCfg.base_url, ModelProviderCfg.mark) \
+            return session.query(ModelCfg.id, ModelCfg.api_key, ModelCfg.base_url, ModelProviderCfg.mark) \
                 .join(ModelProviderCfg, ModelCfg.provider_id == ModelProviderCfg.id) \
                 .where(ModelCfg.id == model_cfg_id) \
                 .first()
