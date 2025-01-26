@@ -1,5 +1,4 @@
-from celery import shared_task
-
+from awsome.core.celery_app import celery as ywjz_celery
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.schemas.es.save_document import SaveDocument
 from awsome.models.v1.knowledge_file import KnowledgeFileVectorizeTasks
@@ -15,7 +14,7 @@ from awsome.services.constant import (milvus_default_fields_768,  # 默认字段
 from awsome.services.knowledge_file import KnowledgeFileService
 
 
-@shared_task(
+@ywjz_celery.task(
     bind=True,
     autoretry_for=(Exception,),  # 自动重试所有异常
     max_retries=3,               # 最大重试次数

@@ -15,11 +15,20 @@ export PYTHONPATH=$PYTHONPATH:$PROJECT_DIR
 # 创建 logs/ 目录（如果不存在）
 mkdir -p "$SCRIPT_DIR/logs"
 
-# 启动多个 Celery worker
-for i in {1..3}; do
+# 获取用户指定的 worker 数量，默认为 1
+NUM_WORKERS=${1:-1}
+
+# 确保 NUM_WORKERS 是一个正整数
+if ! [[ "$NUM_WORKERS" =~ ^[0-9]+$ ]]; then
+    echo "错误：请输入一个正整数作为 worker 数量。"
+    exit 1
+fi
+
+# 启动指定数量的 Celery worker
+for ((i=1; i<=NUM_WORKERS; i++)); do
     worker_name="worker${i}"
     log_file="$SCRIPT_DIR/logs/${worker_name}.log"
-    celery -A awsome.core.celery_app worker -n "${worker_name}@%h" --loglevel=info --logfile="$log_file" &
+    nohup celery -A awsome.core.celery_app worker -n "${worker_name}@%h" --loglevel=info --logfile="$log_file" > /dev/null 2>&1 &
 done
 
 echo "所有 Celery worker 已启动，日志保存在 $SCRIPT_DIR/logs/ 下。"
