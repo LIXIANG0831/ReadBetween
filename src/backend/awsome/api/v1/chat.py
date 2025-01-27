@@ -1,67 +1,44 @@
 import json
 from fastapi.responses import StreamingResponse
-from fastapi import APIRouter
-from awsome.models.v1.chat import Chat
+from fastapi import APIRouter, HTTPException
+from awsome.models.v1.chat import ChatRequest
 from awsome.utils.logger_util import logger_util
-from awsome.settings import get_config
-import openai
-
-client = openai.Client(
-    api_key=get_config("api.openai.api_key"),
-    base_url=get_config("api.openai.base_url")
-)
+from awsome.utils.model_factory import ModelFactory
 
 router = APIRouter(tags=["模型会话"])
 
 
-@router.post("/chat", summary="直接与模型会话" )
-async def chat(chat_request: Chat):
-    async def generate():
-        messages = chat_request.messages.copy()  # 复制现有的消息列表
-        messages.append({"role": "user", "content": chat_request.query})
-        try:
-            response = client.chat.completions.create(
-                model="gpt-4-32k",
-                stream=chat_request.stream,
-                temperature=chat_request.temperature,
-                messages=messages,
-            )
+@router.post("/chat", summary="直接与模型对话")
+async def chat(chat_request: ChatRequest):
+    try:
+        # 创建模型客户端
+        client = ModelFactory.create_client()
 
-            answer = ""  # 拼接模型响应
+        # 构造 OpenAI 请求参数
+        generate_params = {
+            "messages": [msg.dict() for msg in chat_request.messages],
+            "temperature": chat_request.temperature,
+            "max_tokens": chat_request.max_tokens,
+            "stream": chat_request.stream,
+        }
 
-            if chat_request.stream:
-                for chunk in response:  # 处理流式响应
-                    answer += chunk.choices[0].delta.content
-                    if chat_request.pretty_print:
-                        output = chunk.choices[0].delta.content
-                        if output:
-                            yield output + "\n\n"
-                    else:
-                        yield chunk.choices[0].delta.json() + "\n\n"
-                logger_util.info(f"\n用户询问:{chat_request.query}\n流式响应:{answer}")
-            else:
-                answer = response.choices[0].message.content
-                if chat_request.pretty_print:  # 处理非流式响应
-                    yield response.choices[0].message.content + "\n\n"
-                else:
-                    yield response.choices[0].message.json() + "\n\n"
-                logger_util.info(f"\n用户询问:{chat_request.query}\n非流式响应:{answer}")
+        if chat_request.stream:
+            # 流式输出
+            async def generate():
+                response = await client.generate_text(**generate_params)
+                for chunk in response:
+                    # 直接访问 ChoiceDelta 对象的 content 属性
+                    content = chunk.choices[0].delta.content or ""
+                    if content:
+                        yield json.dumps({"content": content}, ensure_ascii=False) + "\n"
 
-            if chat_request.save_messages:
-                if len(messages) > chat_request.max_messages_cnt:
-                    messages.pop(0)
-                messages.append({"role": "assistant", "content": answer})
-                history = {
-                    "history": messages,
-                }
-                yield json.dumps(history, ensure_ascii=False) + "\n\n"
-        except openai.OpenAIError as e:
-            error_message = f"OpenAI API error: {str(e)}"
-            logger_util.error(error_message)
-            yield f"Error: {error_message}\n\n"
-        except Exception as e:
-            error_message = f"An unexpected error occurred: {str(e)}"
-            logger_util.error(error_message)
-            yield f"Error: {error_message}\n\n"
+            return StreamingResponse(generate(), media_type="text/event-stream")
+        else:
+            # 非流式输出
+            response = await client.generate_text(**generate_params)
+            content = response.choices[0].message.content
+            return {"content": content}
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    except Exception as e:
+        logger_util.warning(f"模型直接对话异常: An error occurred: {str(e)}")
+        return HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")

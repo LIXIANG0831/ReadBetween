@@ -39,6 +39,7 @@ def create_app():
     )
 
     app.middleware("http")(log_access)
+    # TODO 添加中间件判断是否设置默认模型
 
     from api.router import root_router
     app.include_router(root_router)
