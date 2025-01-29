@@ -47,13 +47,13 @@ class KnowledgeFile(KnowledgeFileBase, table=True):
     __table_args__ = {"extend_existing": True}  # 允许扩展现有的表
 
 
-class KnowledgeFileDao(KnowledgeFile):
-    @classmethod
-    def insert(cls):
+class KnowledgeFileDao:
+    @staticmethod
+    def insert():
         pass
 
-    @classmethod
-    def batch_insert(cls, file_insert_list):
+    @staticmethod
+    def batch_insert(file_insert_list):
         with session_getter() as session:
             session.add_all(file_insert_list)
             session.commit()
@@ -61,8 +61,8 @@ class KnowledgeFileDao(KnowledgeFile):
                 session.refresh(file)
             return file_insert_list
 
-    @classmethod
-    def select_by_kb_id(cls, kb_id: str, page: int = None, size: int = None):
+    @staticmethod
+    def select_by_kb_id(kb_id: str, page: int = None, size: int = None):
         with session_getter() as session:
             query = session.query(KnowledgeFile).where(KnowledgeFile.kb_id == kb_id, KnowledgeFile.delete == 0)
             if page is not None and size is not None:
@@ -72,8 +72,8 @@ class KnowledgeFileDao(KnowledgeFile):
                 all_knowledge_files = query.all()
             return all_knowledge_files
 
-    @classmethod
-    async def delete_by_kb_id(cls, kb_id: str):
+    @staticmethod
+    async def delete_by_kb_id(kb_id: str):
         async with async_session_getter() as session:
             query_stmt = select(KnowledgeFile).where(KnowledgeFile.kb_id == bindparam('kb_id', value=kb_id))
             results = await session.execute(query_stmt)
@@ -84,19 +84,19 @@ class KnowledgeFileDao(KnowledgeFile):
             await session.commit()
             logger_util.info(f"Deleted Knowledge_files with Knowledge_id: {kb_id}")
 
-    @classmethod
-    def delete_by_id(cls):
+    @staticmethod
+    def delete_by_id():
         pass
 
-    @classmethod
-    def select_by_file_id(cls, file_id: str):
+    @staticmethod
+    def select_by_file_id(file_id: str):
         with session_getter() as session:
             query = session.query(KnowledgeFile).where(KnowledgeFile.id == file_id, KnowledgeFile.delete == 0)
             file_info = query.all()
             return file_info
 
-    @classmethod
-    def update_file(cls, file_info: KnowledgeFile):
+    @staticmethod
+    def update_file(file_info: KnowledgeFile):
         with session_getter() as session:
             # 查询数据库中对应的记录
             file = session.query(KnowledgeFile).filter(KnowledgeFile.id == file_info.id,

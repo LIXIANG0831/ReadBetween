@@ -56,18 +56,18 @@ class ModelCfg(ModelCfgBase, table=True):
     __table_args__ = {"extend_existing": True}  # 允许扩展现有的表
 
 
-class ModelCfgDao(ModelCfgBase):
-    @classmethod
-    def insert(cls, model_cfg: ModelCfg):
+class ModelCfgDao:
+    @staticmethod
+    def insert(model_cfg: ModelCfg):
         with session_getter() as session:
             session.add(model_cfg)
             session.commit()
             session.refresh(model_cfg)
             return model_cfg
 
-    @classmethod
-    def delete_by_id(cls, id):
-        delete_model_cfg = cls.select_one(id)
+    @staticmethod
+    def delete_by_id(id):
+        delete_model_cfg = ModelCfgDao.select_one(id)
         if delete_model_cfg is None:
             return None
         with session_getter() as session:
@@ -75,8 +75,8 @@ class ModelCfgDao(ModelCfgBase):
             session.commit()
             return delete_model_cfg
 
-    @classmethod
-    def select_all(cls):
+    @staticmethod
+    def select_all():
         with (session_getter() as session):
             results = session.query(ModelCfg, ModelProviderCfg) \
                 .join(ModelProviderCfg, ModelCfg.provider_id == ModelProviderCfg.id) \
@@ -95,18 +95,18 @@ class ModelCfgDao(ModelCfgBase):
                 final_results.append(model_cfg_with_provider)
             return final_results
 
-    @classmethod
-    def select_one(cls, id):
+    @staticmethod
+    def select_one(id):
         with session_getter() as session:
             return session.query(ModelCfg).filter(ModelCfg.id == id).first()
 
-    @classmethod
-    def select_one_by_model_name(cls, model_name: str):
+    @staticmethod
+    def select_one_by_model_name(model_name: str):
         with session_getter() as session:
             return session.query(ModelCfg).filter(ModelCfg.f_model_name == model_name).first()
 
-    @classmethod
-    def select_one_with_provider(cls, model_cfg_id: str):
+    @staticmethod
+    def select_one_with_provider(model_cfg_id: str):
         with session_getter() as session:
             return session.query(ModelCfg.id, ModelCfg.api_key, ModelCfg.base_url, ModelProviderCfg.mark) \
                 .join(ModelProviderCfg, ModelCfg.provider_id == ModelProviderCfg.id) \

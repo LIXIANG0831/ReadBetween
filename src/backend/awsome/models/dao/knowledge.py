@@ -1,14 +1,20 @@
+from __future__ import annotations
 import uuid
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
+
+from sqlalchemy.orm import Mapped, relationship
+
 from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, INT, select
-from sqlmodel import Field, DateTime, text
+from sqlmodel import Field, DateTime, text, Relationship
 from awsome.core.context import session_getter, async_session_getter
 from awsome.utils.logger_util import logger_util
 from datetime import datetime
 from fastapi import HTTPException
 
-
+if TYPE_CHECKING:
+    from .conversation_knowledge_link import ConversationKnowledgeLink
+    from .conversations import Conversation
 
 class KnowledgeBase(AwsomeDBModel):
     __tablename__ = "knowledge"
@@ -45,8 +51,24 @@ class KnowledgeBase(AwsomeDBModel):
 class Knowledge(KnowledgeBase, table=True):
     __table_args__ = {"extend_existing": True}  # 允许扩展现有的表
 
+    conversation_links: Mapped[List["ConversationKnowledgeLink"]] = Relationship(
+        back_populates="knowledge",
+        sa_relationship=relationship(
+            "ConversationKnowledgeLink",
+            back_populates="knowledge"
+        )
+    )
 
-class KnowledgeDao(Knowledge):
+    @property
+    def conversations(self) -> List["Conversation"]:
+        return [
+            link.conversation
+            for link in self.conversation_links
+            if link.delete == 0 and link.conversation.delete == 0
+        ]
+
+
+class KnowledgeDao:
     @classmethod
     async def insert(cls, name, desc, model, collection_name, index_name, enable_layout):
         async with async_session_getter() as session:
@@ -108,3 +130,38 @@ class KnowledgeDao(Knowledge):
                 all_knowledge = result.scalars().all()
                 logger_util.info("Fetched all Knowledge entries.")
                 return all_knowledge
+
+    @classmethod
+    async def get_many(cls, knowledge_base_ids: List[str]) -> List[Knowledge]:
+        """
+        批量获取多个知识库记录
+        :param knowledge_base_ids: 知识库ID列表
+        :return: 知识库对象列表
+        """
+        async with async_session_getter() as session:
+            # 构建查询语句：ID在列表中且未被删除
+            stmt = (
+                select(Knowledge)
+                .where(Knowledge.id.in_(knowledge_base_ids))
+                .where(Knowledge.delete == 0)
+            )
+
+            try:
+                result = await session.execute(stmt)
+                knowledge_list = result.scalars().all()
+
+                # 验证是否找到所有请求的ID
+                found_ids = {kb.id for kb in knowledge_list}
+                missing_ids = set(knowledge_base_ids) - found_ids
+
+                if missing_ids:
+                    logger_util.warning(f"未找到的知识库ID: {missing_ids}")
+
+                return knowledge_list
+
+            except Exception as e:
+                logger_util.error(f"批量获取知识库失败: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"数据库查询错误: {str(e)}"
+                )

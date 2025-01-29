@@ -40,15 +40,15 @@ class ModelProviderCfg(ModelProviderCfgBase, table=True):
     __table_args__ = {"extend_existing": True}  # 允许扩展现有的表
 
 
-class ModelProviderCfgDao(ModelProviderCfg):
+class ModelProviderCfgDao:
 
-    @classmethod
-    def select_all(cls):
+    @staticmethod
+    def select_all():
         with session_getter() as session:
             return session.query(ModelProviderCfg).all()
 
-    @classmethod
-    def batch_insert(cls, model_provider_list: List[ModelProviderCfg]):
+    @staticmethod
+    def batch_insert(model_provider_list: List[ModelProviderCfg]):
         with session_getter() as session:
             session.add_all(model_provider_list)
             session.commit()
@@ -56,16 +56,16 @@ class ModelProviderCfgDao(ModelProviderCfg):
                 session.refresh(model_provider)
             return model_provider_list
 
-    @classmethod
-    def search(cls, model_provider: ModelProviderCfg):
+    @staticmethod
+    def search(model_provider: ModelProviderCfg):
         with session_getter() as session:
             provider = session.query(ModelProviderCfg).filter(ModelProviderCfg.provider == model_provider.provider).first()
             if provider is None:
                 return True
             return False
 
-    @classmethod
-    def insert(cls, model_provider: ModelProviderCfg):
+    @staticmethod
+    def insert(model_provider: ModelProviderCfg):
         with session_getter() as session:
             session.add(model_provider)
             session.commit()

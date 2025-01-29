@@ -7,6 +7,7 @@ from awsome.core.context import session_getter
 from awsome.utils.logger_util import logger_util
 from datetime import datetime
 
+
 class AccessLogBase(AwsomeDBModel):
     __tablename__ = "access_logs"
 
@@ -35,12 +36,14 @@ class AccessLogBase(AwsomeDBModel):
         )
     )
 
-class AccessLog(AccessLogBase, table=True):
-    __table_args__ = {"extend_existing": True} # 允许扩展现有的表
 
-class AccessLogDao(AccessLog):
-    @classmethod
-    def insert(cls, ip_address: str, request_method: str, request_path: str) -> Optional[AccessLog]:
+class AccessLog(AccessLogBase, table=True):
+    __table_args__ = {"extend_existing": True}  # 允许扩展现有的表
+
+
+class AccessLogDao:
+    @staticmethod
+    def insert(ip_address: str, request_method: str, request_path: str) -> Optional[AccessLog]:
         with session_getter() as session:
             new_access_log = AccessLog(ip_address=ip_address, request_method=request_method, request_path=request_path)
             try:
