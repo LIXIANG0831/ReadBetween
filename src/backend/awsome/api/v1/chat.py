@@ -1,11 +1,87 @@
 import json
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, HTTPException
+from awsome.models.schemas.response import resp_200, resp_500
 from awsome.models.v1.chat import ChatRequest
 from awsome.utils.logger_util import logger_util
 from awsome.utils.model_factory import ModelFactory
+from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
+from awsome.services.chat import ChatService
 
 router = APIRouter(tags=["模型会话"])
+
+
+@router.post("/conversations/create")
+async def create_conversation(create_data: ChatCreate):
+    try:
+        return resp_200(await ChatService.create_conversation(create_data))
+    except Exception as e:
+        logger_util.error(f"create_conversation error: {e}")
+        return resp_500(message=str(e))
+
+
+@router.post("/conversations/delete")
+async def delete_conversation(conv_id: str):
+    try:
+        return resp_200(await ChatService.delete_conversation(conv_id))
+    except Exception as e:
+        logger_util.error(f"delete_conversation error: {e}")
+        return resp_500(message=str(e))
+
+
+@router.post("/conversations/update")
+async def update_conversation(update_data: ChatUpdate):
+    try:
+        return resp_200(await ChatService.update_conversation(update_data))
+    except Exception as e:
+        logger_util.error(f"update_conversation error: {e}")
+        return resp_500(message=str(e))
+
+
+@router.get("/conversations/list")
+async def list_conversations(page: int = 1, size: int = 10):
+    try:
+        return resp_200(await ChatService.list_conversations(page, size))
+    except Exception as e:
+        logger_util.error(f"list_conversations error: {e}")
+        return resp_500(message=str(e))
+
+
+@router.post("/conversations/messages/send", response_class=StreamingResponse)
+async def send_message(message_data: ChatMessageSend):
+    try:
+        # 返回StreamingResponse包装的生成器
+        return StreamingResponse(
+            ChatService.stream_chat_response(message_data),
+            media_type="text/event-stream"  # 设置正确的媒体类型
+        )
+    except Exception as e:
+        logger_util.error(f"send_message初始化错误: {e}")
+
+        # 注意：此处不能返回常规JSON响应，需通过生成器发送错误
+        # 可考虑返回一个立即抛出错误的生成器
+        async def error_generator():
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+        return StreamingResponse(error_generator(), media_type="text/event-stream")
+
+
+@router.get("/conversations/messages/history")
+async def get_message_history(conv_id: str, limit: int = 100):
+    try:
+        return resp_200(await ChatService.get_message_history(conv_id, limit))
+    except Exception as e:
+        logger_util.error(f"get_message_history error: {e}")
+        return resp_500(message=str(e))
+
+
+@router.post("/conversations/messages/clear")
+async def clear_message_history(conv_id: str):
+    try:
+        return resp_200(await ChatService.clear_message_history(conv_id))
+    except Exception as e:
+        logger_util.error(f"clear_message_history error: {e}")
+        return resp_500(message=str(e))
 
 
 @router.post("/chat", summary="直接与模型对话")
