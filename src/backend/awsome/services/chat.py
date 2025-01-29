@@ -59,7 +59,7 @@ class ChatService:
             title=update_data.title,
             system_prompt=update_data.system_prompt,
             temperature=update_data.temperature,
-            knowledge_base_ids=ChatUpdate.knowledge_base_ids
+            knowledge_base_ids=update_data.knowledge_base_ids
         )
 
         return await cls._format_conversation_response(

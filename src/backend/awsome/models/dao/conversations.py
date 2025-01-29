@@ -16,7 +16,7 @@ from awsome.models.dao.base import AwsomeDBModel
 from awsome.models.dao.knowledge import Knowledge
 from awsome.utils.logger_util import logger_util
 
-from .conversation_knowledge_link import ConversationKnowledgeLink
+from .conversation_knowledge_link import ConversationKnowledgeLink, ConversationKnowledgeLinkDao
 
 
 class ConversationBase(AwsomeDBModel):
@@ -74,7 +74,7 @@ class Conversation(ConversationBase, table=True):
         return [
             link.knowledge
             for link in self.knowledge_links
-            if link.delete == 0 and link.knowledge.delete == 0
+            if link.knowledge.delete == 0
         ]
 
 
@@ -167,7 +167,7 @@ class ConversationDao:
                 await session.refresh(conv)
 
             if knowledge_base_ids is not None:
-                # 先删除所有旧关联（软删除）
+                # 先删除所有旧关联（硬删除）
                 await ConversationKnowledgeLinkDao.delete(conv_id)
 
                 # 创建新关联
