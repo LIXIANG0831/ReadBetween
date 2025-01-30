@@ -1,3 +1,4 @@
+from awsome.models.dao import *  # 确保执行任务时已加载全部DAO
 from awsome.core.celery_app import celery as ywjz_celery
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.schemas.es.save_document import SaveDocument
