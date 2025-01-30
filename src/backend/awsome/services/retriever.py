@@ -1,17 +1,34 @@
 import asyncio
 import json
+import threading
 from typing import List, Dict, Union, Optional
 
 from awsome.models.schemas.retriever import RetrieverResult
 from awsome.services.base import BaseService
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.logger_util import logger_util
-from awsome.models.schemas.es.base import BaseDocument
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.model_factory import ModelFactory
 
 
 class RetrieverService(BaseService):
+    # 添加类属性
+    _milvus_client = None
+    _es_client = None
+    _model_client = None
+
+    @classmethod
+    def _get_clients(cls):
+        """初始化所有客户端（线程安全）"""
+        with threading.Lock():
+            if cls._milvus_client is None:
+                cls._milvus_client = MilvusUtil()
+            if cls._es_client is None:
+                cls._es_client = ElasticSearchUtil()
+            if cls._model_client is None:
+                cls._model_client = ModelFactory().create_client()
+        return cls._milvus_client, cls._es_client, cls._model_client
+
     @classmethod
     def _convert_milvus_result_to_retriever_result(cls, milvus_result: Dict) -> RetrieverResult:
         """
@@ -59,6 +76,7 @@ class RetrieverService(BaseService):
             mode: str = "both",  # 检索模式：'milvus', 'es', 'both'
             milvus_collection_names: Optional[List[str]] = None,
             milvus_fields: List[str] = None,
+            milvus_expr: str = None,
             es_index_names: Optional[List[str]] = None,
             es_fields: List[str] = None,
             es_query: Union[str, Dict] = None,
@@ -70,70 +88,78 @@ class RetrieverService(BaseService):
         :param mode: 检索模式，可选值为 'milvus'、'es' 或 'both'。
         :param milvus_collection_names: Milvus 集合名称列表。
         :param milvus_fields: Milvus 返回的字段列表。
+        :param milvus_expr: Milvus条件过滤式
         :param es_index_names: Elasticsearch 索引名称列表。
         :param es_fields: Elasticsearch 返回的字段列表。
         :param es_query: Elasticsearch 查询内容，可以是字符串或字典。
         :param top_k: 返回的最相似结果数量，默认为 5。
         :return: 检索结果字典。
         """
-        results = []
 
-        # 初始化 Milvus 和 Elasticsearch 客户端
-        milvus_client = MilvusUtil()
-        es_client = ElasticSearchUtil()
+        # 复用客户端
+        milvus_client, es_client, model_client = cls._get_clients()
 
+        # 并行执行
+        tasks = []
         # 检索模式：仅使用 Milvus
         if mode in ["milvus", "both"]:
-            if not milvus_collection_names:
-                logger_util.error("未指定 Milvus 集合名称列表")
-                raise ValueError("未指定 Milvus 集合名称列表")
-
-            # 获取查询向量
-            model_client = ModelFactory().create_client()
-            query_vector = model_client.get_embeddings(query).data[0].embedding
-
-            # 在 Milvus 中进行向量检索
-            try:
-                milvus_results = milvus_client.search_vectors(
-                    query_vectors=query_vector,
-                    collection_names=milvus_collection_names,
-                    top_k=top_k,
-                    output_fields=milvus_fields,
-                )  # List[Dict]
-                # 转换 milvus_results 为统一检索数据结构
-                results.extend(
-                    cls._convert_milvus_result_to_retriever_result(milvus_result) for milvus_result in milvus_results
-                )
-            except Exception as e:
-                logger_util.error(f"Milvus 检索失败: {e}")
-
+            tasks.append(cls._milvus_search(milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, model_client))
         # 检索模式：仅使用 Elasticsearch
         if mode in ["es", "both"]:
-            if not es_index_names:
-                logger_util.error("未指定 Elasticsearch 索引名称")
-                raise ValueError("未指定 Elasticsearch 索引名称")
+            tasks.append(cls._es_search(es_client, es_index_names, query, top_k, es_fields, es_query))
 
-            # 构建 Elasticsearch 查询
-            if es_query is None:
-                es_query = query  # 默认使用简单字符串查询
-
-            try:
-                es_results = es_client.search_documents(
-                    index_names=es_index_names,
-                    query=es_query,
-                    size=top_k,
-                    fields=es_fields,
-                )  # List[Dict]
-                # 转换 es_results 为统一检索数据结构
-                results.extend(
-                    cls._convert_es_result_to_retriever_result(es_result) for es_result in es_results
-                )
-            except Exception as e:
-                logger_util.error(f"Elasticsearch 检索失败: {e}")
+        # 合并结果
+        results = []
+        for completed_task in asyncio.as_completed(tasks):
+            results.extend(await completed_task)
 
         # 返回检索结果
         return results
 
+    @classmethod
+    async def _milvus_search(cls, milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, model_client):
+        if not milvus_collection_names:
+            logger_util.error("未指定 Milvus 集合名称列表")
+            raise ValueError("未指定 Milvus 集合名称列表")
+
+        # 获取查询向量
+        query_vector = model_client.get_embeddings(query).data[0].embedding
+
+        # 在 Milvus 中进行向量检索
+        try:
+            milvus_results = milvus_client.search_vectors(
+                query_vectors=query_vector,
+                collection_names=milvus_collection_names,
+                top_k=top_k,
+                output_fields=milvus_fields,
+                expr=milvus_expr,
+            )  # List[Dict]
+            # 转换 milvus_results 为统一检索数据结构
+            return [cls._convert_milvus_result_to_retriever_result(milvus_result) for milvus_result in milvus_results]
+        except Exception as e:
+            logger_util.error(f"Milvus 检索失败: {e}")
+
+    @classmethod
+    async def _es_search(cls, es_client, es_index_names, query, top_k, es_fields, es_query):
+        if not es_index_names:
+            logger_util.error("未指定 Elasticsearch 索引名称")
+            raise ValueError("未指定 Elasticsearch 索引名称")
+
+        # 构建 Elasticsearch 查询
+        if es_query is None:
+            es_query = query  # 默认使用简单字符串查询
+
+        try:
+            es_results = es_client.search_documents(
+                index_names=es_index_names,
+                query=es_query,
+                size=top_k,
+                fields=es_fields,
+            )  # List[Dict]
+            # 转换 es_results 为统一检索数据结构
+            return [cls._convert_es_result_to_retriever_result(es_result) for es_result in es_results]
+        except Exception as e:
+            logger_util.error(f"Elasticsearch 检索失败: {e}")
     @classmethod
     async def rerank_retrieve(cls):
         # TODO 检索重排序
@@ -146,12 +172,13 @@ async def main():
                                                     milvus_collection_names=[
                                                         "c_awsome_6565131da2524faca0e726ec0ffa26d1",
                                                         "c_awsome_de8ed36a35a444a19cec145308b78b1f"],
-                                                    # milvus_fields=['text'],
+                                                    milvus_fields=['text', 'title'],
                                                     es_index_names=["i_awsome_aded292a91db4ec08c9a556392341305",
                                                                     "i_awsome_943eaa8acc564a88b74237f065fc2e5d"],
-                                                    #es_fields=['text']
+                                                    es_fields=['text', 'metadata.title']
                                                     )
     for retrieve_result in retrieve_resp:
+        print(retrieve_result.metadata)
         print(retrieve_result.to_dict())
 
 
