@@ -162,7 +162,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
 @router.get("/knowledge_file/list")
 async def list_knowledge_files(kb_id: str, page: int = 1, size: int = 10):
     try:
-        return resp_200(KnowledgeFileService.select_files_list_by_kb_id(kb_id, page, size))
+        return resp_200(await KnowledgeFileService.select_files_list_by_kb_id(kb_id, page, size))
     except Exception as e:
         logger_util.error(f"查询知识库文件列表异常:{e}")
         return resp_500(message=str(e))
