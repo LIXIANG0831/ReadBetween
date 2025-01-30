@@ -1,11 +1,13 @@
 from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from awsome.models.dao.conversations import ConversationDao, Conversation
-from awsome.models.dao.knowledge import KnowledgeDao
+from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
 from awsome.models.dao.messages import MessageDao
 from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
 from fastapi import HTTPException
 import asyncio
-from typing import Generator
+from typing import Generator, List
+
+from awsome.services.retriever import RetrieverService
 from awsome.utils.logger_util import logger_util
 
 from awsome.utils.model_factory import ModelFactory
@@ -110,12 +112,19 @@ class ChatService:
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
 
+        # 获取知识库召回内容
+        try:
+            real_query_with_rag = await cls._recall_chunks(conversation.knowledge_bases, message_data.message)
+        except Exception as e:
+            logger_util.error(f"召回内容失败: {e}")
+            real_query_with_rag = message_data.message  # 使用原始用户消息
+
         # 保存用户消息并记录ID
         try:
             user_msg = await MessageDao.create_message(
                 conv_id=message_data.conv_id,
                 role="user",
-                content=message_data.message
+                content=real_query_with_rag
             )
             user_msg_id = user_msg.id
             logger_util.debug(f"保存用户消息ID: {user_msg_id}")
@@ -196,3 +205,46 @@ class ChatService:
             "created_at": conv.created_at.isoformat(),
             "updated_at": conv.updated_at.isoformat()
         }
+
+    @classmethod
+    async def _recall_chunks(cls, knowledge_bases: List[Knowledge], message: str):
+        recall_chunk = ""
+        if knowledge_bases:
+            retrieve_resp = await RetrieverService.retrieve(
+                query=message,
+                mode="both",
+                milvus_collection_names=[
+                    knowledge_base.collection_name
+                    for knowledge_base in knowledge_bases
+                ],
+                milvus_fields=['text', 'title'],
+                es_index_names=[
+                    knowledge_base.index_name
+                    for knowledge_base in knowledge_bases
+                ],
+                es_fields=['text', 'metadata.title'],
+                top_k=3
+            )
+            for retrieve_result in retrieve_resp:
+                # TODO 考虑是否抽象为配置项
+                if retrieve_result.source == 'milvus' and float(retrieve_result.score) > 0.8:
+                    recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
+                if retrieve_result.source == 'es' and float(retrieve_result.score) < 4:
+                    recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
+
+        if recall_chunk:
+            return f"""
+                    【上下文参考】
+                    {recall_chunk.strip()}
+                    
+                    【用户最新消息】
+                    {message}
+                    
+                    【生成要求】
+                    请基于上下文参考内容，用自然对话的方式响应用户消息。注意：
+                    1. 不要使用"根据检索内容"、"根据资料"等暴露检索过程的表述
+                    2. 不要直接引用上下文中的标题或元数据
+                    3. 若上下文内容与用户需求无关，则忽略它直接回答
+                    """
+        else:
+            return message
