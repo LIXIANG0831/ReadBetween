@@ -64,7 +64,7 @@ class KnowledgeFileDao:
     @staticmethod
     def select_by_kb_id(kb_id: str, page: int = None, size: int = None):
         with session_getter() as session:
-            query = session.query(KnowledgeFile).where(KnowledgeFile.kb_id == kb_id, KnowledgeFile.delete == 0)
+            query = session.query(KnowledgeFile).where(KnowledgeFile.kb_id == kb_id, KnowledgeFile.delete == 0).order_by(KnowledgeFile.create_time.desc())
             if page is not None and size is not None:
                 offset = (page - 1) * size
                 all_knowledge_files = query.offset(offset).limit(size).all()

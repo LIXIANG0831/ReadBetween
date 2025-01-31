@@ -115,7 +115,7 @@ class KnowledgeDao:
     @classmethod
     async def select(cls, kb_id=None, page=None, page_size=None):
         async with (async_session_getter() as session):
-            stmt = select(Knowledge).where(Knowledge.delete == 0)
+            stmt = select(Knowledge).where(Knowledge.delete == 0).order_by(Knowledge.create_time.desc())
             if kb_id is not None:  # 查特定记录
                 knowledge = await session.execute(stmt.filter(Knowledge.id == kb_id))
                 knowledge = knowledge.scalar_one_or_none()
