@@ -32,7 +32,7 @@ def celery_text_vectorize(self, task_json):
         # 实例化milvus
         milvus_client = MilvusUtil()
         # 实例化es
-        es_client = ElasticSearchUtil.get_client()
+        es_client = ElasticSearchUtil()
         # 获取默认模型配置客户端
         client = ModelFactory.create_client(embedding_name=knowledge_file_vectorize_task.embedding_name)
     except Exception as e:

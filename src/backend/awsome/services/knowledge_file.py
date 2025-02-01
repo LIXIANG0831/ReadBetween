@@ -11,6 +11,7 @@ from awsome.models.dao.knowledge_file import KnowledgeFileDao
 
 minio_client = MinioUtil()
 milvus_client = MilvusUtil()
+es_client = ElasticSearchUtil()
 
 
 class KnowledgeFileService(BaseService):
@@ -83,7 +84,6 @@ class KnowledgeFileService(BaseService):
         delete_expr = f"file_id == '{kb_file_id}'"
         milvus_client.delete_collection_file(delete_kb_info.collection_name, delete_expr)
         # 删除ES中文件
-        ElasticSearchUtil.initialize_connection()
         delete_query = {
             "query": {
                 "term": {
@@ -93,6 +93,6 @@ class KnowledgeFileService(BaseService):
                 }
             }
         }
-        ElasticSearchUtil.delete_documents(delete_kb_info.index_name, delete_query)
+        es_client.delete_documents(delete_kb_info.index_name, delete_query)
         # 删除数据库文件记录
         await KnowledgeFileDao.delete_by_kb_file_id(kb_file_id)
