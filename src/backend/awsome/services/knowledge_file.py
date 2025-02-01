@@ -1,13 +1,16 @@
 from typing import List
 
-from awsome.models.dao.knowledge import KnowledgeDao
+from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.v1.knowledge_file import UploadFileInfo
 from awsome.services.base import BaseService
+from awsome.utils.milvus_util import MilvusUtil
+from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.minio_util import MinioUtil
 from awsome.models.dao.knowledge_file import KnowledgeFileDao
 
 minio_client = MinioUtil()
+milvus_client = MilvusUtil()
 
 
 class KnowledgeFileService(BaseService):
@@ -71,3 +74,25 @@ class KnowledgeFileService(BaseService):
     @classmethod
     async def delete_by_kb_id(cls, kb_id):
         return await KnowledgeFileDao.delete_by_kb_id(kb_id)
+
+    @classmethod
+    async def delete_knowledge_file(cls, kb_file_id):
+        delete_kb_file_info: KnowledgeFile = KnowledgeFileDao.select_by_file_id(kb_file_id)
+        delete_kb_info: Knowledge = await KnowledgeDao.select(delete_kb_file_info.kb_id)
+        # 删除Milvus中文件
+        delete_expr = f"file_id == '{kb_file_id}'"
+        milvus_client.delete_collection_file(delete_kb_info.collection_name, delete_expr)
+        # 删除ES中文件
+        ElasticSearchUtil.initialize_connection()
+        delete_query = {
+            "query": {
+                "term": {
+                    "metadata.file_id.keyword": {
+                        "value": f"{kb_file_id}"
+                    }
+                }
+            }
+        }
+        ElasticSearchUtil.delete_documents(delete_kb_info.index_name, delete_query)
+        # 删除数据库文件记录
+        await KnowledgeFileDao.delete_by_kb_file_id(kb_file_id)

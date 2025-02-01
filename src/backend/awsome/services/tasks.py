@@ -32,7 +32,7 @@ def celery_text_vectorize(self, task_json):
         # 实例化milvus
         milvus_client = MilvusUtil()
         # 实例化es
-        es_client = ElasticSearchUtil()
+        es_client = ElasticSearchUtil.get_client()
         # 获取默认模型配置客户端
         client = ModelFactory.create_client(embedding_name=knowledge_file_vectorize_task.embedding_name)
     except Exception as e:
@@ -125,7 +125,7 @@ def celery_text_vectorize(self, task_json):
             logger_util.debug("====》Milvus插入完成")
 
             # 完成向量化修改状态
-            update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)[0]
+            update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)
             update_file.status = 1
             KnowledgeFileService.update_file(update_file)
             logger_util.debug("====》数据库数据更新状态")
@@ -135,7 +135,7 @@ def celery_text_vectorize(self, task_json):
             file_vectorize_err_msg += f"文件{file_name}解析异常:{e}\n"
 
             # 回写异常信息
-            update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)[0]
+            update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)
             update_file.status = -1
             update_file.extra = file_vectorize_err_msg
             KnowledgeFileService.update_file(update_file)

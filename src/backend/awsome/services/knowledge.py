@@ -15,10 +15,6 @@ from awsome.services.constant import redis_default_model_key
 # 实例化milvus
 milvus_client = MilvusUtil()
 
-
-# 实例化es
-es_client = ElasticSearchUtil()
-
 # 实例化redis
 redis_util = RedisUtil()
 
@@ -76,7 +72,7 @@ class KnowledgeService(BaseService):
 
             # ES索引存在 同步删除ES索引
             drop_es_index_name = drop_knowledge.index_name
-            es_client.delete_index(drop_es_index_name)
+            ElasticSearchUtil.delete_index(drop_es_index_name)
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"删除Milvus集合异常: {str(e)}")

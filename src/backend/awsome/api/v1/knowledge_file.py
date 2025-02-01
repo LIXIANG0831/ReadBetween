@@ -170,4 +170,8 @@ async def list_knowledge_files(kb_id: str, page: int = 1, size: int = 10):
 
 @router.post("/knowledge_file/delete")
 async def delete_knowledge_file(id: str):
-    pass
+    try:
+        return resp_200(await KnowledgeFileService.delete_knowledge_file(id))
+    except Exception as e:
+        logger_util.error(f"删除知识库文件异常:{e}")
+        return resp_500(message=str(e))

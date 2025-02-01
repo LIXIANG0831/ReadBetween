@@ -119,7 +119,7 @@ class MilvusUtil:
         try:
             for collection_name in collection_names:
                 collection = Collection(collection_name)
-                collection.load()  # 加载集合
+                cls.load_collection(collection_name)  # 加载集合
                 # 如果用户没有指定输出字段，则默认返回所有字段（除了向量字段本身）
                 if output_fields is None:
                     output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
@@ -181,6 +181,22 @@ class MilvusUtil:
             logger_util.error(f"删除集合{collection_name}失败：{e}")
             raise MilvusException(message=f"删除集合{collection_name}失败：{e}")
 
+    @classmethod
+    def load_collection(cls, collection_name: str):
+        """
+        检查集合是否已加载，如果未加载则加载集合到内存中。
+
+        :param collection_name: 集合名称。
+        :return: None
+        """
+        try:
+            collection = Collection(collection_name)
+            collection.load()
+            logger_util.info(f"集合 {collection_name} 已加载到内存。")
+        except MilvusException as e:
+            logger_util.error(f"加载集合 {collection_name} 失败: {e}")
+            raise MilvusException(message=f"加载集合 {collection_name} 失败: {e}")
+
     @staticmethod
     def close_connection(self):
         """
@@ -193,6 +209,31 @@ class MilvusUtil:
         except MilvusException as e:
             logger_util.error(f"断开与Milvus的连接失败：{e}")
             raise MilvusException(message=f"断开与Milvus的连接失败：{e}")
+
+    @classmethod
+    def delete_collection_file(cls, collection_name: str, expr: str):
+        """
+        根据条件删除指定集合中的数据记录。
+
+        :param collection_name: 集合名称。
+        :param expr: 条件表达式，用于指定要删除的记录。
+        :return: None
+        """
+        try:
+            # 检查集合是否存在
+            if cls.check_collection_exists(collection_name):
+                # 加载集合到内存
+                cls.load_collection(collection_name)
+
+                collection = Collection(collection_name)
+                collection.delete(expr)  # 删除符合条件的记录
+                collection.flush()  # 刷新集合，确保删除操作生效
+                logger_util.info(f"从集合 {collection_name} 中删除了符合条件的记录，条件为: {expr}")
+            else:
+                raise MilvusException(message=f"当前删除集合 {collection_name} 不存在")
+        except MilvusException as e:
+            logger_util.error(f"删除集合 {collection_name} 中的记录失败，条件为: {expr}，错误信息: {e}")
+            raise MilvusException(message=f"删除集合 {collection_name} 中的记录失败，条件为: {expr}，错误信息: {e}")
 
 
 async def main():

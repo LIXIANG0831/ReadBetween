@@ -92,7 +92,7 @@ class KnowledgeFileDao:
     def select_by_file_id(file_id: str):
         with session_getter() as session:
             query = session.query(KnowledgeFile).where(KnowledgeFile.id == file_id, KnowledgeFile.delete == 0)
-            file_info = query.all()
+            file_info = query.one()
             return file_info
 
     @staticmethod
@@ -108,3 +108,14 @@ class KnowledgeFileDao:
                 return file
             else:
                 raise Exception("记录不存在")
+
+    @classmethod
+    async def delete_by_kb_file_id(cls, kb_file_id):
+        async with async_session_getter() as session:
+            query_stmt = select(KnowledgeFile).where(KnowledgeFile.id == kb_file_id)
+            results = await session.execute(query_stmt)
+            delete_file: KnowledgeFile = results.scalar_one_or_none()
+            # 软删除
+            delete_file.delete = 1
+            await session.commit()
+            logger_util.info(f"Deleted Knowledge_files Id: {kb_file_id}")

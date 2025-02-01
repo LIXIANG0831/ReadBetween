@@ -1,3 +1,4 @@
+from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Document, Date, Integer, Text, Keyword, connections, Long, Index, Search, analyzer, \
     token_filter, tokenizer, Nested
 from awsome.settings import get_config
@@ -5,180 +6,167 @@ from awsome.utils.logger_util import logger_util
 from awsome.models.schemas.es.base import BaseDocument
 
 
-
-
 class ElasticSearchUtil:
+    _es_initialized = False  # 类变量用于跟踪连接状态
 
     def __init__(self, es_hosts=None, es_timeout=None, es_http_auth=None):
         """
-        初始化 Elasticsearch 连接。
-        :param es_hosts: Elasticsearch 主机列表，默认从配置文件中获取。
-        :param es_timeout: 连接超时时间，默认从配置文件中获取。
-        :param es_http_auth: HTTP 认证信息，默认从配置文件中获取。
+        初始化并配置全局Elasticsearch连接（仅首次实例化生效）
         """
-        # 如果未传入参数，则从配置文件中获取默认值
+        if not self.__class__._es_initialized:
+            self.__class__.initialize_connection(es_hosts, es_timeout, es_http_auth)
+            self.__class__._es_initialized = True
+
+    @classmethod
+    def initialize_connection(cls, es_hosts=None, es_timeout=None, es_http_auth=None):
+        """
+        全局连接初始化方法（可独立调用）
+        """
+        # 获取配置参数a
         es_hosts = es_hosts or get_config("storage.es.hosts")
         es_timeout = es_timeout or get_config("storage.es.timeout")
         es_http_auth = es_http_auth or get_config("storage.es.http_auth")
 
-        # 连接到 Elasticsearch
         try:
+            # 创建全局连接（默认连接别名）
             connections.create_connection(
-                hosts=es_hosts,  # 指定主机和端口
-                timeout=es_timeout,  # 超时时间
-                http_auth=es_http_auth  # 校验
+                alias='default',
+                hosts=es_hosts,
+                timeout=es_timeout,
+                http_auth=es_http_auth
             )
-            logger_util.info("Elasticsearch连接已建立。")
+            logger_util.info("Elasticsearch全局连接已建立")
         except Exception as e:
             logger_util.error(f"Elasticsearch连接失败: {e}")
-            raise Exception(f"Elasticsearch连接失败: {e}")
+            raise ConnectionError(f"Elasticsearch连接失败: {e}")
+
+    @classmethod
+    def get_client(cls):
+        """
+        获取全局Elasticsearch客户端实例
+        """
+        if not connections.get_connection():
+            cls.initialize_connection()
+        return connections.get_connection()
 
     @classmethod
     def save_document(cls, save_document: BaseDocument):
         """
-        将文档保存到 Elasticsearch 索引中。
-        :param save_document: 要保存的文档对象。
+        保存文档到Elasticsearch（使用全局连接）
         """
         try:
-            save_document.save()
+            save_document.save(using='default')  # 显式指定使用默认连接
         except Exception as e:
             logger_util.error(f"保存文档失败: {e}")
-            raise Exception(f"保存文档失败: {e}")
+            raise RuntimeError(f"保存文档失败: {e}")
 
     @classmethod
     def delete_index(cls, index_name):
         """
-        删除指定的 Elasticsearch 索引。
-        :param index_name: 要删除的索引名称。
+        删除指定索引（使用全局连接）
         """
         try:
-            # 检查索引是否存在
-            if Index(index_name).exists():
-                # 删除索引
-                Index(index_name).delete()
-                logger_util.info(f"索引 {index_name} 已删除。")
+            index = Index(index_name, using='default')
+            if index.exists():
+                index.delete()
+                logger_util.info(f"索引 {index_name} 已删除")
             else:
-                logger_util.warning(f"索引 {index_name} 不存在，无需删除。")
+                logger_util.warning(f"索引 {index_name} 不存在")
         except Exception as e:
-            logger_util.error(f"删除索引 {index_name} 时发生错误: {e}")
-            raise Exception(f"删除索引 {index_name} 时发生错误: {e}")
+            logger_util.error(f"删除索引失败: {e}")
+            raise RuntimeError(f"删除索引失败: {e}")
 
     @classmethod
     def search_documents(cls, index_names, query, size=10, fields=None):
         """
-        在指定的索引中搜索文档，并支持返回字段过滤。
-        :param index_names: 索引名称列表，支持从多个索引中检索。
-        :param query: 查询内容，可以是简单的字符串或复杂的查询字典。
-        :param size: 返回结果的数量，默认为10。
-        :param fields: 返回字段过滤，可以是一个字段列表或排除字段字典。
-        :return: 查询结果列表。
+        使用全局连接执行搜索
         """
         try:
-            # 创建搜索对象
-            s = Search(index=index_names)
+            s = Search(index=index_names, using='default')
 
-            # 构建查询
             if isinstance(query, str):
-                # 如果查询是字符串，使用 multi_match 查询在所有字段中搜索
                 s = s.query("multi_match", query=query, fields="*")
             elif isinstance(query, dict):
-                # 如果查询是字典，直接使用 raw DSL
                 s = s.update_from_dict(query)
             else:
                 raise ValueError("查询内容必须是字符串或字典类型")
 
-            # 设置返回结果数量
             s = s[0:size]
-
-            # 设置字段过滤
             if fields:
                 if isinstance(fields, list):
-                    # 包含指定字段
                     s = s.source(fields)
                 elif isinstance(fields, dict) and "excludes" in fields:
-                    # 排除指定字段
                     s = s.source({"excludes": fields["excludes"]})
 
-            # 执行查询
             response = s.execute()
-
-            # 提取结果
-            results = [
-                {
-                    "id": hit.meta.id,
-                    "score": hit.meta.score,
-                    "index_name": hit.meta.index,  # 获取文档所属的索引名称
-                    "document": hit.to_dict()
-                }
-                for hit in response.hits
-            ]
-            logger_util.info(f"查询成功，返回结果数量: {len(results)}")
-            return results
+            return [{
+                "id": hit.meta.id,
+                "score": hit.meta.score,
+                "index_name": hit.meta.index,
+                "document": hit.to_dict()
+            } for hit in response.hits]
         except Exception as e:
-            logger_util.error(f"在索引 {index_names} 中搜索文档时发生错误: {e}")
-            raise Exception(f"在索引 {index_names} 中搜索文档时发生错误: {e}")
+            logger_util.error(f"搜索失败: {e}")
+            raise RuntimeError(f"搜索失败: {e}")
 
     @classmethod
     def delete_documents(cls, index_name, query):
         """
-        根据查询条件删除指定索引中的文档。
-        :param index_name: 索引名称。
-        :param query: 查询条件，用于指定要删除的文档。
-        :return: 删除结果。
+        使用全局连接删除文档
         """
         try:
-            # 创建删除查询对象
-            s = Search(index=index_name)
-            s = s.query(query)
-
-            # 执行删除操作
-            response = s.delete()
-
-            # 提取删除结果
+            es = cls.get_client()
+            response = es.delete_by_query(
+                index=index_name,
+                body=query
+            )
             deleted_count = response["deleted"]
-            logger_util.info(f"成功删除 {deleted_count} 条文档。")
+            logger_util.info(f"删除成功：{deleted_count}条")
             return {"deleted_count": deleted_count}
         except Exception as e:
-            logger_util.error(f"在索引 {index_name} 中删除文档时发生错误: {e}")
-            raise Exception(f"在索引 {index_name} 中删除文档时发生错误: {e}")
+            logger_util.error(f"删除文档失败: {e}")
+            raise RuntimeError(f"删除文档失败: {e}")
 
     @classmethod
     def check_connection(cls):
         """
-        检查 Elasticsearch 连接是否正常。
+        检查全局连接状态
         """
         try:
-            # 使用 ping 方法检查连接
-            if connections.get_connection().ping():
-                logger_util.info("Elasticsearch连接正常！")
-            else:
-                logger_util.error("Elasticsearch连接失败！")
+            es = cls.get_client()
+            if es.ping():
+                logger_util.info("连接正常")
+                return True
+            logger_util.error("连接失败")
+            return False
         except Exception as e:
-            logger_util.error(f"连接时发生错误: {e}")
+            logger_util.error(f"连接检查异常: {e}")
+            return False
 
 
 if __name__ == '__main__':
-    es_util = ElasticSearchUtil()
-    query_dict = {  # match 查询必须嵌套在 query 字段下
+    # 使用示例
+    es_util = ElasticSearchUtil()  # 首次实例化会初始化连接
+
+    # 后续使用方式任选其一：
+    # 方式1：通过类方法直接使用
+    # query_str = "卡萨帝热水器"
+    # results_2 = ElasticSearchUtil.search_documents(
+    #     index_names=["i_awsome_f608273522074e55ba210760a00a6e77"],
+    #     query=query_str,
+    #     size=5,
+    #     # fields={"excludes": ["metadata"]}  # 只返回 text
+    # )
+    # print(results_2)
+    delete_query = {
         "query": {
-            "match": {
-                "text": "卡萨帝热水器"
+            "term": {
+                "metadata.file_id.keyword": {
+                    "value": "1529d06c-1109-46ee-b8af-6711a06085b1"
+                }
             }
         }
     }
-    # results_1 = es_util.search_documents(
-    #     index_names=["i_awsome_aded292a91db4ec08c9a556392341305", "i_awsome_943eaa8acc564a88b74237f065fc2e5d"],
-    #     query=query_dict,
-    #     size=5,
-    #     fields=["metadata.title", "text"]  # 只返回title text
-    # )
-    # print(results_1)
+    result = ElasticSearchUtil.delete_documents("i_awsome_f608273522074e55ba210760a00a6e77", delete_query)
+    print(result)
 
-    query_str = "卡萨帝热水器"
-    results_2 = es_util.search_documents(
-        index_names=["i_awsome_aded292a91db4ec08c9a556392341305", "i_awsome_943eaa8acc564a88b74237f065fc2e5d"],
-        query=query_str,
-        size=5,
-        # fields={"excludes": ["metadata"]}  # 只返回 text
-    )
-    print(results_2)

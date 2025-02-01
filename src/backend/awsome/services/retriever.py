@@ -24,7 +24,7 @@ class RetrieverService(BaseService):
             if cls._milvus_client is None:
                 cls._milvus_client = MilvusUtil()
             if cls._es_client is None:
-                cls._es_client = ElasticSearchUtil()
+                cls._es_client = ElasticSearchUtil.get_client()
             if cls._model_client is None:
                 cls._model_client = ModelFactory().create_client()
         return cls._milvus_client, cls._es_client, cls._model_client
