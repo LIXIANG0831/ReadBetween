@@ -1,40 +1,44 @@
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Document, Date, Integer, Text, Keyword, connections, Long, Index, Search, analyzer, \
-    token_filter, tokenizer, Nested
+from elasticsearch_dsl import connections, Document, Search, Index
+from elasticsearch_dsl.connections import add_connection
+from threading import Lock
 from awsome.settings import get_config
 from awsome.utils.logger_util import logger_util
 from awsome.models.schemas.es.base import BaseDocument
 
 
 class ElasticSearchUtil:
-    _es_initialized = False  # 类变量用于跟踪连接状态
+    _lock = Lock()  # 线程锁，确保线程安全
+    _default_client = None  # 默认客户端
 
     def __init__(self, es_hosts=None, es_timeout=None, es_http_auth=None):
         """
         初始化并配置全局Elasticsearch连接（仅首次实例化生效）
         """
-        if not self.__class__._es_initialized:
-            self.__class__.initialize_connection(es_hosts, es_timeout, es_http_auth)
-            self.__class__._es_initialized = True
+        if not self.__class__._default_client:
+            with self._lock:
+                if not self.__class__._default_client:
+                    self.__class__.initialize_connection(es_hosts, es_timeout, es_http_auth)
 
     @classmethod
     def initialize_connection(cls, es_hosts=None, es_timeout=None, es_http_auth=None):
         """
         全局连接初始化方法（可独立调用）
         """
-        # 获取配置参数a
+        # 获取配置参数
         es_hosts = es_hosts or get_config("storage.es.hosts")
         es_timeout = es_timeout or get_config("storage.es.timeout")
         es_http_auth = es_http_auth or get_config("storage.es.http_auth")
 
         try:
             # 创建全局连接（默认连接别名）
-            connections.create_connection(
-                alias='default',
+            client = Elasticsearch(
                 hosts=es_hosts,
                 timeout=es_timeout,
                 http_auth=es_http_auth
             )
+            cls._default_client = client
+            add_connection(alias='default', conn=client)
             logger_util.info("Elasticsearch全局连接已建立")
         except Exception as e:
             logger_util.error(f"Elasticsearch连接失败: {e}")
@@ -45,9 +49,9 @@ class ElasticSearchUtil:
         """
         获取全局Elasticsearch客户端实例
         """
-        if not connections.get_connection():
+        if not cls._default_client:
             cls.initialize_connection()
-        return connections.get_connection()
+        return cls._default_client
 
     @classmethod
     def save_document(cls, save_document: BaseDocument):
@@ -169,4 +173,3 @@ if __name__ == '__main__':
     }
     result = ElasticSearchUtil.delete_documents("i_awsome_f608273522074e55ba210760a00a6e77", delete_query)
     print(result)
-
