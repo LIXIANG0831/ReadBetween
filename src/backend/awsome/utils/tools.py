@@ -107,6 +107,9 @@ class EncryptionTool(BaseTool):
             logger_util.warning(f"解密失败，直接返回原始字符串: {encrypted_password}. 错误信息: {e}")
             return encrypted_password
 
+    def obscure(self, password: str) -> str:
+        return password[:3] + '*' * 10 + password[13:]
+
 
 # 示例使用
 if __name__ == "__main__":

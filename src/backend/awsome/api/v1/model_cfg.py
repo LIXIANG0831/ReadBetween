@@ -56,9 +56,8 @@ async def list_model_cfg():
             model_cfg_copy = copy.deepcopy(model_cfg)
             # 解密
             model_cfg_copy.api_key = encryption_tool.decrypt(model_cfg.api_key)
-            print(model_cfg_copy.api_key)
             # 设置秘钥混淆
-            model_cfg_copy.api_key = model_cfg_copy.api_key[:3] + '*' * 10 + model_cfg_copy.api_key[13:]
+            model_cfg_copy.api_key = encryption_tool.obscure(model_cfg_copy.api_key)
 
             model_cfg_list_resp.append(model_cfg_copy)
         return resp_200(model_cfg_list_resp)
@@ -87,7 +86,7 @@ async def setting_default_model_cfg(model_cfg_setting: ModelCfgSetting):
             "model_cfg_id": model_call_info[0],
             "api_key": model_call_info[1],
             "base_url": model_call_info[2],
-            "provider_mark": model_call_info[3],
+            "mark": model_call_info[3],
             "llm_name": model_cfg_setting.llm_name,
             "embedding_name": model_cfg_setting.embedding_name,
         }
@@ -104,6 +103,30 @@ async def setting_default_model_cfg(model_cfg_setting: ModelCfgSetting):
             raise HTTPException(status_code=500, detail="保存模型配置到 Redis 失败")
 
         return resp_200(data=model_info)
+    except Exception as e:
+        logger_util.error(f"设置系统默认模型异常{e}")
+        return resp_500(message=str(e))
+
+
+@router.get("/model_cfg/default")
+async def get_default_model_cfg():
+    try:
+        from awsome.services.constant import redis_default_model_key
+        if redis_util.exists(redis_default_model_key):
+            # 如果键存在，先删除
+            default_model_cfg_result = redis_util.get(redis_default_model_key)
+            if not default_model_cfg_result:
+                raise HTTPException(status_code=500, detail="默认模型配置不存在")
+            default_model_cfg_dict = json.loads(default_model_cfg_result)
+            # 解密api_key
+            default_model_cfg_dict["api_key"] = encryption_tool.obscure(
+                encryption_tool.decrypt(
+                    encrypted_password=default_model_cfg_dict["api_key"]
+                )
+            )
+            return resp_200(data=default_model_cfg_dict)
+        else:
+            return resp_500(message=f"未设置默认模型配置")
     except Exception as e:
         logger_util.error(f"设置系统默认模型异常{e}")
         return resp_500(message=str(e))
