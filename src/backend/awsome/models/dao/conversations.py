@@ -9,7 +9,7 @@ import uuid
 from sqlalchemy.orm import Mapped, relationship, selectinload
 from sqlmodel import Field, Relationship
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, text, select
+from sqlalchemy import Column, String, Text, DateTime, text, select, func
 
 from awsome.core.context import async_session_getter
 from awsome.models.dao.base import AwsomeDBModel
@@ -194,3 +194,16 @@ class ConversationDao:
             )
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
+
+    @classmethod
+    async def cnt_conversation_total(cls):
+        async with async_session_getter() as session:
+            # 构造查询语句，统计满足条件的记录总数
+            stmt = select(func.count()).select_from(Conversation).where(Conversation.delete == 0)
+
+            # 执行查询并获取结果
+            result = await session.execute(stmt)
+            total_count = result.scalar()  # 获取总数
+
+            logger_util.info(f"Total count of Concersation entries: {total_count}")
+            return total_count

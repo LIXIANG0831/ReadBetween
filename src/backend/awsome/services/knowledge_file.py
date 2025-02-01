@@ -2,6 +2,7 @@ from typing import List
 
 from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
 from awsome.models.dao.knowledge_file import KnowledgeFile
+from awsome.models.schemas.response import PageModel
 from awsome.models.v1.knowledge_file import UploadFileInfo
 from awsome.services.base import BaseService
 from awsome.utils.milvus_util import MilvusUtil
@@ -18,15 +19,11 @@ class KnowledgeFileService(BaseService):
     """
     分页查询文件列表通过知识库ID
     """
-    # TODO 数据库查询接口修改为异步
     @classmethod
     async def select_files_list_by_kb_id(cls, kb_id: str, page: int = None, size: int = None):
-        if size is None and page is None:
-            # 查询全部
-            return KnowledgeFileDao.select_by_kb_id(kb_id)
-        else:
-            # 分页查询
-            return KnowledgeFileDao.select_by_kb_id(kb_id, page, size)
+        # 分页查询
+        total = len(KnowledgeFileDao.select_by_kb_id(kb_id))
+        return PageModel(total=total, data=KnowledgeFileDao.select_by_kb_id(kb_id, page, size))
 
     """
     删除文件及已向量化内容

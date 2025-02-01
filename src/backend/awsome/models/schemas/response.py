@@ -11,6 +11,12 @@ class ResponseModel(BaseModel, Generic[T]):
     data: T = None
 
 
+class PageModel(BaseModel, Generic[T]):
+    """统一分页返回模型"""
+    total: int
+    data: List[T]
+
+
 def resp_200(data: Union[list, dict, str, Any] = None) -> ResponseModel:
     """返回成功响应"""
     return ResponseModel(status_code=200, status_message='SUCCESS', data=data)

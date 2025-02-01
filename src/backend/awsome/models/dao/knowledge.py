@@ -5,7 +5,7 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy.orm import Mapped, relationship
 
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String, INT, select
+from sqlalchemy import Column, String, INT, select, func
 from sqlmodel import Field, DateTime, text, Relationship
 from awsome.core.context import session_getter, async_session_getter
 from awsome.utils.logger_util import logger_util
@@ -130,6 +130,19 @@ class KnowledgeDao:
                 all_knowledge = result.scalars().all()
                 logger_util.info("Fetched all Knowledge entries.")
                 return all_knowledge
+
+    @classmethod
+    async def cnt_knowledge_total(cls):
+        async with (async_session_getter() as session):
+            # 构造查询语句，统计满足条件的记录总数
+            stmt = select(func.count()).select_from(Knowledge).where(Knowledge.delete == 0)
+
+            # 执行查询并获取结果
+            result = await session.execute(stmt)
+            total_count = result.scalar()  # 获取总数
+
+            logger_util.info(f"Total count of Knowledge entries: {total_count}")
+            return total_count
 
     @classmethod
     async def get_many(cls, knowledge_base_ids: List[str]) -> List[Knowledge]:

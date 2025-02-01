@@ -2,6 +2,7 @@ from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeL
 from awsome.models.dao.conversations import ConversationDao, Conversation
 from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
 from awsome.models.dao.messages import MessageDao
+from awsome.models.schemas.response import PageModel
 from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
 from fastapi import HTTPException
 import asyncio
@@ -71,9 +72,9 @@ class ChatService:
     @classmethod
     async def list_conversations(cls, page: int, size: int):
         """分页获取用户对话列表"""
+        total = await ConversationDao.cnt_conversation_total()
         conversations = await ConversationDao.list_with_kb(page, size)
-        return [
-            {
+        return PageModel(total=total, data=[{
                 "id": conv.id,
                 "title": conv.title,
                 "model": conv.model,
@@ -91,7 +92,7 @@ class ChatService:
                 "updated_at": conv.updated_at.isoformat()
             }
             for conv in conversations
-        ]
+        ])
 
     @classmethod
     async def get_message_history(cls, conv_id: str, limit: int):

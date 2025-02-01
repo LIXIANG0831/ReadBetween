@@ -1,6 +1,5 @@
 import json
 
-from elasticsearch import Elasticsearch
 from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
 from awsome.services.base import BaseService
 from awsome.models.dao.knowledge import KnowledgeDao
@@ -11,6 +10,7 @@ from awsome.services.constant import milvus_default_index_params, milvus_default
 from fastapi import HTTPException
 import uuid
 from awsome.services.constant import redis_default_model_key
+from awsome.models.schemas.response import PageModel
 
 # 实例化milvus
 milvus_client = MilvusUtil()
@@ -90,7 +90,9 @@ class KnowledgeService(BaseService):
 
     @classmethod
     async def list_knowledge_by_page(cls, page, size):
-        return await KnowledgeDao.select(page=page, page_size=size)
+        total = await KnowledgeDao.cnt_knowledge_total()
+        page_data = await KnowledgeDao.select(page=page, page_size=size)
+        return PageModel(total=total, data=page_data)
 
     @classmethod
     async def get_knowledge_by_id(cls, id):
