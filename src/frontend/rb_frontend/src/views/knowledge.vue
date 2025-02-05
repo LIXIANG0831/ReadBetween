@@ -90,7 +90,12 @@
           <a-textarea v-model:value="createForm.desc" />
         </a-form-item>
         <a-form-item label="向量模型">
-          <a-select
+          <a-input
+            v-model:value="createForm.model"
+            placeholder="请输入向量模型名称"
+            disabled
+          />
+          <!-- <a-select
             v-model:value="createForm.model"
             placeholder="请选择向量模型"
           >
@@ -98,7 +103,7 @@
               >text-embedding-004</a-select-option
             >
             <a-select-option value="model2">模型2</a-select-option>
-          </a-select>
+          </a-select> -->
         </a-form-item>
         <a-form-item label="启用版面识别">
           <a-switch
@@ -117,8 +122,9 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDefaultModelStore } from '@/store/useDefaultModelStore';
 import {
   CheckOutlined,
   CloseOutlined,
@@ -144,6 +150,8 @@ interface Knowledge {
   update_time: string
 }
 
+const defaultModelStore = useDefaultModelStore();
+const defaultModelCfg = ref(null);
 const search = ref('')
 const tableData = ref<Knowledge[]>([])
 const editDialogVisible = ref(false)
@@ -226,7 +234,20 @@ const fetchKnowledgeList = async () => {
   }
 }
 
-onMounted(fetchKnowledgeList)
+onMounted(() => {
+  fetchKnowledgeList();
+  // 在组件挂载时加载默认模型配置
+  defaultModelStore.loadDefaultModelCfg();
+  defaultModelCfg.value = defaultModelStore.defaultModelCfg;
+  // console.log(defaultModelCfg.value)
+});
+
+// 监听 defaultModelCfg 的变化
+watch(defaultModelCfg, (newVal) => {
+  if (newVal) {
+    createForm.value.model = newVal.embedding_name || '未设置默认模型配置';
+  }
+}, { immediate: true });
 
 const filterTableData = computed(() =>
   tableData.value.filter(
@@ -272,7 +293,7 @@ const handleCreate = () => {
     id: '',
     name: '',
     desc: '',
-    model: '',
+    model: defaultModelCfg.value?.embedding_name || '',
     enable_layout: 0,
     create_time: '',
     update_time: '',
@@ -298,6 +319,7 @@ const handlePageChange = (page: number, pageSize: number) => {
   fetchKnowledgeList()
 }
 </script>
+
 
 <style scoped>
 .knowledge-container {

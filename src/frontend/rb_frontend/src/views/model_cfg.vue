@@ -119,6 +119,8 @@ import {
   getAvailableModelCfg,
   getDefaultCfg
 } from '@/api/model_cfg';
+import { useDefaultModelStore } from '@/store/useDefaultModelStore';
+
 
 interface Provider {
   id: string;
@@ -187,6 +189,10 @@ const fetchDefaultModelCfg = async () => {
     const { data } = await getDefaultCfg();
     if (data.status_code !== 200) throw new Error(data.status_message || '获取默认配置失败');
     defaultModelCfg.value = data.data;
+
+    const defaultModelStore = useDefaultModelStore();
+    defaultModelStore.setDefaultModelCfg(data.data);
+
   } catch (error) {
     handleAPIError(error);
   }
@@ -278,6 +284,7 @@ const saveSetDefault = async () => {
     
     setDefaultDialogVisible.value = false;
     await fetchDefaultModelCfg();
+
     message.success('默认配置设置成功');
   } catch (error) {
     handleAPIError(error);
