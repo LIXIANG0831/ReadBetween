@@ -1,0 +1,10 @@
+services:
+  memoji_frontend:
+    image: memoji_frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: memoji_frontend
+    restart: always
+    ports:
+      - "29014:80"

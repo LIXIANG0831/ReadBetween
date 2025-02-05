@@ -1,0 +1,26 @@
+button:
+  about: 关于
+  back: 返回
+  go: 确定
+  home: 首页
+  toggle_dark: 切换深色模式
+  toggle_langs: 切换语言
+  search: 搜索
+  searchPlaceholder: 请输入关键词搜索
+login:
+  email: 邮箱地址
+  emailValidate: 请输入正确格式的邮箱地址
+  emailLogin: 邮箱验证码登陆
+  emailPlaceholder: 请输入邮箱地址
+  emailCodeTimeout: 秒后重新发送
+  sendEmailCode: 发送验证码
+  resendCode: 重新发送验证码
+  sendCodeSuccess: 验证码发送成功
+  sendCodeFail: 验证码发送失败
+  code: 验证码
+  captcha: 验证码
+  captchaPlaceholder: 请输入计算结果
+  remember: 自动登录
+header:
+  login: 登陆
+not-found: 未找到页面

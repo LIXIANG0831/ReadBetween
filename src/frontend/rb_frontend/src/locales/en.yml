@@ -1,0 +1,26 @@
+button:
+  about: About
+  back: Back
+  go: GO
+  home: Home
+  toggle_dark: Toggle dark mode
+  toggle_langs: Change languages
+  search: Search
+  searchPlaceholder: Please input key word
+login:
+  email: Email
+  emailValidate: Please input the right email address
+  emailLogin: Email Code Login
+  emailPlaceholder: Please input your email address
+  emailCodeTimeout: seconds before resend code
+  sendEmailCode: Send Code
+  resendCode: Resend Code
+  sendCodeSuccess: Send Email Code Success
+  sendCodeFail: Send Email Code Fail
+  code: Code
+  captcha: Captcha
+  captchaPlaceholder: Please input the right answer
+  remember: RememberMe
+header:
+  login: Login
+not-found: Not found
