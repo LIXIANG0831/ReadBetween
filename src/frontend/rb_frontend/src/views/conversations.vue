@@ -35,7 +35,7 @@
     >
       <a-form :model="form" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
         <a-form-item label="模型" name="model">
-          <a-input v-model:value="form.model" placeholder="请输入模型名称" />
+          <a-input v-model:value="form.model" placeholder="请输入模型名称" disabled />
         </a-form-item>
         <a-form-item label="系统提示" name="system_prompt">
           <a-input v-model:value="form.system_prompt" placeholder="请输入系统提示" />
@@ -95,6 +95,7 @@ import { FrownOutlined, SmileOutlined, SyncOutlined, UserOutlined } from '@ant-d
 import { BubbleList } from 'ant-design-x-vue';
 import { Flex, Space, Spin } from 'ant-design-vue';
 import type { BubbleListProps } from 'ant-design-x-vue';
+import { useDefaultModelStore } from '@/store/useDefaultModelStore';
 
 import { 
   createConversation,
@@ -105,6 +106,8 @@ import {
   listKnowledge,
 } from '@/api/knowledge';
 
+const defaultModelStore = useDefaultModelStore();
+const defaultModelCfg = ref(null);
 const AButton = Button;
 const ALayout = Layout;
 const ALayoutSider = Layout.Sider;
@@ -132,7 +135,7 @@ const { token } = theme.useToken();
 const isCreateDialogVisible = ref(false);
 const form = ref<Api.CreateConversationParams>({
   title: '新会话',
-  model: 'gemini-2.0-flash-exp',
+  model: '',
   system_prompt: 'System prompt here',
   temperature: 0.1,
   knowledge_base_ids: [],
@@ -205,7 +208,17 @@ const createNewConversation = async () => {
 onMounted(() => {
   fetchConversations();
   fetchKnowledgeList();
+  // 在组件挂载时加载默认模型配置
+  defaultModelStore.loadDefaultModelCfg();
+  defaultModelCfg.value = defaultModelStore.defaultModelCfg;
 });
+
+// 监听 defaultModelCfg 的变化
+watch(defaultModelCfg, (newVal) => {
+  if (newVal) {
+    form.value.model = newVal.llm_name || '未设置默认模型配置';
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>
