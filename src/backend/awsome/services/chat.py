@@ -1,3 +1,5 @@
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
+
 from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from awsome.models.dao.conversations import ConversationDao, Conversation
 from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
@@ -157,7 +159,7 @@ class ChatService:
                 if content is not None:
                     full_response.append(content)
                     yield f"data: {content}\n\n"
-                    await asyncio.sleep(0.02)  # 控制流式速度
+                    # await asyncio.sleep(0.02)  # 控制流式速度
 
             # 保存助手响应
             assistant_content = "".join(full_response)

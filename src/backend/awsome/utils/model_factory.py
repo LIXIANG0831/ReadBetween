@@ -139,7 +139,7 @@ class ModelFactory:
         if kwargs.get("llm_name") is not None:
             config["llm_name"] = kwargs.get("llm_name")
 
-        provider = config.get("provider_mark")
+        provider = config.get("mark")
         # config api_key 还原
         config["api_key"] = encryption_tool.decrypt(config.get("api_key"))
         if provider == "openai":
