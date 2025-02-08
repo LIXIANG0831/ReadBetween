@@ -125,6 +125,11 @@ class ElasticSearchUtil:
         :return: 删除结果。
         """
         try:
+            # 检查索引是否存在
+            if not Index(index_name).exists():
+                logger_util.info(f"索引 {index_name} 已被删除，无需删除")
+                return
+
             # 创建 Search 对象
             s = Search(index=index_name)
 

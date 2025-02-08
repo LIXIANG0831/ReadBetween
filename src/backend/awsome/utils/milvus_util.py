@@ -230,7 +230,7 @@ class MilvusUtil:
                 collection.flush()  # 刷新集合，确保删除操作生效
                 logger_util.info(f"从集合 {collection_name} 中删除了符合条件的记录，条件为: {expr}")
             else:
-                raise MilvusException(message=f"当前删除集合 {collection_name} 不存在")
+                logger_util.info(f"当前删除集合 {collection_name} 不存在，已被删除")
         except MilvusException as e:
             logger_util.error(f"删除集合 {collection_name} 中的记录失败，条件为: {expr}，错误信息: {e}")
             raise MilvusException(message=f"删除集合 {collection_name} 中的记录失败，条件为: {expr}，错误信息: {e}")
