@@ -36,8 +36,9 @@ class ChatUpdate(BaseModel):
 class ChatMessageSend(BaseModel):
     conv_id: str = Field(..., description="对话 ID")
     message: str = Field(..., description="消息内容")
-    temperature: Optional[float] = Field(None, ge=0, le=2, description="控制生成文本的随机性")
-    max_tokens: Optional[int] = Field(None, ge=1, description="生成的最大 token 数量")
+    temperature: Optional[float] = Field(0.3, ge=0, le=2, description="控制生成文本的随机性")
+    max_tokens: Optional[int] = Field(2000, ge=1, description="生成的最大 token 数量")
+    search: bool = Field(default=False, description="是否开启网络搜索")
 
 
 class ConversationOut(BaseModel):

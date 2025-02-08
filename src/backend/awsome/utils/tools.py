@@ -1,6 +1,10 @@
 import base64
 import binascii
-
+import json
+import time
+from typing import List, Dict, Optional
+from DrissionPage._pages.session_page import SessionPage
+import ast
 from awsome.settings import get_config
 from cryptography.fernet import Fernet, InvalidToken
 import hashlib
@@ -111,6 +115,129 @@ class EncryptionTool(BaseTool):
         return password[:3] + '*' * 10 + password[13:]
 
 
+
+BAIDU_ENDPOINT = "https://www.baidu.com/s"
+
+
+class WebPage:
+    """
+    网页信息类，用于存储网页的基本信息，如标题、摘要、URL、来源和内容。
+    """
+
+    def __init__(self, name: str = "", snippet: str = "", url: str = "", source: str = "", content: str = ""):
+        """
+        初始化网页信息。
+
+        :param name: 网页标题
+        :param snippet: 网页摘要
+        :param url: 网页URL
+        :param source: 网页来源（如百度）
+        :param content: 网页内容
+        """
+        self.name = name
+        self.snippet = snippet
+        self.url = url
+        self.source = source
+        self.content = content
+
+    def to_dict(self) -> Dict:
+        """
+        将网页信息转换为字典格式，便于序列化。
+
+        :return: 包含网页信息的字典
+        """
+        return {
+            'name': self.name,
+            'snippet': self.snippet,
+            'content': self.content,
+            'url': self.url,
+            'source': self.source,
+        }
+
+
+class WebSearchTool:
+    """
+    网页搜索工具类，提供百度搜索和网页内容获取的功能。
+    """
+
+    @staticmethod
+    def search_baidu(query: str, size: int = 10, lm: int = 3, tn: str = "news") -> List[WebPage]:
+        """
+        在百度上搜索指定的查询，并返回搜索结果页面的列表。
+
+        :param query: 搜索关键词
+        :param size: 返回结果的数量（默认10）
+        :param lm: 搜索时间范围（默认3天）
+        :param tn: 搜索类型（默认新闻）
+        :return: 包含搜索结果的 WebPage 对象列表
+        """
+        try:
+            # 构造百度搜索的URL
+            url = f'{BAIDU_ENDPOINT}?wd={query}&rn={size}&lm={lm}&tn={tn}'
+            page = SessionPage()
+            time_out = 3
+            # 发送请求获取页面内容
+            page.get(url, timeout=time_out, retry=3, interval=0)
+            if not page.html:
+                logger_util.info("百度搜索异常, html为空")
+                return []
+
+            # 解析搜索结果
+            elements = page.ele('#content_left').eles("tag:div@@class:result@@class:result@@class:new-pmd")
+            pages = []
+            for element in elements:
+                try:
+                    url = element.attr("mu")
+                    name = element.ele("@href").text
+                    snippet = element.text
+                    if name and url and snippet:
+                        # 创建 WebPage 对象并添加到结果列表
+                        web_page = WebPage(name=name, snippet=snippet, content=snippet, url=url, source="baidu")
+                        pages.append(web_page)
+                except Exception as e:
+                    logger_util.error(f"解析百度搜索结果时发生异常: {e}")
+            return pages
+
+        except Exception as e:
+            logger_util.error(f"百度搜索发生异常: {e}")
+            return []
+
+    @staticmethod
+    def get_page_detail(url: str, limit: int = 1000) -> Optional[str]:
+        """
+        获取指定URL的网页内容。
+
+        :param url: 网页URL
+        :param limit: 字符限制
+        :return: 网页内容（截取前limit个字符），如果获取失败则返回None
+        """
+        start = time.time()
+        try:
+            page = SessionPage()
+            # 发送请求获取网页内容
+            page.get(url, timeout=1, retry=0, interval=0, show_errmsg=True)
+            if page.html:
+                # 提取网页正文内容
+                body = page.ele("tag:body").text
+                content = "。".join([item for item in body.split("\n") if len(item) > 0])
+                if '�' not in content and len(content) > 50:
+                    logger_util.info(f"获取网页内容成功，url: {url}，耗时：{time.time() - start}")
+                    # 检查是否存在版权问题
+                    if '授权' in content and '禁止使用' in content:
+                        logger_util.error("版权问题，内容不可用")
+                        return content[:limit]
+                    else:
+                        return content[:limit]
+                else:
+                    logger_util.error(f"内容异常不可用！content: {content}")
+                    return None
+            else:
+                logger_util.error(f"获取网页详情失败，html为空，url: {url}, 耗时：{time.time() - start}")
+        except Exception as e:
+            logger_util.error(f"获取网页详情异常，url: {url}, 耗时：{time.time() - start}, 错误: {e}")
+        return None
+
+
 # 示例使用
 if __name__ == "__main__":
     # encryption_tool = EncryptionTool()  # 创建实例
@@ -122,9 +249,27 @@ if __name__ == "__main__":
     # 解密密码
     # decrypted = encryption_tool.decrypt(encrypted)
     # print(f"Decrypted: {decrypted}")
-    pdf_file_path = '/Users/lixiang/Documents/Test_Material/普通.pdf'
-    pdf_extract = PdfExtractTool(pdf_file_path)
-    results = asyncio.run(pdf_extract.extract())
+
+    # PDF 解析
+    # pdf_file_path = '/Users/lixiang/Documents/Test_Material/普通.pdf'
+    # pdf_extract = PdfExtractTool(pdf_file_path)
+    # results = asyncio.run(pdf_extract.extract())
+    # for result in results:
+    #     print(result)
+    #     print("\n")
+
+    # 示例：搜索百度并获取网页详情
+    search_tool = WebSearchTool()
+    results = search_tool.search_baidu('青岛的天气', size=5, lm=3)
+    detail_results = []
+
+    # 遍历搜索结果，获取每个网页的详情
     for result in results:
-        print(result)
-        print("\n")
+        detail_result = {"url": result.url, "title": result.name}
+        content = search_tool.get_page_detail(result.url)
+        if content:
+            detail_result["content"] = content
+            detail_results.append(detail_result)
+
+    # 打印结果
+    print(json.dumps(detail_results, ensure_ascii=False, indent=4))

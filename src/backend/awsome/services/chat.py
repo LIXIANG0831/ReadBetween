@@ -1,5 +1,4 @@
-from openai.types.chat.chat_completion_chunk import ChoiceDelta
-
+from awsome.models.schemas.source import SourceMsg
 from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from awsome.models.dao.conversations import ConversationDao, Conversation
 from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
@@ -14,6 +13,7 @@ from awsome.services.retriever import RetrieverService
 from awsome.utils.logger_util import logger_util
 
 from awsome.utils.model_factory import ModelFactory
+from awsome.utils.tools import WebSearchTool
 
 
 class ChatService:
@@ -77,22 +77,22 @@ class ChatService:
         total = await ConversationDao.cnt_conversation_total()
         conversations = await ConversationDao.list_with_kb(page, size)
         return PageModel(total=total, data=[{
-                "id": conv.id,
-                "title": conv.title,
-                "model": conv.model,
-                "knowledge_bases": [
-                    {
-                        "id": kb.id,
-                        "name": kb.name,
-                        "desc": kb.desc,
-                        "model": kb.model,
-                        "collection_name": kb.collection_name,
-                        "index_name": kb.index_name,
-                    }
-                    for kb in conv.knowledge_bases
-                ],
-                "updated_at": conv.updated_at.isoformat()
-            }
+            "id": conv.id,
+            "title": conv.title,
+            "model": conv.model,
+            "knowledge_bases": [
+                {
+                    "id": kb.id,
+                    "name": kb.name,
+                    "desc": kb.desc,
+                    "model": kb.model,
+                    "collection_name": kb.collection_name,
+                    "index_name": kb.index_name,
+                }
+                for kb in conv.knowledge_bases
+            ],
+            "updated_at": conv.updated_at.isoformat()
+        }
             for conv in conversations
         ])
 
@@ -110,24 +110,46 @@ class ChatService:
     @classmethod
     async def stream_chat_response(cls, message_data: ChatMessageSend) -> Generator:
         """流式聊天处理"""
+        # 来源信息
+        source_msg_list: List[SourceMsg] = []
         # 获取对话配置
-        conversation = await ConversationDao.get(message_data.conv_id)
+        conversation: Conversation = await ConversationDao.get(message_data.conv_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
 
+        # 最终给模型的输入
+        final_query = message_data.message
+
         # 获取知识库召回内容
-        try:
-            real_query_with_rag = await cls._recall_chunks(conversation.knowledge_bases, message_data.message)
-        except Exception as e:
-            logger_util.error(f"召回内容失败: {e}")
-            real_query_with_rag = message_data.message  # 使用原始用户消息
+        if len(conversation.knowledge_bases) > 0:
+            logger_util.debug(f"用户开启并使用知识库检索")
+            try:
+                final_query = await cls._append_kb_recall_msg(conversation.knowledge_bases, final_query)
+            except Exception as e:
+                logger_util.error(f"知识库召回内容失败: {e}")
+
+        # 获取网络搜索内容
+        if message_data.search is True:
+            logger_util.debug(f"用户开启并使用网络检索")
+            try:
+                final_query = await cls._append_web_search_msg(message_data.message, final_query)
+            except Exception as e:
+                logger_util.error(f"网络检索失败：{e}")
+
+        # 获取 历史记录
+        # 构造 OpenAI 请求参数
+        system_prompt = [{'role': 'system', 'content': f'{conversation.system_prompt}'}]
+        history_messages = await cls._build_openai_messages(message_data.conv_id)
+        current_message = [{'role': 'user', 'content': f'{final_query}'}]
+        messages = system_prompt + history_messages + current_message
+        logger_util.debug(f"当前请求模型完整请求消息: {messages}")
 
         # 保存用户消息并记录ID
         try:
             user_msg = await MessageDao.create_message(
                 conv_id=message_data.conv_id,
                 role="user",
-                content=real_query_with_rag
+                content=message_data.message
             )
             user_msg_id = user_msg.id
             logger_util.debug(f"保存用户消息ID: {user_msg_id}")
@@ -136,49 +158,50 @@ class ChatService:
             yield f"data: [ERROR] 消息保存失败\n\n"
             return
 
-        # 获取 历史记录
-        # 构造 OpenAI 请求参数
-        system_prompt = [{'role': 'system', 'content': f'{conversation.system_prompt}'}]
-        history_messages = await cls._build_openai_messages(message_data.conv_id)
-        messages = system_prompt + history_messages
-        logger_util.debug(f"构造完整请求消息: {messages}")
-
-        # 创建模型调用客户端
-        client = ModelFactory.create_client(llm_name=conversation.model)
         try:
-            response = await client.generate_text(
-                messages=messages,
-                temperature=message_data.temperature or conversation.temperature,
-                max_tokens=message_data.max_tokens,
-                stream=True
-            )
-
+            # 创建模型调用客户端
+            client = ModelFactory.create_client(llm_name=conversation.model)
+            # 完整的模型回复
             full_response = []
-            for chunk in response:
-                content = chunk.choices[0].delta.content or ""
-                if content is not None:
-                    full_response.append(content)
-                    yield f"data: {content}\n\n"
-                    # await asyncio.sleep(0.02)  # 控制流式速度
+            try:
+                response = await client.generate_text(
+                    messages=messages,
+                    temperature=message_data.temperature or conversation.temperature,
+                    max_tokens=message_data.max_tokens,
+                    stream=True
+                )
+
+                for chunk in response:
+                    content = chunk.choices[0].delta.content or ""
+                    if content is not None:
+                        full_response.append(content)
+                        yield f"data: {content}\n\n"
+                        # await asyncio.sleep(0.02)  # 控制流式速度
+            except Exception as e:
+                error_msg = f"模型响应失败: {str(e)}"
+                raise Exception(error_msg)
 
             # 保存助手响应
-            assistant_content = "".join(full_response)
-            await MessageDao.create_message(
-                conv_id=message_data.conv_id,
-                role="assistant",
-                content=assistant_content
-            )
-            logger_util.debug(f"保存助手响应消息: {assistant_content}")
+            try:
+                assistant_content = "".join(full_response)
+                await MessageDao.create_message(
+                    conv_id=message_data.conv_id,
+                    role="assistant",
+                    content=assistant_content
+                )
+                logger_util.debug(f"保存助手响应消息: {assistant_content}")
+            except Exception as e:
+                error_msg = f"保存助手响应信息失败: {e}"
+                raise Exception(error_msg)
         except Exception as e:
-            # 删除刚保存的用户消息
+            logger_util.error(f"模型调用或保存模型回复失败: {str(e)}")
+            # 回滚用户保存消息
             try:
                 await MessageDao.delete_message(user_msg_id)
                 logger_util.info(f"已回滚用户消息: {user_msg_id}")
             except Exception as delete_error:
                 logger_util.error(f"消息回滚失败: {delete_error}")
-
-            error_msg = f"[ERROR] {str(e)}"
-            yield f"data: {error_msg}\n\n"
+            yield f"data: [ERROR] {e}\n\n"
 
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
@@ -210,7 +233,7 @@ class ChatService:
         }
 
     @classmethod
-    async def _recall_chunks(cls, knowledge_bases: List[Knowledge], message: str):
+    async def _append_kb_recall_msg(cls, knowledge_bases: List[Knowledge], message: str):
         recall_chunk = ""
         if knowledge_bases:
             retrieve_resp = await RetrieverService.retrieve(
@@ -248,6 +271,29 @@ class ChatService:
                     1. 不要使用"根据检索内容"、"根据资料"等暴露检索过程的表述
                     2. 不要直接引用上下文中的标题或元数据
                     3. 若上下文内容与用户需求无关，则忽略它直接回答
-                    """
+            """
+        else:
+            return message
+
+    @classmethod
+    async def _append_web_search_msg(cls, query: str, message: str):
+        search_tool = WebSearchTool()
+        web_search_info = ""
+        # 一级检索
+        search_results = search_tool.search_baidu(query, size=3, lm=3)
+        # 二级检索
+        for search_item in search_results:
+            # TODO 拼接检索内容到提示词final_query
+            search_content = search_tool.get_page_detail(search_item.url)
+            if search_content is not None:
+                # source_msg_list.append(SourceMsg(source="web", title=search_item.name, url=search_item.url))
+                web_search_info += f"Title: {search_item.name}\nContent: {search_content}\n\n"
+        if web_search_info:
+            return f"""
+                【网络检索内容】
+                {web_search_info}
+                
+                {message}
+            """
         else:
             return message
