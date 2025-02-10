@@ -83,13 +83,13 @@
       class="create-modal"
     >
       <a-form :model="createForm" :label-col="{ span: 4 }">
-        <a-form-item label="知识库名称">
+        <a-form-item label="知识库名称" required>
           <a-input v-model:value="createForm.name" />
         </a-form-item>
         <a-form-item label="描述">
           <a-textarea v-model:value="createForm.desc" />
         </a-form-item>
-        <a-form-item label="向量模型">
+        <a-form-item label="向量模型" required>
           <a-input
             v-model:value="createForm.model"
             placeholder="请输入向量模型名称"

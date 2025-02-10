@@ -24,13 +24,5 @@ app.use(router);
 app.use(store);
 app.use(i18n);
 
-import { useDefaultModelStore } from './store/useDefaultModelStore';
-const defaultModelStore = useDefaultModelStore();
-// 在应用启动时加载默认模型配置
-defaultModelStore.loadDefaultModelCfg().then(() => {
-  if (!defaultModelStore.defaultModelCfg) {
-    // 如果默认配置为空，跳转到配置页面
-    router.push({ name: 'model_cfg' });
-  }
-  app.mount('#app');
-});
+
+app.mount('#app');

@@ -30,8 +30,14 @@ function createService() {
       const code = apiData.status_code;
       // 如果没有 code, 代表这不是项目后端开发的 api
       if (code === undefined) {
-        ElMessage.error('非本系统的接口');
-        return Promise.reject(new Error('非本系统的接口'));
+        // 流式接口的特殊处理
+        if (response.status === 200){
+          return response;
+        }
+        else{
+          ElMessage.error('非本系统的接口');
+          return Promise.reject(new Error('非本系统的接口'));
+        }
       }
       switch (code) {
         case 200:

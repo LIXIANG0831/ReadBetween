@@ -78,10 +78,17 @@ export async function sendMessage(
   data: Api.SendMessageParams,
   options?: { [key: string]: any },
 ) {
-  return request<Api.Success>('/api/v1/conversations/messages/send', {
+  const apiUrl = 'http://localhost:8080/api/v1/conversations/messages/send'; // 你的 API endpoint
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options?.headers || {}), // 合并 options 中的 headers (如果存在)
+  };
+
+  return fetch(apiUrl, {
     method: 'POST',
-    data,
-    ...(options || {}),
+    headers: headers,
+    body: JSON.stringify(data),
+    ...(options || {}), // 合并其他 options，例如 signal, mode, 等等 (小心覆盖 fetch 的配置)
   });
 }
 
