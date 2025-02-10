@@ -6,15 +6,14 @@ from awsome.models.dao.messages import MessageDao
 from awsome.models.schemas.response import PageModel
 from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
 from fastapi import HTTPException
-import asyncio
 from typing import Generator, List
-
 from awsome.services.retriever import RetrieverService
 from awsome.utils.logger_util import logger_util
-
+from awsome.utils.minio_util import MinioUtil
 from awsome.utils.model_factory import ModelFactory
 from awsome.utils.tools import WebSearchTool
 
+minio_client = MinioUtil()
 
 class ChatService:
 
@@ -121,18 +120,20 @@ class ChatService:
         final_query = message_data.message
 
         # 获取知识库召回内容
+        kb_source_list = None
         if len(conversation.knowledge_bases) > 0:
             logger_util.debug(f"用户开启并使用知识库检索")
             try:
-                final_query = await cls._append_kb_recall_msg(conversation.knowledge_bases, final_query)
+                final_query, kb_source_list = await cls._append_kb_recall_msg(conversation.knowledge_bases, final_query)
             except Exception as e:
                 logger_util.error(f"知识库召回内容失败: {e}")
 
         # 获取网络搜索内容
+        web_source_list = None
         if message_data.search is True:
             logger_util.debug(f"用户开启并使用网络检索")
             try:
-                final_query = await cls._append_web_search_msg(message_data.message, final_query)
+                final_query, web_source_list = await cls._append_web_search_msg(message_data.message, final_query)
             except Exception as e:
                 logger_util.error(f"网络检索失败：{e}")
 
@@ -171,6 +172,7 @@ class ChatService:
                     stream=True
                 )
 
+                yield f"data: [START]\n\n"
                 for chunk in response:
                     content = chunk.choices[0].delta.content or ""
                     if content is not None:
@@ -193,6 +195,15 @@ class ChatService:
             except Exception as e:
                 error_msg = f"保存助手响应信息失败: {e}"
                 raise Exception(error_msg)
+
+            # 返回来源信息
+            if web_source_list is not None:
+                source_msg_list.extend(web_source_list)
+            if kb_source_list is not None:
+                source_msg_list.extend(kb_source_list)
+
+            yield f"data: [SOURCE] {[source_msg.to_dict() for source_msg in list(set(source_msg_list))]}\n\n"
+            yield f"data: [END]\n\n"
         except Exception as e:
             logger_util.error(f"模型调用或保存模型回复失败: {str(e)}")
             # 回滚用户保存消息
@@ -235,6 +246,7 @@ class ChatService:
     @classmethod
     async def _append_kb_recall_msg(cls, knowledge_bases: List[Knowledge], message: str):
         recall_chunk = ""
+        source_list: List[SourceMsg] = []
         if knowledge_bases:
             retrieve_resp = await RetrieverService.retrieve(
                 query=message,
@@ -243,15 +255,20 @@ class ChatService:
                     knowledge_base.collection_name
                     for knowledge_base in knowledge_bases
                 ],
-                milvus_fields=['text', 'title'],
+                milvus_fields=['text', 'title', 'source'],
                 es_index_names=[
                     knowledge_base.index_name
                     for knowledge_base in knowledge_bases
                 ],
-                es_fields=['text', 'metadata.title'],
+                es_fields=['text', 'metadata.title', 'metadata.source'],
                 top_k=3
             )
             for retrieve_result in retrieve_resp:
+                # 返回object_name minio获取预签名链接
+                minio_object_name = retrieve_result.metadata['source']
+                minio_file_url = minio_client.get_presigned_url(object_name=minio_object_name)
+                # 保存来源信息
+                source_list.append(SourceMsg(source="kb", title=retrieve_result.metadata['title'], url=minio_file_url))
                 # TODO 考虑是否抽象为配置项
                 if retrieve_result.source == 'milvus' and float(retrieve_result.score) > 0.8:
                     recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
@@ -271,14 +288,15 @@ class ChatService:
                     1. 不要使用"根据检索内容"、"根据资料"等暴露检索过程的表述
                     2. 不要直接引用上下文中的标题或元数据
                     3. 若上下文内容与用户需求无关，则忽略它直接回答
-            """
+            """, source_list
         else:
-            return message
+            return message, None
 
     @classmethod
     async def _append_web_search_msg(cls, query: str, message: str):
         search_tool = WebSearchTool()
         web_search_info = ""
+        source_list: List[SourceMsg] = []
         # 一级检索
         search_results = search_tool.search_baidu(query, size=3, lm=3)
         # 二级检索
@@ -286,7 +304,7 @@ class ChatService:
             # TODO 拼接检索内容到提示词final_query
             search_content = search_tool.get_page_detail(search_item.url)
             if search_content is not None:
-                # source_msg_list.append(SourceMsg(source="web", title=search_item.name, url=search_item.url))
+                source_list.append(SourceMsg(source="web", title=search_item.name, url=search_item.url))
                 web_search_info += f"Title: {search_item.name}\nContent: {search_content}\n\n"
         if web_search_info:
             return f"""
@@ -294,6 +312,6 @@ class ChatService:
                 {web_search_info}
                 
                 {message}
-            """
+            """, source_list
         else:
-            return message
+            return message, None

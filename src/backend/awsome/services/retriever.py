@@ -170,13 +170,20 @@ async def main():
     # 考虑多个collection
     retrieve_resp = await RetrieverService.retrieve("卡萨帝热水器",
                                                     milvus_collection_names=[
-                                                        "c_awsome_6565131da2524faca0e726ec0ffa26d1",
-                                                        "c_awsome_de8ed36a35a444a19cec145308b78b1f"],
-                                                    milvus_fields=['text', 'title'],
-                                                    es_index_names=["i_awsome_aded292a91db4ec08c9a556392341305",
-                                                                    "i_awsome_943eaa8acc564a88b74237f065fc2e5d"],
-                                                    es_fields=['text', 'metadata.title']
+                                                        "c_awsome_08912d305d254ddb9c5244acfaa0116b"],
+                                                    milvus_fields=['text', 'title', 'source'],
+                                                    es_index_names=["i_awsome_d97cc39f627e488d9f58b166c142a5e1"],
+                                                    es_fields=['text', 'metadata.title', 'metadata.source']
                                                     )
+    # RetrieverResult
+    # 用于表示召回结果的通用类。
+    # :param source: 来源（"es" 或 "milvus"）
+    # :param name: 集合名称 | 索引名称
+    # :param id: 文档 ID | 集合 ID
+    # :param score: 相似度分数或相关性分数
+    # :param metadata: 元数据（字典形式）
+    # :param text: 文本内容
+    # :param vector: 向量（仅 Milvus 有，可选）
     for retrieve_result in retrieve_resp:
         print(retrieve_result.metadata)
         print(retrieve_result.to_dict())
