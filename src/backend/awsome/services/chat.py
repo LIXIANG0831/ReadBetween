@@ -1,3 +1,5 @@
+import json
+
 from awsome.models.schemas.source import SourceMsg
 from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from awsome.models.dao.conversations import ConversationDao, Conversation
@@ -172,12 +174,15 @@ class ChatService:
                     stream=True
                 )
 
-                yield f"data: [START]\n\n"
+                # yield f"data: [START]\n\n"
+                yield cls._format_stream_response(event="START", text="")
                 for chunk in response:
                     content = chunk.choices[0].delta.content or ""
                     if content is not None:
                         full_response.append(content)
-                        yield f"data: {content}\n\n"
+                        # yield f"data: {content}\n\n"
+                        yield cls._format_stream_response(event="MESSAGE", text=content)
+
                         # await asyncio.sleep(0.02)  # 控制流式速度
             except Exception as e:
                 error_msg = f"模型响应失败: {str(e)}"
@@ -202,8 +207,12 @@ class ChatService:
             if kb_source_list is not None:
                 source_msg_list.extend(kb_source_list)
 
-            yield f"data: [SOURCE] {[source_msg.to_dict() for source_msg in list(set(source_msg_list))]}\n\n"
-            yield f"data: [END]\n\n"
+            if len(source_msg_list) != 0:
+                # yield f"data: [SOURCE] {[source_msg.to_dict() for source_msg in list(set(source_msg_list))]}\n\n"
+                yield cls._format_stream_response(event="SOURCE", text="", extra=[source_msg.to_dict() for source_msg in list(set(source_msg_list))])
+            # yield f"data: [END]\n\n"
+            yield cls._format_stream_response(event="END", text="")
+
         except Exception as e:
             logger_util.error(f"模型调用或保存模型回复失败: {str(e)}")
             # 回滚用户保存消息
@@ -212,7 +221,8 @@ class ChatService:
                 logger_util.info(f"已回滚用户消息: {user_msg_id}")
             except Exception as delete_error:
                 logger_util.error(f"消息回滚失败: {delete_error}")
-            yield f"data: [ERROR] {e}\n\n"
+            # yield f"data: [ERROR] {e}\n\n"
+            cls._format_stream_response(event="ERROR", text=f"{e}")
 
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
@@ -315,3 +325,18 @@ class ChatService:
             """, source_list
         else:
             return message, None
+
+    @classmethod
+    def _format_stream_response(cls, event: str, text: str, extra=None):
+        if extra is not None:
+            stream_resp = {
+                "event": event,
+                "text": text,
+                "extra": extra
+            }
+        else:
+            stream_resp = {
+                "event": event,
+                "text": text
+            }
+        return f"data: {json.dumps(stream_resp, ensure_ascii=False)}\n\n"
