@@ -37,9 +37,10 @@
               :chats="chats"
               @message-send="handleMessageSend"
               :loading="isLoading"
-              showClearContext
               :roleConfig="roleConfig"
               :message-key="msg => msg.timestamp.toString()"
+              :renderHintBox="renderHintBox"
+              :hints="hints.value"
             />
           </div>
         </a-layout-content>
@@ -105,6 +106,13 @@
 </template>
 
 <script setup lang="ts">
+const hintsExample = [
+  "告诉我更多",
+  "Semi Design 的组件有哪些？",
+  "我能够通过 DSM 定制自己的主题吗？",
+]
+
+
 import { Chat } from '@kousum/semi-ui-vue';
 import { ref, onMounted, computed, watch } from 'vue';
 import {
@@ -169,6 +177,8 @@ const knowledgeList = ref<Api.Knowledge[]>([]);
 const isLoading = ref(false);
 const isCreateDialogVisible = ref(false);
 const isEditing = ref(false);
+const hints = ref<string[]>(["测试提示信息 1", "测试提示信息 2"]); // 初始化 hints 用于存储提示消息
+let sourceContent = ''; // 来源信息
 
 // 表单数据
 const form = ref<Api.CreateConversationParams>({
@@ -213,8 +223,15 @@ const fetchMessageHistory = async (convId: string) => {
         timestamp: new Date().getTime()
       }));
     }
+    else {
+      console.error('获取消息历史失败:', res.data); // 打印错误信息
+      message.error('获取消息历史失败');
+      chats.value = []; // 出错时，确保 chats.value 仍然是空数组或数组
+    }
   } catch (error) {
+    console.error('获取消息历史异常:', error); // 打印异常信息
     message.error('获取消息历史失败');
+    chats.value = []; // 异常时，确保 chats.value 仍然是空数组或数组
   }
 };
 
@@ -228,6 +245,25 @@ const fetchKnowledgeList = async () => {
   } catch (error) {
     message.error('获取知识库失败');
   }
+};
+
+// 自定义提示信息
+const renderHintBox = (props: { content: string, onHintClick: () => void, index: number }) => {
+  console.log('renderHintBox called', props.content);
+  const { content } = props; // 这里我们只需要 content，不需要 onHintClick 和 index
+  const commonHintStyle = { // 可以复用你之前定义的样式，或者根据 sourceContent 的特点自定义样式
+    border: '1px solid var(--semi-color-border)',
+    padding: '10px',
+    borderRadius: '10px',
+    color: 'var( --semi-color-text-1)',
+    display: 'block', // 修改为 block，让 sourceContent 独占一行
+    cursor: 'default', // 修改 cursor 为 default，因为 sourceContent 通常不需要点击
+    fontSize: '14px',
+    marginTop: '8px', // 可以添加一些 margin，与聊天内容分隔开
+    whiteSpace: 'pre-line' // 保留换行符，处理 sourceContent 中的换行
+  };
+
+  return h('div', { style: commonHintStyle}, content); // 使用 v-html 渲染 Markdown 内容
 };
 
 // 发送消息处理
@@ -314,7 +350,37 @@ const handleMessageSend = async (text: string) => {
           break;
           
         case 'SOURCE':
-          console.log('Source data:', data);
+          console.log('Source data:', data.extra);
+          const sourceData = data.extra;
+          
+          // 分别保存 kb 和 web 的数据
+          const kbSources = sourceData
+            .filter(item => item.source === 'kb')
+            .map(item => `[🔖 ${item.title}](${item.url})`);
+          
+          const webSources = sourceData
+            .filter(item => item.source === 'web')
+            .map(item => `[🌐 ${item.title}](${item.url})`);
+
+          // 格式化来源内容
+          if (kbSources) {
+            sourceContent += "**知识库**:\n"
+            sourceContent += kbSources + '\n'; // 添加换行符分隔不同来源
+          }
+
+          if (webSources) {
+            sourceContent += "**网络搜索**:\n"
+            sourceContent += webSources;
+          }
+
+          if (sourceContent) {
+            // hints.value = [sourceContent]; // 将 sourceContent 设置为 hints，renderHintBox 会渲染它
+            hints.value = ["123","456"]
+            console.log('hints.value updated:', hints.value);
+          } else {
+            hints.value = []; // 没有 sourceContent 时清空 hints
+          }
+
           break;
           
         case 'END':
