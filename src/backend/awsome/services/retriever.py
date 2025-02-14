@@ -77,6 +77,7 @@ class RetrieverService(BaseService):
             milvus_collection_names: Optional[List[str]] = None,
             milvus_fields: List[str] = None,
             milvus_expr: str = None,
+            milvus_search_params: str = None,
             es_index_names: Optional[List[str]] = None,
             es_fields: List[str] = None,
             es_query: Union[str, Dict] = None,
@@ -89,6 +90,7 @@ class RetrieverService(BaseService):
         :param milvus_collection_names: Milvus 集合名称列表。
         :param milvus_fields: Milvus 返回的字段列表。
         :param milvus_expr: Milvus条件过滤式
+        :param milvus_search_params 索引查询参数
         :param es_index_names: Elasticsearch 索引名称列表。
         :param es_fields: Elasticsearch 返回的字段列表。
         :param es_query: Elasticsearch 查询内容，可以是字符串或字典。
@@ -103,7 +105,7 @@ class RetrieverService(BaseService):
         tasks = []
         # 检索模式：仅使用 Milvus
         if mode in ["milvus", "both"]:
-            tasks.append(cls._milvus_search(milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, model_client))
+            tasks.append(cls._milvus_search(milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, milvus_search_params, model_client))
         # 检索模式：仅使用 Elasticsearch
         if mode in ["es", "both"]:
             tasks.append(cls._es_search(es_client, es_index_names, query, top_k, es_fields, es_query))
@@ -117,7 +119,7 @@ class RetrieverService(BaseService):
         return results
 
     @classmethod
-    async def _milvus_search(cls, milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, model_client):
+    async def _milvus_search(cls, milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, milvus_search_params, model_client):
         if not milvus_collection_names:
             logger_util.error("未指定 Milvus 集合名称列表")
             raise ValueError("未指定 Milvus 集合名称列表")
@@ -133,6 +135,7 @@ class RetrieverService(BaseService):
                 top_k=top_k,
                 output_fields=milvus_fields,
                 expr=milvus_expr,
+                search_params=milvus_search_params
             )  # List[Dict]
             # 转换 milvus_results 为统一检索数据结构
             return [cls._convert_milvus_result_to_retriever_result(milvus_result) for milvus_result in milvus_results]
