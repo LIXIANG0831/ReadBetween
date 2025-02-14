@@ -202,7 +202,7 @@ class ChatService:
                     conv_id=message_data.conv_id,
                     role="assistant",
                     content=assistant_content,
-                    source=json.dumps([msg.to_dict() for msg in source_msg_list], ensure_ascii=False),
+                    source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False),
                 )
                 logger_util.debug(f"保存助手响应消息: {assistant_content}")
             except Exception as e:
