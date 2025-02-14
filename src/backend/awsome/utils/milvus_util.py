@@ -113,7 +113,6 @@ class MilvusUtil:
         """
         results = []
 
-        # TODO 开放Milvus查询参数
         if search_params is None:
             search_params = {"metric_type": "L2", "params": {"ef": 10}}
 
