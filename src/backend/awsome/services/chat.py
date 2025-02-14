@@ -152,7 +152,8 @@ class ChatService:
             user_msg = await MessageDao.create_message(
                 conv_id=message_data.conv_id,
                 role="user",
-                content=message_data.message
+                content=message_data.message,
+                source=None
             )
             user_msg_id = user_msg.id
             logger_util.debug(f"保存用户消息ID: {user_msg_id}")
@@ -188,24 +189,25 @@ class ChatService:
                 error_msg = f"模型响应失败: {str(e)}"
                 raise Exception(error_msg)
 
+            # 返回来源信息
+            if web_source_list is not None:
+                source_msg_list.extend(web_source_list)
+            if kb_source_list is not None:
+                source_msg_list.extend(kb_source_list)
+
             # 保存助手响应
             try:
                 assistant_content = "".join(full_response)
                 await MessageDao.create_message(
                     conv_id=message_data.conv_id,
                     role="assistant",
-                    content=assistant_content
+                    content=assistant_content,
+                    source=json.dumps([msg.to_dict() for msg in source_msg_list], ensure_ascii=False),
                 )
                 logger_util.debug(f"保存助手响应消息: {assistant_content}")
             except Exception as e:
                 error_msg = f"保存助手响应信息失败: {e}"
                 raise Exception(error_msg)
-
-            # 返回来源信息
-            if web_source_list is not None:
-                source_msg_list.extend(web_source_list)
-            if kb_source_list is not None:
-                source_msg_list.extend(kb_source_list)
 
             if len(source_msg_list) != 0:
                 # yield f"data: [SOURCE] {[source_msg.to_dict() for source_msg in list(set(source_msg_list))]}\n\n"

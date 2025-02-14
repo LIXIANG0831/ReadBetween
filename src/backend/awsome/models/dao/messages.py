@@ -32,6 +32,10 @@ class MessageBase(AwsomeDBModel):
         sa_column=Column(Text, nullable=False),
         description="消息内容"
     )
+    source: str = Field(
+        sa_column=Column(Text, nullable=True),
+        description="消息内容"
+    )
     timestamp: datetime = Field(
         sa_column=Column(
             DateTime,
@@ -59,9 +63,9 @@ class Message(MessageBase, table=True):
 
 class MessageDao:
     @staticmethod
-    async def create_message(conv_id: str, role: str, content: str):
+    async def create_message(conv_id: str, role: str, content: str, source: str):
         async with async_session_getter() as session:
-            new_msg = Message(conv_id=conv_id, role=role, content=content)
+            new_msg = Message(conv_id=conv_id, role=role, content=content, source=source)
             session.add(new_msg)
             await session.commit()
             await session.refresh(new_msg)
