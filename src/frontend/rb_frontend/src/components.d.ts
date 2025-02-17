@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ChatInput: typeof import('./components/ChatInput.vue')['default']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']
@@ -52,6 +53,7 @@ declare module 'vue' {
     LoginDialog: typeof import('./components/LoginDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SourceCard: typeof import('./components/SourceCard.vue')['default']
     ZhReadme: typeof import('./components/ZhReadme.md')['default']
   }
   export interface ComponentCustomProperties {

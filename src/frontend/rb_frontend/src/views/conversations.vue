@@ -1,17 +1,18 @@
 <template>
   <div class="common-layout">
     <a-layout style="height: 100vh;">
-      <a-layout-sider width="400" class="aside" style="height: 100%;">
+      <a-layout-sider width="250px" class="aside" style="height: 100%;margin-bottom: 16px;">
         <div style="padding: 16px;height: 100%;display: flex;flex-direction: column;">
-          <a-button type="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
-            新建会话
-          </a-button>
+          
           <a-menu
             v-model:selectedKeys="activeKey"
             mode="inline"
             :style="style"
             @click="handleConversationClick"
           >
+            <a-button type="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
+              新建渠道
+            </a-button>
             <a-menu-item v-for="item in items" :key="item.id" class="menu-item">
               <template #icon>
                 <message-outlined />
@@ -27,22 +28,39 @@
       </a-layout-sider>
       <a-layout>
         <a-layout-content class="main">
-          <div style="padding: 16px;">
-            <div style="margin-bottom: 16px;">
+          <div v-if="activeKey.length > 0" style="width: 100%;">
+              <!-- <div style="margin-bottom: 16px;">
+                <a-button @click="handleClearHistory" :disabled="!activeKey[0]">
+                  清除历史记录
+                </a-button>
+              </div> -->
+              <Chat
+              :chats="chats"
+              @message-send="handleMessageSend"
+              :message-key="msg => msg.timestamp.toString()"
+              :loading="isLoading"
+              :roleConfig="roleConfig"
+              showClearContext
+              :style="commonChatOuterStyle"
+              :onClear="handleClearHistory"
+              :chatBoxRenderConfig="chatBoxConfig"
+              :renderInputArea="renderCustomInput"
+              />
+            </div>
+          <div v-else class="read-between-placeholder">
+            ReadBetween
+          </div>
+
+
+          <!-- <div style="padding: 16px;"> -->
+            <!-- <div style="margin-bottom: 16px;">
               <a-button @click="handleClearHistory" :disabled="!activeKey[0]">
                 清除历史记录
               </a-button>
-            </div>
-            <Chat
-              :chats="chats"
-              @message-send="handleMessageSend"
-              :loading="isLoading"
-              :roleConfig="roleConfig"
-              :message-key="msg => msg.timestamp.toString()"
-              :renderHintBox="renderHintBox"
-              :hints="hints.value"
-            />
-          </div>
+            </div> -->
+
+            
+          <!-- </div> -->
         </a-layout-content>
       </a-layout>
     </a-layout>
@@ -106,14 +124,8 @@
 </template>
 
 <script setup lang="ts">
-const hintsExample = [
-  "告诉我更多",
-  "Semi Design 的组件有哪些？",
-  "我能够通过 DSM 定制自己的主题吗？",
-]
 
-
-import { Chat } from '@kousum/semi-ui-vue';
+import { Chat, Button, MarkdownRender } from '@kousum/semi-ui-vue';
 import { ref, onMounted, computed, watch } from 'vue';
 import {
   message,
@@ -141,10 +153,15 @@ import {
 } from '@/api/conversations';
 import { listKnowledge } from '@/api/knowledge';
 import { useDefaultModelStore } from '@/store/useDefaultModelStore';
+import SourceCard from '@/components/SourceCard.vue';
+// import ChatInput from '@/components/ChatInput.vue';
+import { IconGlobeStroke } from '@kousum/semi-icons-vue';
+
 
 interface ExtendedChatMessage {
   content: string;
   role: 'user' | 'assistant';
+  source: array;
   status?: 'loading' | 'error';
   timestamp: number;
 }
@@ -154,6 +171,12 @@ interface StreamMessage {
   text?: string;
   [key: string]: any;
 }
+
+// interface ChatBoxRenderConfig {
+//   showAvatar?: boolean; // 是否显示头像
+//   showTime?: boolean; // 是否显示时间
+//   renderContent?: (message: Message) => VNode; // 自定义内容渲染
+// }
 
 const roleConfig = ref({
   user: {
@@ -165,6 +188,8 @@ const roleConfig = ref({
     avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/other/logo.png'
   }
 });
+
+
 
 const defaultModelStore = useDefaultModelStore();
 const { token } = theme.useToken();
@@ -180,9 +205,16 @@ const isEditing = ref(false);
 const hints = ref<string[]>(["测试提示信息 1", "测试提示信息 2"]); // 初始化 hints 用于存储提示消息
 let sourceContent = ''; // 来源信息
 
+// 聊天框外边框属性设置
+const commonChatOuterStyle = {
+  border: '1px solid var(--semi-color-border)',
+  borderRadius: '16px',
+  height: '700px'
+};
+
 // 表单数据
 const form = ref<Api.CreateConversationParams>({
-  title: '新会话',
+  title: '新渠道',
   model: '',
   system_prompt: '你是我的AI助手',
   temperature: 0.3,
@@ -203,9 +235,10 @@ const fetchConversations = async () => {
     const res = await listConversations();
     if (res.data.status_code === 200) {
       items.value = res.data.data.data;
-      if (items.value.length > 0 && !activeKey.value.length) {
-        activeKey.value = [items.value[0].id];
-      }
+      // 默认选中第一个
+      // if (items.value.length > 0 && !activeKey.value.length) {
+      //   activeKey.value = [items.value[0].id];
+      // }
     }
   } catch (error) {
     message.error('获取会话列表失败');
@@ -220,8 +253,10 @@ const fetchMessageHistory = async (convId: string) => {
       chats.value = res.data.data.map(msg => ({
         content: msg.content,
         role: msg.role === 'user' ? 'user' : 'assistant',
+        source: JSON.parse(msg.source),
         timestamp: new Date().getTime()
       }));
+      // console.log(chats.value)
     }
     else {
       console.error('获取消息历史失败:', res.data); // 打印错误信息
@@ -266,10 +301,82 @@ const renderHintBox = (props: { content: string, onHintClick: () => void, index:
   return h('div', { style: commonHintStyle}, content); // 使用 v-html 渲染 Markdown 内容
 };
 
+// 自定义对话框
+const chatBoxConfig = ref({
+  renderChatBoxContent: (props) => {
+    const { role, message, className } = props;
+
+    // 如果 message.status 是 "loading"，不返回任何内容
+    console.log("======")
+    console.log(message.status)
+    console.log("======")
+
+    if (message.status === "loading") {
+      return h("div", { class: className });
+    }
+
+    // 替换头像图标
+    // 遍历 message.source，根据 source 字段添加 avatar 属性
+    const processedSource = message.source && message.source.length > 0
+      ? message.source.map((item) => {
+      if (item.source === 'kb') {
+        return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
+      } else if (item.source === 'web') {
+        return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
+      }
+      return item; // 其他情况保持原样
+    }) : []; 
+
+    // 使用 h 函数构建渲染内容
+    return h(
+      'div',
+      { class: className },
+      message.source && message.source.length > 0
+        ? [h(SourceCard, { source: processedSource }), h(MarkdownRender, { raw: message.content })] 
+        : h(MarkdownRender, { raw: message.content }) 
+    );
+  }
+});
+
+// 自定义输入区域渲染函数
+const isSearchEnabled = ref(false);
+const toggleSearch = () => isSearchEnabled.value = !isSearchEnabled.value;
+const renderCustomInput = (props) => {
+  return h('div', { style: { display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' } }, [
+    // 默认输入框（占据剩余空间）
+    h('div', { style: { flexGrow: 1 } }, [ // 使用 div 包裹 defaultNode 并设置 flexGrow
+        props.defaultNode
+    ]),  
+
+    // 网络搜索图标按钮
+    h(Button, {
+      type: isSearchEnabled.value ? 'primary' : 'default',
+      onClick: toggleSearch,
+      icon: () => h(IconGlobeStroke, { size: '32' }), // 使用 IconSearch 组件作为 icon
+      style: { 
+        paddingRight: '8px',
+        flexShrink: 0,
+        padding: '6px',
+        borderRadius: '50%',
+        minWidth: 'unset',
+        width: '48px',     // Fixed width and height for button size
+        height: '48px',
+        backgroundColor: 'var(--semi-color-fill-0)', // Default background
+        border: 'none',
+        display: 'flex',       // Ensure icon is centered
+        alignItems: 'center',  // Vertically center icon
+        justifyContent: 'center' // Horizontally center icon
+      } // 调整图标按钮样式，去除文字部分的padding
+    }),
+
+    // 如果还有其他图标按钮，可以放在这里，例如：
+    // h(Button, { ...otherButtonProps, icon: () => h(OtherIcon) }),
+  ]);
+};
+
 // 发送消息处理
 const handleMessageSend = async (text: string) => {
   if (!activeKey.value[0] || !text.trim()) return;
-
   try {
     isLoading.value = true;
 
@@ -278,6 +385,7 @@ const handleMessageSend = async (text: string) => {
     const userMessage: ExtendedChatMessage = {
       content: text,  // 使用原始输入文本
       role: 'user',
+      source: [],
       timestamp: Date.now()
     };
 
@@ -285,6 +393,7 @@ const handleMessageSend = async (text: string) => {
       content: '',
       role: 'assistant',
       status: 'loading',
+      source: [],
       timestamp: userMessage.timestamp + 1  // 确保唯一性
     };
 
@@ -299,6 +408,7 @@ const handleMessageSend = async (text: string) => {
     const response = await sendMessage({
       conv_id: activeKey.value[0],
       message: text,        // 使用原始输入文本
+      search: isSearchEnabled.value,
       temperature: form.value.temperature
     });
 
@@ -352,35 +462,7 @@ const handleMessageSend = async (text: string) => {
         case 'SOURCE':
           console.log('Source data:', data.extra);
           const sourceData = data.extra;
-          
-          // 分别保存 kb 和 web 的数据
-          const kbSources = sourceData
-            .filter(item => item.source === 'kb')
-            .map(item => `[🔖 ${item.title}](${item.url})`);
-          
-          const webSources = sourceData
-            .filter(item => item.source === 'web')
-            .map(item => `[🌐 ${item.title}](${item.url})`);
-
-          // 格式化来源内容
-          if (kbSources) {
-            sourceContent += "**知识库**:\n"
-            sourceContent += kbSources + '\n'; // 添加换行符分隔不同来源
-          }
-
-          if (webSources) {
-            sourceContent += "**网络搜索**:\n"
-            sourceContent += webSources;
-          }
-
-          if (sourceContent) {
-            // hints.value = [sourceContent]; // 将 sourceContent 设置为 hints，renderHintBox 会渲染它
-            hints.value = ["123","456"]
-            console.log('hints.value updated:', hints.value);
-          } else {
-            hints.value = []; // 没有 sourceContent 时清空 hints
-          }
-
+          handleSourceData(sourceData)
           break;
           
         case 'END':
@@ -403,6 +485,29 @@ const handleMessageSend = async (text: string) => {
         return msg;  // 保持用户和其他消息不变
       });
     };
+
+  // ================= 处理来源数据的方法 =================
+  const handleSourceData = (sourceData: any) => {
+    chats.value = chats.value.map(msg => {
+      if (msg.timestamp === assistantMessage.timestamp) {
+        // 遍历 sourceData 并根据 source 值添加 avatar 属性
+        const processedSourceData = sourceData.map((item) => {
+          if (item.source === "kb") {
+            return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" };
+          } else if (item.source === "web") {
+            return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" }; 
+          }
+          return item;
+        });
+        
+        return {
+          ...msg,
+          source: [...msg.source, ...processedSourceData]
+        };
+      }
+      return msg;
+    });
+  };
 
     // ================= 结束处理 =================
     const handleStreamEnd = () => {
@@ -513,7 +618,7 @@ const handleModalClose = () => {
   isCreateDialogVisible.value = false;
   isEditing.value = false;
   form.value = {
-    title: '新会话',
+    title: '新渠道',
     model: defaultModelStore.defaultModelCfg?.llm_name || '',
     system_prompt: '你是我的AI助手',
     temperature: 0.3,
@@ -533,6 +638,7 @@ onMounted(async () => {
   await fetchKnowledgeList();
   defaultModelStore.loadDefaultModelCfg();
   form.value.model = defaultModelStore.defaultModelCfg?.llm_name || '';
+  // console.log(activeKey.value)
 });
 
 // 监听模型配置变化
@@ -610,5 +716,24 @@ watch(() => defaultModelStore.defaultModelCfg, (newVal) => {
 
 .a-layout, .a-layout-sider, .a-layout-content {
   height: 100%;
+}
+
+.read-between-placeholder {
+  font-size: 96px; /* Adjust as needed */
+  color: #999; /* Adjust as needed */
+  text-align: center;
+
+  /* Make it fill the parent container */
+  width: 100%;
+  height: 100%;
+
+  /* Center the text both horizontally and vertically */
+  display: flex;
+  justify-content: center; /* Horizontal centering */
+  align-items: center;     /* Vertical centering */
+
+  /* Font adjustments */
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* A common sans-serif stack */
+  font-weight: 400; /* Light or Regular, try 300 or 400 */
 }
 </style>

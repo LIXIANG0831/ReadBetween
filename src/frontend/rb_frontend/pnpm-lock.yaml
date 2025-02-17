@@ -11,6 +11,9 @@ dependencies:
   '@element-plus/icons-vue':
     specifier: ^2.3.1
     version: 2.3.1(vue@3.5.13)
+  '@kousum/semi-icons-vue':
+    specifier: ^0.24.0
+    version: 0.24.0(acorn@8.14.0)(vue@3.5.13)
   '@kousum/semi-ui-vue':
     specifier: ^0.25.0
     version: 0.25.0(acorn@8.14.0)(lodash@4.17.21)(vue@3.5.13)

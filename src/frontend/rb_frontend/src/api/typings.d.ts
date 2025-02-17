@@ -114,18 +114,20 @@ declare namespace Api {
   };
 
   /**
-   * 发送消息的参数。
-   * @param {string} conv_id - 会话ID。
-   * @param {string} message - 要发送的消息内容。
-   * @param {number | null} [temperature] - 消息生成的温度值，可选。
-   * @param {number | null} [max_tokens] - 消息生成的最大令牌数，可选。
-   */
-  type SendMessageParams = {
-    conv_id: string;
-    message: string;
-    temperature?: number | null;
-    max_tokens?: number | null;
-  };
+ * 发送消息的参数。
+ * @param {string} conv_id - 会话ID。
+ * @param {string} message - 要发送的消息内容。
+ * @param {number | null} [temperature] - 消息生成的温度值，可选。
+ * @param {number | null} [max_tokens] - 消息生成的最大令牌数，可选。
+ * @param {boolean} [search] - 是否启用搜索功能，可选，默认为 false。
+ */
+type SendMessageParams = {
+  conv_id: string;
+  message: string;
+  temperature?: number | null;
+  max_tokens?: number | null;
+  search?: boolean;
+};
 
   /**
    * 获取消息历史的参数。
