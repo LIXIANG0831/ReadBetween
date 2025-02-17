@@ -1,4 +1,3 @@
-import os
 from mem0 import Memory
 from awsome.settings import get_config
 
@@ -9,7 +8,7 @@ class MemoryUtil:
         初始化 MemoryUtil 工具类.
 
         Args:
-            config (dict): 内存配置字典，例如 openai_config 或 azure_config.
+            config (dict): 内存配置字典.
         """
         self.memory = Memory.from_config(config)
 
@@ -38,125 +37,57 @@ class MemoryUtil:
         """
         return self.memory.get_all(user_id=user_id)
 
-    def search_memories(self, query, user_id):
+    def search_memories(self, query, user_id, limit=5):
         """
         根据查询语句搜索指定用户的相关记忆.
 
         Args:
             query (str): 查询语句.
             user_id (str): 用户ID.
+            limit (int): 返回条数
 
         Returns:
             list: 相关的记忆列表.
+            str: 拼接记忆列表为字符串.
         """
-        return self.memory.search(query, user_id=user_id)
+        memory = self.memory.search(query, user_id=user_id, limit=limit)
+        original_memories = memory.get("results", [])
+        graph_entities = memory.get("relations", [])
+        memory_str_list = []
+        # 向量数据库
+        for vc_memory_str in original_memories:
+            current_memory_str = vc_memory_str.get("memory", "")
+            memory_str_list.append(current_memory_str)
+        # 图数据库
+        for graph_memory_str in graph_entities:
+            source = graph_memory_str.get("source", "")
+            relationship = graph_memory_str.get("relationship", "")
+            target = graph_memory_str.get("target", "")
+            current_memory_str = f"[{source}][{relationship}][{target}]"
+            memory_str_list.append(current_memory_str)
 
-    # 可以根据需要添加更多 Memory 类的方法封装
+        return memory, "\n".join(f"- {memory_str}" for memory_str in memory_str_list)
 
 
 if __name__ == '__main__':
-    # 配置文件 (保持不变)
-    openai_config = {
-        "llm": {  # LLM配置
-            "provider": "openai",
-            "config": {
-                "model": "COSMO-GPT",
-                "temperature": 0.1,
-                "max_tokens": 2000,
-                "top_p": 0.3,
-                "api_key": get_config("api.openai.api_key"),
-                "openai_base_url": get_config("api.openai.base_url")
-            }
-        },
-        "embedder": {
-            "provider": "openai",
-            "config": {
-                "model": "text-embedding-ada-002",
-                "embedding_dims": "768",
-                "api_key": get_config("api.openai.api_key"),
-                "openai_base_url": get_config("api.openai.base_url")
-            }
-        },
-        "graph_store": {
-            "provider": "neo4j",
-            "config": {
-                # "url": "neo4j+s://localhost:7687",
-                "url": "bolt://localhost:7687",
-                "username": "neo4j",
-                "password": "12345678"
-            }
-        },
-        "vector_store": {
-            "provider": "milvus",
-            "config": {
-                "collection_name": "test",
-                "embedding_model_dims": "768",
-                "url": get_config("storage.milvus.uri")
-            }
-        },
-        "version": "v1.1"  # v1.1配置支持Graph
-    }
-
-    azure_config = {
-        "llm": {  # LLM配置
-            "provider": "azure_openai",
-            "config": {
-                "model": "gpt-4o-mini",
-                "temperature": 0.1,
-                "max_tokens": 2000,
-                "azure_kwargs": {
-                    "azure_deployment": "",
-                    "api_version": "",
-                    "azure_endpoint": "",
-                    "api_key": ""
-                },
-            }
-        },
-        "embedder": {
-            "provider": "azure_openai",
-            "config": {
-                "model": "text-embedding-ada-002",
-                "azure_kwargs": {
-                    "api_version": "",
-                    "azure_deployment": "",
-                    "azure_endpoint": "",
-                    "api_key": ""
-                }
-            }
-        },
-        "graph_store": {
-            "provider": "neo4j",
-            "config": {
-                # "url": "neo4j+s://localhost:7687",
-                "url": "bolt://localhost:7687",
-                "username": "neo4j",
-                "password": "12345678"
-            }
-        },
-        "version": "v1.1"  # v1.1配置支持Graph
-    }
+    # 配置文件
+    from awsome.services.constant import memory_config
 
     # 使用工具类
-    openai_memory_tool = MemoryUtil(openai_config)
-    # azure_memory_tool = MemoryUtil(azure_config)
+    openai_memory_tool = MemoryUtil(memory_config)
 
     owner_1 = "lixiang"
     owner_2 = "houxiaoqing"
 
     # 使用 openai_memory_tool
-    results_openai = openai_memory_tool.add_memory("卡奥斯是一家公司", user_id=owner_1)
-    print("OpenAI Memory Add Result:", results_openai)
-
+    # openai_memory_tool.add_memory("卡奥斯是一家公司", user_id=owner_1)
     # openai_memory_tool.add_memory("我喜欢吃面包", user_id=owner_1)
     # openai_memory_tool.add_memory("我最喜欢吃的面包是我女朋友侯晓晴做的司康面包", user_id=owner_1)
 
-    # owner_memery_openai = openai_memory_tool.get_all_memories(user_id=owner_1)
-    # print("OpenAI Owner Memories:", owner_memery_openai)
+    owner_memery_openai = openai_memory_tool.get_all_memories(user_id=owner_1)
+    print("OpenAI Owner Memories:", owner_memery_openai)
 
-    # query_openai = "我叫什么？"
-    # related_memories_openai = openai_memory_tool.search_memories(query_openai, user_id=owner_1)
+    # query_openai = "我喜欢吃什么？"
+    # related_memories_openai, related_memories_str= openai_memory_tool.search_memories(query_openai, user_id=owner_1, limit=1)
+    # print(related_memories_str)
     # print("OpenAI Related Memories:", related_memories_openai)
-
-    # 使用 azure_memory_tool (如果需要)
-    # results_azure = azure_memory_tool.add_memory("一些 Azure 相关信息", user_id=owner_2)
-    # print("Azure Memory Add Result:", results_azure)
