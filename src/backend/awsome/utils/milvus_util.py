@@ -1,6 +1,7 @@
 import asyncio
 import json
-
+from sklearn.decomposition import PCA
+import numpy as np
 from pymilvus import (
     connections,
     Collection,
@@ -123,6 +124,8 @@ class MilvusUtil:
                 # 如果用户没有指定输出字段，则默认返回所有字段（除了向量字段本身）
                 if output_fields is None:
                     output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
+                # 统一进行维度调整
+                query_vectors = MilvusUtil.unified_pca([query_vectors], 1024)[0]
                 result: SearchResult = collection.search(
                     data=[query_vectors],
                     anns_field="vector",
@@ -235,8 +238,31 @@ class MilvusUtil:
             logger_util.error(f"删除集合 {collection_name} 中的记录失败，条件为: {expr}，错误信息: {e}")
             raise MilvusException(message=f"删除集合 {collection_name} 中的记录失败，条件为: {expr}，错误信息: {e}")
 
+    @staticmethod
+    def unified_pca(vectors, target_dim=1024):
+        if isinstance(vectors, list):
+            vectors = np.array(vectors)
+        original_dim = vectors.shape[1]
+        try:
+            if original_dim > target_dim:
+                # 降维：PCA
+                pca = PCA(n_components=target_dim)
+                logger_util.debug(f"降维: {original_dim} to {target_dim}")
+                return pca.fit_transform(vectors)
+            elif original_dim < target_dim:
+                # 升维：补零（或选择其他方法）
+                logger_util.debug(f"升维: {original_dim} to {target_dim}")
+                return np.pad(vectors, ((0, 0), (0, target_dim - original_dim)), mode='constant')
+            else:
+                # 维度相同：直接返回
+                logger_util.debug(f"等维: {original_dim} to {target_dim}")
+                return vectors
+        except Exception as e:
+            logger_util.error(f"PCA维度转换失败: {e}")
+            raise Exception(f"PCA维度转换失败: {e}")
 
-async def main():
+
+def main():
     milvus_client = MilvusUtil()
     model_client = ModelFactory().create_client()
 
@@ -262,10 +288,13 @@ async def main():
     #
     # # 从多个集合中搜索向量
     query_vectors = model_client.get_embeddings("卡萨帝热水器").data[0].embedding
-    results = milvus_client.search_vectors(query_vectors, ["c_awsome_6565131da2524faca0e726ec0ffa26d1", "c_awsome_de8ed36a35a444a19cec145308b78b1f"],)
-    print(len(results))
-    for result in results:
-        print(result)
+    aa = milvus_client.unified_pca([query_vectors], 1024)
+    print(aa)
+
+    # results = milvus_client.search_vectors(query_vectors, ["c_awsome_6565131da2524faca0e726ec0ffa26d1", "c_awsome_de8ed36a35a444a19cec145308b78b1f"],)
+    # print(len(results))
+    # for result in results:
+    #     print(result)
 
     # # 删除指定集合
     # milvus_client.drop_collection("collection_one")
@@ -277,4 +306,5 @@ async def main():
 
 # 使用示例
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    main()

@@ -103,6 +103,10 @@ def celery_text_vectorize(self, task_json):
             for m_extract_result in extract_results:
                 chunk_vector_resp = client.get_embeddings(inputs=m_extract_result.get("chunk", ""))
                 chunk_vector = chunk_vector_resp.data[0].embedding
+
+                # 统一进行维度调整
+                chunk_vector = milvus_client.unified_pca([chunk_vector], 1024)[0]
+
                 data = {
                     "bbox": str(m_extract_result.get("chunk_bboxes", "")),
                     "start_page": m_extract_result.get("start_page", 0),

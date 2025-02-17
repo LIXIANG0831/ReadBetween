@@ -6,7 +6,7 @@ from awsome.models.dao.knowledge import KnowledgeDao
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.redis_util import RedisUtil
-from awsome.services.constant import milvus_default_index_params, milvus_default_fields_768
+from awsome.services.constant import milvus_default_index_params, milvus_default_fields_768, milvus_default_fields_1024
 from fastapi import HTTPException
 import uuid
 from awsome.services.constant import redis_default_model_key
@@ -37,7 +37,7 @@ class KnowledgeService(BaseService):
         try:
             # 创建MilvusCollection
             milvus_client.create_collection(new_milvus_collection_name,  # 集合名
-                                            milvus_default_fields_768)  # 属性
+                                            milvus_default_fields_1024)  # 属性
             # 创建MilvusIndex
             milvus_client.create_index_on_field(new_milvus_collection_name,  # 集合名
                                                 "vector",  # 创建索引的属性
