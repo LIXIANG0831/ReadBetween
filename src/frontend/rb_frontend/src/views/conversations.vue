@@ -157,6 +157,8 @@ import { useDefaultModelStore } from '@/store/useDefaultModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 // import ChatInput from '@/components/ChatInput.vue';
 import { IconGlobeStroke } from '@kousum/semi-icons-vue';
+import DOMPurify from 'dompurify'; // 转义用于MD渲染的字符
+
 
 
 interface ExtendedChatMessage {
@@ -308,10 +310,8 @@ const chatBoxConfig = ref({
     const { role, message, className } = props;
 
     // 如果 message.status 是 "loading"，不返回任何内容 返回加载状态
-    console.log("======")
-    console.log(message.status)
-    console.log("======")
-    if (message.status === "loading") {
+    // message.content为空时 MarkdownRender会报错
+    if (message.status === "loading" || message.content === "") {
       return h("div", { class: className, style: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40px' } }, [ // Center align the spin and set minHeight
         h(ASpin, { size: 'small' }) // Use ASpin for loading icon, size can be adjusted
       ]);
