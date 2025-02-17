@@ -88,7 +88,19 @@
         >
           <span class="source-item-header" :style="{ display: 'flex', columnGap: '5px', alignItems: 'center' }">
             <Avatar :style="{ width: '16px', height: '16px', flexShrink: '0' }" shape="square" :src="s.avatar" />
-            <span class="source-title" :style="{ color: 'var(--semi-color-text-2)', textOverflow: 'ellipsis' }">{{ s.title }}</span>
+            <a
+              :href="s.url"
+              target="_blank"
+              class="source-title-link"
+              :style="{
+                color: 'var(--semi-color-text-2)',
+                textOverflow: 'ellipsis',
+                textDecoration: 'none', /* Remove underline */
+              }"
+            >
+              <span class="source-title" :style="{ color: 'var(--semi-color-text-2)', textOverflow: 'ellipsis' }">{{ s.title }}</span>
+
+            </a>
           </span>
           <!-- <span class="source-subtitle" :style="{ color: 'var(--semi-color-primary)', fontSize: '12px' }">{{ s.subTitle }}</span> -->
           <!-- <span
