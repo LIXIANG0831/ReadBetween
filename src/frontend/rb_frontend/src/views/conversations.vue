@@ -134,7 +134,8 @@ import {
   Input as AInput,
   Select as ASelect,
   Slider as ASlider,
-  Menu as AMenu
+  Menu as AMenu,
+  Spin as ASpin
 } from 'ant-design-vue';
 import {
   DeleteOutlined,
@@ -306,13 +307,14 @@ const chatBoxConfig = ref({
   renderChatBoxContent: (props) => {
     const { role, message, className } = props;
 
-    // 如果 message.status 是 "loading"，不返回任何内容
+    // 如果 message.status 是 "loading"，不返回任何内容 返回加载状态
     console.log("======")
     console.log(message.status)
     console.log("======")
-
     if (message.status === "loading") {
-      return h("div", { class: className });
+      return h("div", { class: className, style: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40px' } }, [ // Center align the spin and set minHeight
+        h(ASpin, { size: 'small' }) // Use ASpin for loading icon, size can be adjusted
+      ]);
     }
 
     // 替换头像图标
