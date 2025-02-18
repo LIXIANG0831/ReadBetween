@@ -1,5 +1,4 @@
 from mem0 import Memory
-from awsome.settings import get_config
 
 
 class MemoryUtil:
@@ -68,6 +67,16 @@ class MemoryUtil:
 
         return memory, "\n".join(f"- {memory_str}" for memory_str in memory_str_list)
 
+    def delete_all_memories(self, user_id):
+        """
+        删除指定用户的相关记忆.
+
+        Args:
+            user_id (str): 用户ID.
+
+        """
+        self.memory.delete_all(user_id=user_id)
+
 
 if __name__ == '__main__':
     # 配置文件
@@ -84,10 +93,10 @@ if __name__ == '__main__':
     # openai_memory_tool.add_memory("我喜欢吃面包", user_id=owner_1)
     # openai_memory_tool.add_memory("我最喜欢吃的面包是我女朋友侯晓晴做的司康面包", user_id=owner_1)
 
-    owner_memery_openai = openai_memory_tool.get_all_memories(user_id=owner_1)
-    print("OpenAI Owner Memories:", owner_memery_openai)
+    # owner_memery_openai = openai_memory_tool.get_all_memories(user_id=owner_1)
+    # print("OpenAI Owner Memories:", owner_memery_openai)
 
-    # query_openai = "我喜欢吃什么？"
-    # related_memories_openai, related_memories_str= openai_memory_tool.search_memories(query_openai, user_id=owner_1, limit=1)
-    # print(related_memories_str)
-    # print("OpenAI Related Memories:", related_memories_openai)
+    query_openai = "精神抖擞啊"
+    related_memories_openai, related_memories_str= openai_memory_tool.search_memories(query_openai, user_id=owner_1, limit=1)
+    print(related_memories_str)
+    print("OpenAI Related Memories:", related_memories_openai)

@@ -23,6 +23,7 @@ class ChatCreate(BaseModel):
     system_prompt: str = Field("你是一个有用的助手", description="系统提示")
     temperature: float = Field(0.3, ge=0, le=2, description="控制生成文本的随机性")
     knowledge_base_ids: Optional[List[str]] = Field(default=[], description="绑定的知识库ID列表")
+    use_memory: int = Field(default=0, description="是否使用记忆")
 
 class ChatUpdate(BaseModel):
     conv_id: str = Field(..., description="对话 ID")
@@ -30,7 +31,7 @@ class ChatUpdate(BaseModel):
     system_prompt: Optional[str] = Field(None, description="系统提示")
     temperature: Optional[float] = Field(None, ge=0, le=2, description="控制生成文本的随机性")
     knowledge_base_ids: Optional[List[str]] = Field([], description="绑定的知识库ID列表")
-
+    use_memory: Optional[int] = Field(default=None, description="是否使用记忆")
 
 
 class ChatMessageSend(BaseModel):

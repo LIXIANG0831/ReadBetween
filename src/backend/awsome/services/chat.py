@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from typing import Generator, List
 from awsome.services.retriever import RetrieverService
 from awsome.utils.logger_util import logger_util
+from awsome.utils.memory_util import MemoryUtil
 from awsome.utils.minio_util import MinioUtil
 from awsome.utils.model_factory import ModelFactory
 from awsome.utils.tools import WebSearchTool
@@ -22,7 +23,7 @@ class ChatService:
     @classmethod
     async def create_conversation(cls, create_data: ChatCreate):
         """创建新对话"""
-        # 验证所有知识库是否存在
+        # 验证所用知识库是否存在
         if create_data.knowledge_base_ids:
             existing_kbs = await KnowledgeDao.get_many(create_data.knowledge_base_ids)
             if len(existing_kbs) != len(create_data.knowledge_base_ids):
@@ -34,7 +35,8 @@ class ChatService:
             title=create_data.title,
             model=create_data.model,
             system_prompt=create_data.system_prompt,
-            temperature=create_data.temperature
+            temperature=create_data.temperature,
+            use_memory=create_data.use_memory
         )
 
         # 创建关联关系
@@ -52,20 +54,28 @@ class ChatService:
         """软删除对话"""
         # 先删除关联消息
         await MessageDao.delete_conversation_messages(conv_id)
-        # 再删除管理知识库
+        # 再删除知识库关联关系
         await ConversationKnowledgeLinkDao.delete(conv_id)
+        # 再删除记忆
+        conversation: Conversation = await ConversationDao.get(conv_id)
+        if conversation.use_memory == 1:
+            from awsome.services.constant import memory_config
+            memory_util = MemoryUtil(memory_config)
+            memory_util.delete_all_memories(user_id=conv_id)
         # 再删除对话
         return await ConversationDao.soft_delete(conv_id)
 
     @classmethod
     async def update_conversation(cls, update_data: ChatUpdate):
         """更新对话信息"""
+        # TODO 增加记忆更新
         await ConversationDao.update(
             conv_id=update_data.conv_id,
             title=update_data.title,
             system_prompt=update_data.system_prompt,
             temperature=update_data.temperature,
-            knowledge_base_ids=update_data.knowledge_base_ids
+            knowledge_base_ids=update_data.knowledge_base_ids,
+            use_memory=update_data.use_memory
         )
 
         return await cls._format_conversation_response(
@@ -138,6 +148,14 @@ class ChatService:
                 final_query, web_source_list = await cls._append_web_search_msg(message_data.message, final_query)
             except Exception as e:
                 logger_util.error(f"网络检索失败：{e}")
+
+        # 添加/召回记忆
+        if conversation.use_memory == 1:
+            logger_util.debug(f"用户开启并使用记忆")
+            try:
+                final_query = await cls._append_memory_msg(message_data.message, final_query, message_data.conv_id)
+            except Exception as e:
+                logger_util.error(f"记忆召回失败: {e}")
 
         # 获取 历史记录
         # 构造 OpenAI 请求参数
@@ -296,10 +314,10 @@ class ChatService:
                     {message}
                     
                     【生成要求】
-                    请基于上下文参考内容，用自然对话的方式响应用户消息。注意：
-                    1. 不要使用"根据检索内容"、"根据资料"等暴露检索过程的表述
-                    2. 不要直接引用上下文中的标题或元数据
-                    3. 若上下文内容与用户需求无关，则忽略它直接回答
+                    请基于上下文参考内容，用自然对话的方式响应用户消息。注意:
+                    1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
+                    2. 不要直接引用上下文中的标题或元数据.
+                    3. 若上下文内容与用户需求无关，则忽略它直接回答.
             """, source_list
         else:
             return message, None
@@ -327,6 +345,29 @@ class ChatService:
             """, source_list
         else:
             return message, None
+
+    @classmethod
+    async def _append_memory_msg(cls, query: str, message: str, user_id):
+        # user_id 用来标识唯一记忆
+        from awsome.services.constant import memory_config
+        memory_tool = MemoryUtil(memory_config)
+        # 检索记忆
+        related_memories, memory_str = memory_tool.search_memories(query=query, user_id=user_id, limit=3)
+        # 添加记忆
+        memory_tool.add_memory(text=query, user_id=user_id)
+        # 向量库记忆
+        original_memories = related_memories.get("results", [])
+        # 图记忆
+        graph_entities = related_memories.get("relations", [])
+        if len(graph_entities) == 0:
+            return message
+        else:
+            return f"""
+                【用户相关记忆】
+                {memory_str}
+                
+                {message}
+            """
 
     @classmethod
     def _format_stream_response(cls, event: str, text: str, extra=None):

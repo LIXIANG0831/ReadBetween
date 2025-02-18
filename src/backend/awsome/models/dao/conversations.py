@@ -28,6 +28,7 @@ class ConversationBase(AwsomeDBModel):
     system_prompt: str = Field(sa_column=Column(Text), default="你是一个有用的助手", description="系统提示词")
     temperature: float = Field(default=0.7, ge=0, le=2, description="生成温度")
     delete: int = Field(default=0, index=True, description="删除标志")
+    use_memory: int = Field(default=0, index=True, description="删除标志")
     created_at: datetime = Field(
         sa_column=Column(
             DateTime,
@@ -144,7 +145,8 @@ class ConversationDao:
 
     @staticmethod
     async def update(conv_id: str, title: Optional[str] = None, system_prompt: Optional[str] = None,
-                     temperature: Optional[float] = None, knowledge_base_ids: Optional[List[str]] = None):
+                     temperature: Optional[float] = None, knowledge_base_ids: Optional[List[str]] = None,
+                     use_memory: Optional[int] = None):
 
         async with async_session_getter() as session:
             stmt = select(Conversation).where(
@@ -161,6 +163,8 @@ class ConversationDao:
                     conv.system_prompt = system_prompt
                 if temperature is not None:
                     conv.temperature = temperature
+                if use_memory is not None:
+                    conv.use_memory = use_memory
 
                 conv.updated_at = datetime.utcnow()  # 更新更新时间
                 await session.commit()
