@@ -77,6 +77,7 @@ declare namespace Api {
     system_prompt: string;
     temperature: number;
     knowledge_base_ids?: string[] | null;
+    use_memory?: number | null;
   };
 
   /**
@@ -101,6 +102,7 @@ declare namespace Api {
     system_prompt?: string | null;
     temperature?: number | null;
     knowledge_base_ids?: string[] | null;
+    use_memory?: number | null;
   };
 
   /**

@@ -3,7 +3,7 @@
     <a-layout style="height: 100vh;">
       <a-layout-sider width="250px" class="aside" style="height: 100%;margin-bottom: 16px;">
         <div style="padding: 16px;height: 100%;display: flex;flex-direction: column;">
-          
+
           <a-menu
             v-model:selectedKeys="activeKey"
             mode="inline"
@@ -59,7 +59,7 @@
               </a-button>
             </div> -->
 
-            
+
           <!-- </div> -->
         </a-layout-content>
       </a-layout>
@@ -112,6 +112,10 @@
             </a-select-option>
           </a-select>
         </a-form-item>
+        <!-- 新增 use_memory 开关 -->
+        <a-form-item label="启用记忆" name="use_memory">
+          <a-switch v-model:checked="form.use_memory" />
+        </a-form-item>
       </a-form>
       <template #footer>
         <a-button @click="handleModalClose">取消</a-button>
@@ -126,7 +130,7 @@
 <script setup lang="ts">
 
 import { Chat, Button, MarkdownRender } from '@kousum/semi-ui-vue';
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, h } from 'vue';
 import {
   message,
   Modal as AModal,
@@ -135,7 +139,8 @@ import {
   Select as ASelect,
   Slider as ASlider,
   Menu as AMenu,
-  Spin as ASpin
+  Spin as ASpin,
+  Switch as ASwitch // 引入 Switch 组件
 } from 'ant-design-vue';
 import {
   DeleteOutlined,
@@ -175,11 +180,15 @@ interface StreamMessage {
   [key: string]: any;
 }
 
-// interface ChatBoxRenderConfig {
-//   showAvatar?: boolean; // 是否显示头像
-//   showTime?: boolean; // 是否显示时间
-//   renderContent?: (message: Message) => VNode; // 自定义内容渲染
-// }
+// 定义更具体的 API 参数类型
+interface CreateConversationParams extends Api.CreateConversationParams {
+  use_memory: boolean;
+}
+
+interface UpdateConversationParams extends Api.UpdateConversationParams {
+  use_memory: boolean;
+}
+
 
 const roleConfig = ref({
   user: {
@@ -202,11 +211,12 @@ const activeKey = ref<string[]>([]);
 const items = ref<Api.Conversation[]>([]);
 const chats = ref<ExtendedChatMessage[]>([]);
 const knowledgeList = ref<Api.Knowledge[]>([]);
-const isLoading = ref(false);
 const isCreateDialogVisible = ref(false);
 const isEditing = ref(false);
 const hints = ref<string[]>(["测试提示信息 1", "测试提示信息 2"]); // 初始化 hints 用于存储提示消息
 let sourceContent = ''; // 来源信息
+const isLoading = ref(false);
+
 
 // 聊天框外边框属性设置
 const commonChatOuterStyle = {
@@ -216,12 +226,13 @@ const commonChatOuterStyle = {
 };
 
 // 表单数据
-const form = ref<Api.CreateConversationParams>({
+const form = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
   model: '',
   system_prompt: '你是我的AI助手',
   temperature: 0.3,
   knowledge_base_ids: [],
+  use_memory: true // 默认启用记忆
 });
 
 // 样式计算
@@ -238,10 +249,6 @@ const fetchConversations = async () => {
     const res = await listConversations();
     if (res.data.status_code === 200) {
       items.value = res.data.data.data;
-      // 默认选中第一个
-      // if (items.value.length > 0 && !activeKey.value.length) {
-      //   activeKey.value = [items.value[0].id];
-      // }
     }
   } catch (error) {
     message.error('获取会话列表失败');
@@ -327,15 +334,15 @@ const chatBoxConfig = ref({
         return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
       }
       return item; // 其他情况保持原样
-    }) : []; 
+    }) : [];
 
     // 使用 h 函数构建渲染内容
     return h(
       'div',
       { class: className },
       message.source && message.source.length > 0
-        ? [h(SourceCard, { source: processedSource }), h(MarkdownRender, { raw: message.content })] 
-        : h(MarkdownRender, { raw: message.content }) 
+        ? [h(SourceCard, { source: processedSource }), h(MarkdownRender, { raw: message.content })]
+        : h(MarkdownRender, { raw: message.content })
     );
   }
 });
@@ -348,14 +355,14 @@ const renderCustomInput = (props) => {
     // 默认输入框（占据剩余空间）
     h('div', { style: { flexGrow: 1 } }, [ // 使用 div 包裹 defaultNode 并设置 flexGrow
         props.defaultNode
-    ]),  
+    ]),
 
     // 网络搜索图标按钮
     h(Button, {
       type: isSearchEnabled.value ? 'primary' : 'default',
       onClick: toggleSearch,
       icon: () => h(IconGlobeStroke, { size: '32' }), // 使用 IconSearch 组件作为 icon
-      style: { 
+      style: {
         paddingRight: '8px',
         flexShrink: 0,
         padding: '6px',
@@ -435,7 +442,7 @@ const handleMessageSend = async (text: string) => {
 
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
-            
+
             try {
               const parsedData: StreamMessage = JSON.parse(line.slice(6));
               handleStreamEvent(parsedData);
@@ -455,18 +462,18 @@ const handleMessageSend = async (text: string) => {
         case 'START':
           // 初始化处理
           break;
-          
+
         case 'MESSAGE':
           currentContent += data.text || '';
           updateAssistantContent(currentContent);
           break;
-          
+
         case 'SOURCE':
           console.log('Source data:', data.extra);
           const sourceData = data.extra;
           handleSourceData(sourceData)
           break;
-          
+
         case 'END':
           handleStreamEnd();
           break;
@@ -478,10 +485,10 @@ const handleMessageSend = async (text: string) => {
       // 严格匹配当前助手消息
       chats.value = chats.value.map(msg => {
         if (msg.timestamp === assistantMessage.timestamp) {
-          return { 
-            ...msg, 
-            content, 
-            status: content ? undefined : 'loading' 
+          return {
+            ...msg,
+            content,
+            status: content ? undefined : 'loading'
           };
         }
         return msg;  // 保持用户和其他消息不变
@@ -497,11 +504,11 @@ const handleMessageSend = async (text: string) => {
           if (item.source === "kb") {
             return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" };
           } else if (item.source === "web") {
-            return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" }; 
+            return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" };
           }
           return item;
         });
-        
+
         return {
           ...msg,
           source: [...msg.source, ...processedSourceData]
@@ -516,7 +523,7 @@ const handleMessageSend = async (text: string) => {
       isStreamEnded = true;
       isLoading.value = false;
       reader.cancel();
-      
+
       // 最终状态更新
       chats.value = chats.value.map(msg => {
         if (msg.timestamp === assistantMessage.timestamp) {
@@ -530,7 +537,7 @@ const handleMessageSend = async (text: string) => {
     const handleStreamError = (error: any) => {
       console.error('Stream error:', error);
       isLoading.value = false;
-      
+
       // 只修改当前助手消息状态
       chats.value = chats.value.map(msg => {
         if (msg.timestamp === assistantMessage.timestamp) {
@@ -538,7 +545,7 @@ const handleMessageSend = async (text: string) => {
         }
         return msg;  // 用户消息保持原样
       });
-      
+
       message.error('消息处理失败');
     };
 
@@ -594,18 +601,24 @@ const handleEdit = (item: Api.Conversation) => {
     system_prompt: item.system_prompt,
     temperature: item.temperature,
     knowledge_base_ids: item.knowledge_base_ids,
-    conv_id: item.id
-  };
+    conv_id: item.id,
+    use_memory: item.use_memory // 同步 use_memory 字段
+  } as CreateConversationParams; // 强制类型转换
 };
 
 // 提交会话创建/更新
 const handleConversationSubmit = async () => {
   try {
+    const submitForm = {
+      ...form.value,
+      use_memory: form.value.use_memory ? 1 : 0 // Convert boolean to 1 or 0
+    };
+
     if (isEditing.value) {
-      await updateConversation(form.value as Api.UpdateConversationParams);
+      await updateConversation(submitForm as UpdateConversationParams); // 强制类型转换
       message.success('会话更新成功');
     } else {
-      await createConversation(form.value);
+      await createConversation(submitForm);
       message.success('会话创建成功');
     }
     await fetchConversations();
@@ -624,7 +637,8 @@ const handleModalClose = () => {
     model: defaultModelStore.defaultModelCfg?.llm_name || '',
     system_prompt: '你是我的AI助手',
     temperature: 0.3,
-    knowledge_base_ids: []
+    knowledge_base_ids: [],
+    use_memory: true // 初始化 use_memory 为 true
   };
 };
 
