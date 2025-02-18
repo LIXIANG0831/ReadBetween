@@ -10,6 +10,7 @@ from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
 from fastapi import HTTPException
 from typing import Generator, List
 from awsome.services.retriever import RetrieverService
+from awsome.services.tasks import celery_add_memory
 from awsome.utils.logger_util import logger_util
 from awsome.utils.memory_util import MemoryUtil
 from awsome.utils.minio_util import MinioUtil
@@ -354,7 +355,9 @@ class ChatService:
         # 检索记忆
         related_memories, memory_str = memory_tool.search_memories(query=query, user_id=user_id, limit=3)
         # 添加记忆
-        memory_tool.add_memory(text=query, user_id=user_id)
+        # memory_tool.add_memory(text=query, user_id=user_id)
+        # 使用Celery后台添加记忆
+        celery_add_memory.delay(query=query, user_id=user_id)
         # 向量库记忆
         original_memories = related_memories.get("results", [])
         # 图记忆

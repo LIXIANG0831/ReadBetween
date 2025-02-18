@@ -4,6 +4,7 @@ from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.schemas.es.save_document import SaveDocument
 from awsome.models.v1.knowledge_file import KnowledgeFileVectorizeTasks
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
+from awsome.utils.memory_util import MemoryUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.minio_util import MinioUtil
 from awsome.utils.logger_util import logger_util
@@ -13,7 +14,22 @@ from awsome.services.constant import (milvus_default_fields_768,  # 默认字段
                                       milvus_default_index_params  # 默认索引配置
                                       )
 from awsome.services.knowledge_file import KnowledgeFileService
-
+@ywjz_celery.task(
+    bind=True,
+    autoretry_for=(Exception,),  # 自动重试所有异常
+    max_retries=3,               # 最大重试次数
+    retry_backoff=True,          # 启用退避策略
+    retry_backoff_max=30,        # 最大重试间隔为 30 秒
+    retry_backoff_factor=2       # 退避因子为 2
+)
+def celery_add_memory(self, query: str, user_id: str):
+    try:
+        from awsome.services.constant import memory_config
+        memory_tool = MemoryUtil(memory_config)
+        # 添加记忆
+        return memory_tool.add_memory(text=query, user_id=user_id)
+    except Exception as e:
+        logger_util.error(f"任务失败: {e}，正在重试，重试次数：{self.request.retries}")
 
 @ywjz_celery.task(
     bind=True,
@@ -133,6 +149,8 @@ def celery_text_vectorize(self, task_json):
             update_file.status = 1
             KnowledgeFileService.update_file(update_file)
             logger_util.debug("====》数据库数据更新状态")
+
+            return "ok"
         except Exception as e:
             logger_util.error(f"任务失败，正在重试，重试次数：{self.request.retries}")
 
