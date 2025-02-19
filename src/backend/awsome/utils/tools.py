@@ -80,13 +80,22 @@ class PdfExtractTool(BaseTool):
         return results
 
 
-class EncryptionTool(BaseTool):
+class EncryptionTool:
     def __init__(self):
         # 从配置中获取盐值并编码为字节
-        self.SALT = get_config("extra.salt").encode()
+        self.SALT = self.get_salt().encode()
         # 生成密钥，使用盐值来增强安全性
         self.key = self.generate_key()
         self.cipher = Fernet(self.key)
+
+    @staticmethod
+    def get_salt() -> str:
+        """从配置中获取盐值"""
+        # 假设 get_config 是一个从配置文件中获取值的函数
+        salt = get_config("extra.salt")
+        if not salt:
+            raise ValueError("Salt value is not configured. Please set the 'extra.salt' configuration.")
+        return salt
 
     def generate_key(self) -> bytes:
         """生成基于盐的密钥"""
@@ -97,6 +106,7 @@ class EncryptionTool(BaseTool):
         """加密密码"""
         password_bytes = password.encode()
         encrypted_password = self.cipher.encrypt(password_bytes)
+        # 返回加密后的数据，并确保使用 Base64 编码
         return encrypted_password.decode()
 
     def decrypt(self, encrypted_password: str) -> str:
@@ -107,13 +117,15 @@ class EncryptionTool(BaseTool):
             decrypted_password = self.cipher.decrypt(encrypted_bytes)
             return decrypted_password.decode()
         except (InvalidToken, binascii.Error) as e:
-            # 如果解密失败，记录日志并返回原始字符串
-            logger_util.warning(f"解密失败，直接返回原始字符串: {encrypted_password}. 错误信息: {e}")
-            return encrypted_password
+            # 如果解密失败，记录错误日志并抛出异常
+            logger_util.error(f"解密失败，加密数据可能已被篡改或密钥不匹配. 错误信息: {e}")
+            raise ValueError(f"解密失败，加密数据可能已被篡改或密钥不匹配. 错误信息: {e}")
 
     def obscure(self, password: str) -> str:
+        """模糊显示密码"""
+        if len(password) < 13:
+            return '*' * len(password)
         return password[:3] + '*' * 10 + password[13:]
-
 
 
 BAIDU_ENDPOINT = "https://www.baidu.com/s"
@@ -240,15 +252,15 @@ class WebSearchTool:
 
 # 示例使用
 if __name__ == "__main__":
-    # encryption_tool = EncryptionTool()  # 创建实例
+    encryption_tool = EncryptionTool()  # 创建实例
     # 加密密码
-    # password = "你好"
-    # encrypted = encryption_tool.encrypt(password)
-    # print(f"Encrypted: {encrypted}")
+    password = "你好"
+    encrypted = encryption_tool.encrypt(password)
+    print(f"Encrypted: {encrypted}")
 
     # 解密密码
-    # decrypted = encryption_tool.decrypt(encrypted)
-    # print(f"Decrypted: {decrypted}")
+    decrypted = encryption_tool.decrypt(encrypted)
+    print(f"Decrypted: {decrypted}")
 
     # PDF 解析
     # pdf_file_path = '/Users/lixiang/Documents/Test_Material/普通.pdf'
@@ -259,17 +271,17 @@ if __name__ == "__main__":
     #     print("\n")
 
     # 示例：搜索百度并获取网页详情
-    search_tool = WebSearchTool()
-    results = search_tool.search_baidu('青岛的天气', size=5, lm=3)
-    detail_results = []
+    # search_tool = WebSearchTool()
+    # results = search_tool.search_baidu('青岛的天气', size=5, lm=3)
+    # detail_results = []
 
     # 遍历搜索结果，获取每个网页的详情
-    for result in results:
-        detail_result = {"url": result.url, "title": result.name}
-        content = search_tool.get_page_detail(result.url)
-        if content:
-            detail_result["content"] = content
-            detail_results.append(detail_result)
-
-    # 打印结果
-    print(json.dumps(detail_results, ensure_ascii=False, indent=4))
+    # for result in results:
+    #     detail_result = {"url": result.url, "title": result.name}
+    #     content = search_tool.get_page_detail(result.url)
+    #     if content:
+    #         detail_result["content"] = content
+    #         detail_results.append(detail_result)
+    #
+    # # 打印结果
+    # print(json.dumps(detail_results, ensure_ascii=False, indent=4))

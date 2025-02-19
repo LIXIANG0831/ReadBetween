@@ -8,7 +8,6 @@ from awsome.utils.tools import EncryptionTool
 
 encryption_tool = EncryptionTool()
 
-
 class ModelCfgService(BaseService):
 
     @classmethod

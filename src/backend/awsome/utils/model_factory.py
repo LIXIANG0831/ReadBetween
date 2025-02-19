@@ -4,13 +4,10 @@ from abc import ABC, abstractmethod
 import dashscope
 from openai import OpenAI
 from awsome.utils.redis_util import RedisUtil
-from awsome.utils.tools import EncryptionTool
 from awsome.services.constant import redis_default_model_key
-from fastapi.responses import StreamingResponse
-from typing import AsyncIterable
+from awsome.utils.tools import EncryptionTool
 
 encryption_tool = EncryptionTool()
-
 
 class BaseModelProvider(ABC):
     @abstractmethod
@@ -114,6 +111,7 @@ class QwenModelProvider(BaseModelProvider):
 class ModelFactory:
     _default_model_cfg = None
     redis_util = RedisUtil()
+    _client_cache = {} # 全局缓存模型调用Client
 
     @classmethod
     def _get_default_model_config(cls):
@@ -122,14 +120,16 @@ class ModelFactory:
             if default_model_cfg:
                 try:
                     cls._default_model_cfg = json.loads(default_model_cfg)
+                    # config api_key 还原
+                    cls._default_model_cfg["api_key"] = encryption_tool.decrypt(cls._default_model_cfg.get("api_key"))
                 except json.JSONDecodeError:
                     raise ValueError("默认模型配置为无效的Json格式")
             else:
                 raise ValueError("Redis中不存在默认模型配置")
         return cls._default_model_cfg
 
-    @staticmethod
-    def create_client(config=None, **kwargs):
+    @classmethod
+    def create_client(cls, config=None, **kwargs):
         if config is None:
             config = ModelFactory._get_default_model_config()
 
@@ -140,14 +140,23 @@ class ModelFactory:
             config["llm_name"] = kwargs.get("llm_name")
 
         provider = config.get("mark")
-        # config api_key 还原
-        config["api_key"] = encryption_tool.decrypt(config.get("api_key"))
+
+        # 构造缓存键
+        cache_key = json.dumps(config, sort_keys=True)
+        # 检查缓存
+        if cache_key in cls._client_cache:
+            return cls._client_cache[cache_key]
+
         if provider == "openai":
-            return OpenAIModelProvider(config)
+            client = OpenAIModelProvider(config)
         elif provider == "openai-compatible":
-            return CompatibleOpenAIModelProvider(config)
+            client = CompatibleOpenAIModelProvider(config)
         else:
             raise ValueError("Unsupported model provider")
+
+        # 将新创建的实例存储到缓存中
+        cls._client_cache[cache_key] = client
+        return client
 
 
 if __name__ == '__main__':
