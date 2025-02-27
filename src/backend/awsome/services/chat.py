@@ -154,7 +154,8 @@ class ChatService:
         if conversation.use_memory == 1:
             logger_util.debug(f"用户开启并使用记忆")
             try:
-                final_query = await cls._append_memory_msg(message_data.message, final_query, message_data.conv_id)
+                final_query = await cls._append_memory_msg(message_data.message, final_query, message_data.conv_id, 3)
+                logger_util.debug(f"用户召回记忆:\n{final_query}")
             except Exception as e:
                 logger_util.error(f"记忆召回失败: {e}")
 
@@ -348,12 +349,12 @@ class ChatService:
             return message, None
 
     @classmethod
-    async def _append_memory_msg(cls, query: str, message: str, user_id):
+    async def _append_memory_msg(cls, query: str, message: str, user_id, limit: int = 3):
         # user_id 用来标识唯一记忆
         from awsome.services.constant import memory_config
         memory_tool = MemoryUtil(memory_config)
         # 检索记忆
-        related_memories, memory_str = memory_tool.search_memories(query=query, user_id=user_id, limit=3)
+        related_memories, memory_str = memory_tool.search_memories(query=query, user_id=user_id, limit=limit)
         # 添加记忆
         # memory_tool.add_memory(text=query, user_id=user_id)
         # 使用Celery后台添加记忆
