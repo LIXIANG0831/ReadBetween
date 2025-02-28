@@ -131,7 +131,7 @@ class ChatService:
             raise HTTPException(status_code=404, detail="对话不存在")
 
         # 最终给模型的输入
-        final_query = message_data.message
+        final_query = cls._init_user_query(message_data.message)
 
         # 获取知识库召回内容
         kb_source_list = None
@@ -313,14 +313,7 @@ class ChatService:
                     【上下文参考】
                     {recall_chunk.strip()}
                     
-                    【用户最新消息】
                     {message}
-                    
-                    【生成要求】
-                    请基于上下文参考内容，用自然对话的方式响应用户消息。注意:
-                    1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
-                    2. 不要直接引用上下文中的标题或元数据.
-                    3. 若上下文内容与用户需求无关，则忽略它直接回答.
             """, source_list
         else:
             return message, None
@@ -388,3 +381,17 @@ class ChatService:
                 "text": text
             }
         return f"data: {json.dumps(stream_resp, ensure_ascii=False)}\n\n"
+
+    @classmethod
+    def _init_user_query(cls, message):
+        return f"""
+        【生成要求】
+        请基于上下文参考内容，用自然对话的方式响应用户提问。注意:
+        1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
+        2. 不要直接引用上下文中的标题或元数据.
+        3. 聚焦用户提问，若上下文内容与用户提问无关，则忽略它们直接回答.
+        
+        【用户提问】
+        {message}
+
+        """
