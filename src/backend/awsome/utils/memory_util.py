@@ -62,6 +62,8 @@ class MemoryUtil:
             source = graph_memory_str.get("source", "")
             relationship = graph_memory_str.get("relationship", "")
             target = graph_memory_str.get("target", "")
+            # 替换UUID为用户 防止模型理解不充分
+            source, target = ("用户" if source == user_id else source), ("用户" if target == user_id else target)
             current_memory_str = f"[{source}][{relationship}][{target}]"
             memory_str_list.append(current_memory_str)
 
