@@ -92,6 +92,7 @@ class ChatService:
             "id": conv.id,
             "title": conv.title,
             "model": conv.model,
+            "use_memory": conv.use_memory,
             "knowledge_bases": [
                 {
                     "id": kb.id,
