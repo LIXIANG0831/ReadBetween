@@ -2,7 +2,7 @@
 import zhCN from 'ant-design-vue/es/locale/zh_CN';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { FolderOpenOutlined, HomeOutlined, BookOutlined, RocketOutlined } from '@ant-design/icons-vue';
+import { FolderOpenOutlined, HomeOutlined, BookOutlined, RocketOutlined, DeploymentUnitOutlined } from '@ant-design/icons-vue';
 import { XProvider } from 'ant-design-x-vue';
 
 const locale = zhCN;
@@ -17,6 +17,9 @@ const handleSelect = (event: { key: string }) => {
     router.push('/knowledge');
   }
   else if (key === '2') {
+    router.push('/memory');
+  }
+  else if (key === '3') {
     router.push('/model_cfg');
   }
 };
@@ -40,7 +43,7 @@ const handleSelect = (event: { key: string }) => {
             <template #icon>
               <HomeOutlined />
             </template>
-            <span>🏠 首页</span>
+            <span>🏠 渠道</span>
           </a-menu-item>
           
           <a-menu-item key="1">
@@ -51,6 +54,13 @@ const handleSelect = (event: { key: string }) => {
           </a-menu-item>
 
           <a-menu-item key="2">
+            <template #icon>
+              <DeploymentUnitOutlined />
+            </template>
+            <span>🧠 记忆管理</span>
+          </a-menu-item>
+
+          <a-menu-item key="3">
             <template #icon>
               <RocketOutlined />
             </template>

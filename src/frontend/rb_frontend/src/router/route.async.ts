@@ -38,6 +38,15 @@ const asyncRoutes: Array<RouteRecordRaw> = [
     },
     component: () => import('../views/model_cfg.vue'),
   },
+  {
+    path: '/memory',
+    name: 'memory',
+    meta: {
+      title: '记忆管理',
+      icon: '',
+    },
+    component: () => import('../views/memory.vue'),
+  },
 ];
 
 export default asyncRoutes;

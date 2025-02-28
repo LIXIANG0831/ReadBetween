@@ -50,6 +50,7 @@ declare module 'vue' {
     ILaLanguage: typeof import('~icons/la/language')['default']
     IPhCloudMoonBold: typeof import('~icons/ph/cloud-moon-bold')['default']
     IPhSunHorizonBold: typeof import('~icons/ph/sun-horizon-bold')['default']
+    KnowledgeGraph: typeof import('./components/KnowledgeGraph.vue')['default']
     LoginDialog: typeof import('./components/LoginDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

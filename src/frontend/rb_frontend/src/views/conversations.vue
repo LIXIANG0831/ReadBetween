@@ -162,7 +162,6 @@ import { useDefaultModelStore } from '@/store/useDefaultModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 // import ChatInput from '@/components/ChatInput.vue';
 import { IconGlobeStroke } from '@kousum/semi-icons-vue';
-import DOMPurify from 'dompurify'; // 转义用于MD渲染的字符
 
 
 
