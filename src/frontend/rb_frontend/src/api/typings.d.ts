@@ -1,4 +1,10 @@
 declare namespace Api {
+  type queryMemoryParams = {
+    condition: string;
+    condition_parameters: {
+      [key: string]: any;
+    };
+  }
   /**
    * 创建模型配置的参数。
    * @param {string} provider_id - 模型供应商的ID。
