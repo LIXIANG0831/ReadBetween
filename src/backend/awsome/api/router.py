@@ -5,6 +5,7 @@ from awsome.api.v1.knowledge import router as knowledge_router
 from awsome.api.v1.knowledge_file import router as knowledge_file_router
 from awsome.api.v1.model_cfg import router as model_cfg_router
 from awsome.api.v1.voice import router as voice_router
+from awsome.api.v1.memory import router as memory_router
 
 
 # v1 路由
@@ -13,6 +14,7 @@ v1_router.include_router(chat_router)
 v1_router.include_router(knowledge_router)
 v1_router.include_router(knowledge_file_router)
 v1_router.include_router(voice_router)
+v1_router.include_router(memory_router)
 
 # sys 路由
 sys_router = APIRouter(prefix='/sys')
