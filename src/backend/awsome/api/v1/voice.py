@@ -24,7 +24,7 @@ voice_agents_tasks: Dict[str, asyncio.Task] = {}
 """
 Deprecated 
 """
-@router.get("/voice/get_token")
+@router.get("/voice/get_token", deprecated=True)
 async def get_token(name: str, room: str, identity: str = "identity"):
     token = api.AccessToken(api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET) \
         .with_identity(f"{identity}") \
@@ -42,7 +42,7 @@ async def get_token(name: str, room: str, identity: str = "identity"):
 """
 Deprecated 
 """
-@router.post("/voice/create_agent")
+@router.post("/voice/create_agent", deprecated=True)
 async def create_agent(voice_agent_created: VoiceAgentCreate):
     try:
         # 只允许调用者进入使用
@@ -71,7 +71,7 @@ async def create_agent(voice_agent_created: VoiceAgentCreate):
 """
 Deprecated 
 """
-@router.post("/voice/cancel_agent/{task_id}")
+@router.post("/voice/cancel_agent/{task_id}", deprecated=True)
 async def cancel_agent(task_id: str):
     try:
 
