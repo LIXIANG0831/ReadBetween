@@ -21,7 +21,9 @@ LIVEKIT_API_SECRET = get_config("api.livekit.livekit_api_secret")
 # 全局任务字典
 voice_agents_tasks: Dict[str, asyncio.Task] = {}
 
-
+"""
+Deprecated 
+"""
 @router.get("/voice/get_token")
 async def get_token(name: str, room: str, identity: str = "identity"):
     token = api.AccessToken(api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET) \
@@ -37,7 +39,9 @@ async def get_token(name: str, room: str, identity: str = "identity"):
     logger_util.debug(f"获取LiveKit Room Token: {token.to_jwt()}")
     return {"token": token.to_jwt()}
 
-
+"""
+Deprecated 
+"""
 @router.post("/voice/create_agent")
 async def create_agent(voice_agent_created: VoiceAgentCreate):
     try:
@@ -64,7 +68,9 @@ async def create_agent(voice_agent_created: VoiceAgentCreate):
         logger_util.error(f"创建实时语音服务失败: {e}")
         return resp_500(message=str(e))
 
-
+"""
+Deprecated 
+"""
 @router.post("/voice/cancel_agent/{task_id}")
 async def cancel_agent(task_id: str):
     try:

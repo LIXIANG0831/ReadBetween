@@ -32,7 +32,9 @@ livekit_url = get_config("api.livekit.livekit_url")
 livekit_api_secret = get_config("api.livekit.livekit_api_secret")
 livekit_api_key = get_config("api.livekit.livekit_api_key")
 
-
+"""
+Deprecated 
+"""
 class VoiceAgentService:
     def __init__(self, worker_type=WorkerType.ROOM, agent_name: str = None, prompt: str = None, welcome_words: str = None, participant_identity: str = None):
         self.worker_type = worker_type
