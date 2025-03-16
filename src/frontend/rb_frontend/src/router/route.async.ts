@@ -47,6 +47,15 @@ const asyncRoutes: Array<RouteRecordRaw> = [
     },
     component: () => import('../views/memory.vue'),
   },
+  {
+    path: '/voice',
+    name: 'voice',
+    meta: {
+      title: '语音管理',
+      icon: '',
+    },
+    component: () => import('../views/voice.vue'),
+  },
 ];
 
 export default asyncRoutes;

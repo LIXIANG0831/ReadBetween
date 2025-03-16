@@ -68,6 +68,22 @@ declare namespace Api {
     llm_name: string;
     embedding_name: string;
   };
+
+  /**
+   * 创建会话的参数。
+   * @param {string | null} [title] - 会话的标题，可选。
+   * @param {string} model - 使用的模型名称。
+   * @param {string} system_prompt - 系统提示。
+   * @param {number} temperature - 控制生成文本的随机性。
+   * @param {string[] | null} [knowledge_base_ids] - 绑定的知识库ID列表，可选。
+   */
+  type BaseConversationParams = {
+    title?: string | null;
+    model: string;
+    system_prompt: string;
+    temperature: number;
+    knowledge_base_ids?: string[] | null;
+  };
   
     /**
    * 创建会话的参数。

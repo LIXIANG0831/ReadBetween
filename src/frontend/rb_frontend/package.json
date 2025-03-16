@@ -1,10 +1,9 @@
 {
-  "name": "vitemo",
+  "name": "readbetween",
   "version": "0.0.0",
   "packageManager": "pnpm@9.5.0",
   "type": "module",
   "license": "MIT",
-  "author": "BraveEggTart",
   "scripts": {
     "dev": "vite --host",
     "build:strict": "vue-tsc -b && vite build",
@@ -20,6 +19,7 @@
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
+    "@deepgram/sdk": "^3.11.2",
     "@element-plus/icons-vue": "^2.3.1",
     "@kousum/semi-icons-vue": "^0.24.0",
     "@kousum/semi-ui-vue": "^0.25.0",
@@ -29,6 +29,7 @@
     "axios": "^1.7.2",
     "echarts": "^5.6.0",
     "element-plus": "^2.7.7",
+    "escape-html": "^1.0.3",
     "lodash-es": "^4.17.21",
     "neo4j-driver": "^5.28.1",
     "nprogress": "^0.2.0",

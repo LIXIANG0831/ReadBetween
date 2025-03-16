@@ -13,7 +13,7 @@
             <a-button type="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
               新建渠道
             </a-button>
-            <a-menu-item v-for="item in items" :key="item.id" class="menu-item">
+            <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
               <template #icon>
                 <message-outlined />
               </template>
@@ -45,6 +45,7 @@
               :onClear="handleClearHistory"
               :chatBoxRenderConfig="chatBoxConfig"
               :renderInputArea="renderCustomInput"
+              :uploadProps="customUploadProps"
               />
             </div>
           <div v-else class="read-between-placeholder">
@@ -72,20 +73,20 @@
       width="500px"
       @cancel="handleModalClose"
     >
-      <a-form :model="form" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
+      <a-form :model="CreateConversationForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
         <a-form-item label="会话标题" name="title">
-          <a-input v-model:value="form.title" placeholder="请输入会话标题" />
+          <a-input v-model:value="CreateConversationForm.title" placeholder="请输入会话标题" />
         </a-form-item>
         <a-form-item label="模型" name="model" required>
-          <a-input v-model:value="form.model" disabled />
+          <a-input v-model:value="CreateConversationForm.model" disabled />
         </a-form-item>
         <a-form-item label="系统提示" name="system_prompt">
-          <a-textarea v-model:value="form.system_prompt" :rows="4" />
+          <a-textarea v-model:value="CreateConversationForm.system_prompt" :rows="4" />
         </a-form-item>
         <a-form-item label="温度">
           <div class="slider-container">
             <a-slider
-              v-model:value="form.temperature"
+              v-model:value="CreateConversationForm.temperature"
               :min="0.1"
               :max="2"
               :step="0.1"
@@ -93,13 +94,13 @@
               style="flex: 1;"
             />
             <div class="value-display">
-              {{ form.temperature !== undefined ? form.temperature.toFixed(1) : '0.0' }}
+              {{ CreateConversationForm.temperature !== undefined ? CreateConversationForm.temperature.toFixed(1) : '0.0' }}
             </div>
           </div>
         </a-form-item>
         <a-form-item label="知识库">
           <a-select
-            v-model:value="form.knowledge_base_ids"
+            v-model:value="CreateConversationForm.knowledge_base_ids"
             mode="multiple"
             placeholder="请选择知识库"
           >
@@ -114,7 +115,7 @@
         </a-form-item>
         <!-- 新增 use_memory 开关 -->
         <a-form-item label="启用记忆" name="use_memory">
-          <a-switch v-model:checked="form.use_memory" />
+          <a-switch v-model:checked="CreateConversationForm.use_memory" />
         </a-form-item>
       </a-form>
       <template #footer>
@@ -162,13 +163,13 @@ import { useDefaultModelStore } from '@/store/useDefaultModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 // import ChatInput from '@/components/ChatInput.vue';
 import { IconGlobeStroke } from '@kousum/semi-icons-vue';
-
+import escapeHtml from 'escape-html';
 
 
 interface ExtendedChatMessage {
-  content: string;
+  content: any;
   role: 'user' | 'assistant';
-  source: array;
+  source: any;
   status?: 'loading' | 'error';
   timestamp: number;
 }
@@ -180,12 +181,9 @@ interface StreamMessage {
 }
 
 // 定义更具体的 API 参数类型
-interface CreateConversationParams extends Api.CreateConversationParams {
+interface CreateConversationParams extends Api.BaseConversationParams {
   use_memory: boolean;
-}
-
-interface UpdateConversationParams extends Api.UpdateConversationParams {
-  use_memory: boolean;
+  conv_id: string;
 }
 
 
@@ -207,9 +205,9 @@ const { token } = theme.useToken();
 
 // 状态管理
 const activeKey = ref<string[]>([]);
-const items = ref<Api.Conversation[]>([]);
+const conversation_items = ref([]);
 const chats = ref<ExtendedChatMessage[]>([]);
-const knowledgeList = ref<Api.Knowledge[]>([]);
+const knowledgeList = ref([]);
 const isCreateDialogVisible = ref(false);
 const isEditing = ref(false);
 const hints = ref<string[]>(["测试提示信息 1", "测试提示信息 2"]); // 初始化 hints 用于存储提示消息
@@ -225,13 +223,14 @@ const commonChatOuterStyle = {
 };
 
 // 表单数据
-const form = ref<CreateConversationParams>({ // 使用扩展后的接口
+const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
   model: '',
   system_prompt: '你是我的AI助手',
   temperature: 0.3,
   knowledge_base_ids: [],
-  use_memory: true // 默认启用记忆
+  use_memory: true, // 默认启用记忆
+  conv_id: ""
 });
 
 // 样式计算
@@ -247,7 +246,7 @@ const fetchConversations = async () => {
   try {
     const res = await listConversations();
     if (res.data.status_code === 200) {
-      items.value = res.data.data.data;
+      conversation_items.value = res.data.data.data;
     }
   } catch (error) {
     message.error('获取会话列表失败');
@@ -260,12 +259,12 @@ const fetchMessageHistory = async (convId: string) => {
     const res = await getMessageHistory({ conv_id: convId });
     if (res.data.status_code === 200) {
       chats.value = res.data.data.map(msg => ({
-        content: msg.content,
+        content: JSON.parse(msg.content),
         role: msg.role === 'user' ? 'user' : 'assistant',
         source: JSON.parse(msg.source),
-        timestamp: new Date().getTime()
+        timestamp: new Date(msg.timestamp).getTime()
       }));
-      // console.log(chats.value)
+      console.log(chats.value)
     }
     else {
       console.error('获取消息历史失败:', res.data); // 打印错误信息
@@ -282,7 +281,10 @@ const fetchMessageHistory = async (convId: string) => {
 // 获取知识库列表
 const fetchKnowledgeList = async () => {
   try {
-    const res = await listKnowledge();
+    const res = await listKnowledge({
+      page: 1,
+      size: 1000 // 随便给一个大的值 以后再增加全量接口
+    });
     if (res.data.status_code === 200) {
       knowledgeList.value = res.data.data.data;
     }
@@ -310,10 +312,94 @@ const renderHintBox = (props: { content: string, onHintClick: () => void, index:
   return h('div', { style: commonHintStyle}, content); // 使用 v-html 渲染 Markdown 内容
 };
 
+
+
+// 自定义文件上传
+const uploadedFiles = ref<any[]>([]);
+const MAX_FILE_SIZE_KB = 5 * 1024;
+const MAX_FILE_COUNT = 5;
+const customUploadProps = ref({
+  action: 'https://picui.cn/api/v1/upload', // 你的图片上传接口地址
+  name: 'file', // 对应接口文档中的 image 参数名
+  accept: 'image/*', // 接受所有图片类型
+  multiple: false, // 根据你的需求设置是否允许多文件上传
+  // data: {}, // 如果需要额外的请求参数，在这里设置
+  limit: MAX_FILE_COUNT,
+  // maxSize: MAX_FILE_SIZE_KB,
+  addOnPasting: true,
+  headers: {
+    'Authorization': `Bearer ${import.meta.env.VITE_IMAGE_BED_TOKEN}`,
+    'Accept': 'application/json'
+  }, // 如果需要自定义请求头，在这里设置
+  onExceed: (fileList) => {
+    message.error(`图片数量不能超过 ${MAX_FILE_COUNT}个!`);
+  },
+  // onSizeError: (file, fileList) => {
+  //   message.error(`图片大小不能超过 ${MAX_FILE_SIZE_KB}KB!`);
+  // },
+  beforeUpload: (obj) => {
+    // 上传实际接口之前
+    console.log('beforeUpload:', obj);
+    
+    // 可以进行文件类型和大小的校验
+    const fileType = obj.file.fileInstance.type; // 获取文件类型
+    const fileSize = obj.file.fileInstance.size; // 获取文件大小（字节）
+    
+    const isLtMaxSize = fileSize / 1024 <= MAX_FILE_SIZE_KB;
+    if (!isLtMaxSize) {
+      message.error(`图片大小不能超过 ${MAX_FILE_SIZE_KB}KB!`);
+      return { 
+        shouldUpload: false, 
+        fileInstance: obj.file.fileInstance, 
+        autoRemove: true 
+      }; // 返回对象，设置 autoRemove 为 true
+    }
+    return true;
+  },
+  afterUpload: (obj) => {
+    // 上传实际接口之后
+    console.log('afterUpload:', obj);
+  },
+  onChange: (info) => {
+    // 过滤出状态为 'done' 的文件，更新 uploadedFiles
+    uploadedFiles.value = info.fileList.filter(file => file.status === 'success');
+  },
+  onSuccess: (response, file, fileList) => {
+    console.log('onSuccess:', response, file, fileList);
+    if (response && response.status === true) {
+      message.success(`${file.name} 上传成功.`);
+      // 在这里处理上传成功后的逻辑，例如将返回的图片 URL 显示在聊天框中
+      // 你可能需要更新你的 chats 状态，添加一条包含图片消息的新项
+      const imageUrl = response.data.url; // 假设你的接口返回的 data.url 是图片地址
+      // 注意：你需要根据你的聊天消息结构来添加这条图片消息
+      // 例如：
+      // chats.value = [
+      //   ...chats.value,
+      //   {
+      //   role: 'user', // 或者 'assistant'，取决于谁发送的图片
+      //   content: `![](${imageUrl})`, // 使用 Markdown 图片语法
+      //   source: [],
+      //   timestamp: Date.now(),
+      //   },
+      // ];
+    } else {
+      message.error(`${file.name} 上传失败.`);
+    }
+  },
+  onError: (error, file, fileList) => {
+    console.error('onError:', error, file, fileList);
+    message.error(`${file.name} 上传失败.`);
+  },
+  onProgress: (percent, file) => {
+    console.log(`${file.name} 上传中: ${percent}%`);
+  },
+  // 其他你可能需要的配置项...
+} as any);
+
 // 自定义对话框
 const chatBoxConfig = ref({
   renderChatBoxContent: (props) => {
-    const { role, message, className } = props;
+    const { role, message, defaultNode, className } = props;
 
     // 如果 message.status 是 "loading"，不返回任何内容 返回加载状态
     // message.content为空时 MarkdownRender会报错
@@ -325,23 +411,43 @@ const chatBoxConfig = ref({
 
     // 替换头像图标
     // 遍历 message.source，根据 source 字段添加 avatar 属性
-    const processedSource = message.source && message.source.length > 0
+    const processedHistorySourceCard = message.source && message.source.length > 0
       ? message.source.map((item) => {
+        let faviconUrl = '';
       if (item.source === 'kb') {
         return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
       } else if (item.source === 'web') {
-        return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
+        // 截取网站域名
+        const urlObj = new URL(item.url);
+        faviconUrl = `${urlObj.origin}/favicon.ico`;
+        return { ...item, avatar: faviconUrl };
       }
       return item; // 其他情况保持原样
     }) : [];
 
+    // 处理多模态message响应
+    let processedContent = '';
+    if (Array.isArray(message.content)) {
+      message.content.forEach(item => {
+        if (item.type === 'text') {
+          processedContent += item.text + '\n';
+        } else if (item.type === 'image_url') {
+          const imageUrl = item.image_url.url;
+          processedContent += `![](${imageUrl})\n`;
+        }
+      });
+    } else {
+      processedContent = message.content;
+    }
+
     // 使用 h 函数构建渲染内容
+    const escapedContent = escapeHtml(processedContent);
     return h(
       'div',
       { class: className },
       message.source && message.source.length > 0
-        ? [h(SourceCard, { source: processedSource }), h(MarkdownRender, { raw: message.content })]
-        : h(MarkdownRender, { raw: message.content })
+        ? [h(SourceCard, { source: processedHistorySourceCard }), h(MarkdownRender, { raw: escapedContent, components: {} })]
+        : h(MarkdownRender, { raw: escapedContent, components: {} })
     );
   }
 });
@@ -383,15 +489,39 @@ const renderCustomInput = (props) => {
 };
 
 // 发送消息处理
-const handleMessageSend = async (text: string) => {
-  if (!activeKey.value[0] || !text.trim()) return;
+const handleMessageSend = async (user_message: any) => {
+  if (!activeKey.value[0] || !user_message.trim()) return;
   try {
     isLoading.value = true;
+
+    
+    // 拼接UserMessage用于展示
+    // 检查 uploadedFiles 是否为空
+    if (uploadedFiles.value.length > 0) {
+        // 构造包含图片的 userMessage
+        const contentArray: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+          { type: "text", text: user_message }
+        ];
+
+        uploadedFiles.value.forEach(file => {
+          if (file.response?.data?.links?.url) {  // 校验响应存在
+            let image_url = file.response.data.links.url
+            contentArray.push({
+              type: "image_url",
+              image_url: { url: image_url }
+            });
+          }
+        });
+  
+        // 修改为包含图片的 userMessage
+        user_message = contentArray
+
+    }
 
     // ================= 消息创建阶段 =================
     // 创建完全独立的消息对象
     const userMessage: ExtendedChatMessage = {
-      content: text,  // 使用原始输入文本
+      content: user_message,  // 使用原始输入文本
       role: 'user',
       source: [],
       timestamp: Date.now()
@@ -415,10 +545,13 @@ const handleMessageSend = async (text: string) => {
     // ================= 流处理阶段 =================
     const response = await sendMessage({
       conv_id: activeKey.value[0],
-      message: text,        // 使用原始输入文本
+      message: JSON.stringify(user_message),        // 使用原始输入文本
       search: isSearchEnabled.value,
-      temperature: form.value.temperature
+      temperature: CreateConversationForm.value.temperature
     });
+
+    // 清空 uploadedFiles 文件上传列表
+    uploadedFiles.value = [];
 
     if (!response.ok) throw new Error('Failed to get stream');
 
@@ -468,7 +601,7 @@ const handleMessageSend = async (text: string) => {
           break;
 
         case 'SOURCE':
-          console.log('Source data:', data.extra);
+          // console.log('Source data:', data.extra);
           const sourceData = data.extra;
           handleSourceData(sourceData)
           break;
@@ -499,18 +632,21 @@ const handleMessageSend = async (text: string) => {
     chats.value = chats.value.map(msg => {
       if (msg.timestamp === assistantMessage.timestamp) {
         // 遍历 sourceData 并根据 source 值添加 avatar 属性
-        const processedSourceData = sourceData.map((item) => {
+        const processedCurrentSourceCard = sourceData.map((item) => {
+          let faviconUrl = '';
+          const urlObj = new URL(item.url);
+          faviconUrl = `${urlObj.origin}/favicon.ico`;
           if (item.source === "kb") {
-            return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" };
+            return { ...item, avatar: faviconUrl };
           } else if (item.source === "web") {
-            return { ...item, avatar: "https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png" };
+            return { ...item, avatar: faviconUrl };
           }
           return item;
         });
 
         return {
           ...msg,
-          source: [...msg.source, ...processedSourceData]
+          source: [...msg.source, ...processedCurrentSourceCard]
         };
       }
       return msg;
@@ -591,17 +727,19 @@ const handleDelete = async (convId: string) => {
 };
 
 // 编辑会话
-const handleEdit = (item: Api.Conversation) => {
+const handleEdit = (item) => {
   isEditing.value = true;
   isCreateDialogVisible.value = true;
-  form.value = {
+  // 提取 knowledge_bases 中每个元素的 id
+  const knowledgeBaseIds = item.knowledge_bases.map((kb) => kb.id);
+  CreateConversationForm.value = {
     title: item.title,
     model: item.model,
     system_prompt: item.system_prompt,
     temperature: item.temperature,
-    knowledge_base_ids: item.knowledge_base_ids,
+    knowledge_base_ids: knowledgeBaseIds,
     conv_id: item.id,
-    use_memory: item.use_memory // 同步 use_memory 字段
+    use_memory: !!item.use_memory // 同步 use_memory 字段
   } as CreateConversationParams; // 强制类型转换
 };
 
@@ -609,12 +747,12 @@ const handleEdit = (item: Api.Conversation) => {
 const handleConversationSubmit = async () => {
   try {
     const submitForm = {
-      ...form.value,
-      use_memory: form.value.use_memory ? 1 : 0 // Convert boolean to 1 or 0
+      ...CreateConversationForm.value,
+      use_memory: CreateConversationForm.value.use_memory ? 1 : 0 // Convert boolean to 1 or 0
     };
 
     if (isEditing.value) {
-      await updateConversation(submitForm as UpdateConversationParams); // 强制类型转换
+      await updateConversation(submitForm as Api.UpdateConversationParams); // 强制类型转换
       message.success('会话更新成功');
     } else {
       await createConversation(submitForm);
@@ -631,19 +769,21 @@ const handleConversationSubmit = async () => {
 const handleModalClose = () => {
   isCreateDialogVisible.value = false;
   isEditing.value = false;
-  form.value = {
+  CreateConversationForm.value = {
     title: '新渠道',
     model: defaultModelStore.defaultModelCfg?.llm_name || '',
     system_prompt: '你是我的AI助手',
     temperature: 0.3,
     knowledge_base_ids: [],
-    use_memory: true // 初始化 use_memory 为 true
+    use_memory: true, // 初始化 use_memory 为 true
+    conv_id: ""
   };
 };
 
 // 会话点击处理
 const handleConversationClick = ({ key }: { key: string }) => {
   activeKey.value = [key];
+  console.log('Selected:', key); // 添加调试日志
   fetchMessageHistory(key);
 };
 
@@ -652,14 +792,14 @@ onMounted(async () => {
   await fetchConversations();
   await fetchKnowledgeList();
   defaultModelStore.loadDefaultModelCfg();
-  form.value.model = defaultModelStore.defaultModelCfg?.llm_name || '';
+  CreateConversationForm.value.model = defaultModelStore.defaultModelCfg?.llm_name || '';
   // console.log(activeKey.value)
 });
 
 // 监听模型配置变化
 watch(() => defaultModelStore.defaultModelCfg, (newVal) => {
   if (newVal) {
-    form.value.model = newVal.llm_name;
+    CreateConversationForm.value.model = newVal.llm_name;
   }
 }, { immediate: true });
 </script>

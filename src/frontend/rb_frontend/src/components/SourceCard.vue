@@ -131,7 +131,7 @@ interface SourceItem {
   avatar: string;
   url: string;
   title: string;
-  content: string;
+  content: any;
 }
 
 const props = defineProps({

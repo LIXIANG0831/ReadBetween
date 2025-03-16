@@ -22,7 +22,13 @@ const handleSelect = (event: { key: string }) => {
   else if (key === '3') {
     router.push('/model_cfg');
   }
+  // else if (key === '4') {
+    // router.push('/voice');
+  // }
 };
+
+import VoiceInteraction from '@/components/VoiceInteraction.vue'
+
 </script>
 
 <template>
@@ -66,6 +72,13 @@ const handleSelect = (event: { key: string }) => {
             </template>
             <span>🚀 模型管理</span>
           </a-menu-item>
+
+          <!-- <a-menu-item key="4">
+            <template #icon>
+              <RocketOutlined />
+            </template>
+            <span>🚀 语言管理</span>
+          </a-menu-item> -->
         </a-menu>
       </a-layout-sider>
 

@@ -55,6 +55,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SourceCard: typeof import('./components/SourceCard.vue')['default']
+    VoiceInteraction: typeof import('./components/VoiceInteraction.vue')['default']
     ZhReadme: typeof import('./components/ZhReadme.md')['default']
   }
   export interface ComponentCustomProperties {
