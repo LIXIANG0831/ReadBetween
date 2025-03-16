@@ -169,7 +169,7 @@ class ChatService:
         if conversation.use_memory == 1 and is_vl_query is False:
             logger_util.debug(f"用户开启并使用记忆")
             try:
-                final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
+                final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 1)
                 logger_util.debug(f"用户召回记忆:\n{final_query}")
             except Exception as e:
                 logger_util.error(f"记忆召回失败: {e}")
@@ -407,7 +407,7 @@ class ChatService:
             请基于上下文参考内容，用自然对话的方式响应用户提问。注意:
             1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
             2. 不要直接引用上下文中的标题或元数据.
-            3. 聚焦用户提问，若上下文内容与用户提问无关，则忽略它们直接回答.
+            3. 聚焦用户提问，若上下文内容与用户提问无关，则忽略无关上下文内容进行回答.
             
             【用户提问】
             {message}

@@ -101,7 +101,8 @@ export default {
               }
               return tooltipContent;
             } else if (params.dataType === 'edge') {
-              return `<b>[${params.sourceName}] 👉<${params.label.formatter}>👉 [${params.targetName}]<br></b>`;
+              console.log(params.label.formatter)
+              return `<b>[${params.sourceName}] 👉${params.label.formatter}👉 [${params.targetName}]<br></b>`;
             }
             return params.name || 'Unknown';
           }

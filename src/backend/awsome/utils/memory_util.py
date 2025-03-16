@@ -36,7 +36,7 @@ class MemoryUtil:
         """
         return self.memory.get_all(user_id=user_id)
 
-    def search_memories(self, query, user_id, limit=5):
+    def search_memories(self, query, user_id, limit=3):
         """
         根据查询语句搜索指定用户的相关记忆.
 
