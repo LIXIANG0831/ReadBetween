@@ -1,5 +1,5 @@
 import json
-
+from datetime import datetime
 from awsome.models.schemas.source import SourceMsg
 from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from awsome.models.dao.conversations import ConversationDao, Conversation
@@ -93,6 +93,8 @@ class ChatService:
             "title": conv.title,
             "model": conv.model,
             "use_memory": conv.use_memory,
+            "system_prompt": conv.system_prompt,
+            "temperature": conv.temperature,
             "knowledge_bases": [
                 {
                     "id": kb.id,
@@ -130,12 +132,24 @@ class ChatService:
         if not conversation:
             raise HTTPException(status_code=404, detail="对话不存在")
 
-        # 最终给模型的输入
-        final_query = cls._init_user_query(message_data.message)
+        # 判断问答类型
+        content = json.loads(message_data.message)
+        is_vl_query = False
+        if isinstance(content, str):  # 普通问答
+            logger_util.debug("普通问答")
+        elif isinstance(content, list):  # 多模态问答
+            logger_util.debug("多模态问答")
+            # 多模态问答时 忽略知识库/网络检索/记忆功能
+            is_vl_query = True
+        else:
+            logger_util.error("数据类型既不是 str 也不是 list")
+            raise Exception("数据类型既不是 str 也不是 list")
 
+        # 最终给模型的用户输入[+RAG/Web等参考信息] 和 用户初始输入
+        final_query, first_query = cls._init_user_query(content, is_vl_query)
         # 获取知识库召回内容
         kb_source_list = None
-        if len(conversation.knowledge_bases) > 0:
+        if len(conversation.knowledge_bases) > 0 and is_vl_query is False:
             logger_util.debug(f"用户开启并使用知识库检索")
             try:
                 final_query, kb_source_list = await cls._append_kb_recall_msg(conversation.knowledge_bases, final_query)
@@ -144,18 +158,18 @@ class ChatService:
 
         # 获取网络搜索内容
         web_source_list = None
-        if message_data.search is True:
+        if message_data.search is True and is_vl_query is False:
             logger_util.debug(f"用户开启并使用网络检索")
             try:
-                final_query, web_source_list = await cls._append_web_search_msg(message_data.message, final_query)
+                final_query, web_source_list = await cls._append_web_search_msg(content, final_query)
             except Exception as e:
                 logger_util.error(f"网络检索失败：{e}")
 
         # 添加/召回记忆
-        if conversation.use_memory == 1:
+        if conversation.use_memory == 1 and is_vl_query is False:
             logger_util.debug(f"用户开启并使用记忆")
             try:
-                final_query = await cls._append_memory_msg(message_data.message, final_query, message_data.conv_id, 3)
+                final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
                 logger_util.debug(f"用户召回记忆:\n{final_query}")
             except Exception as e:
                 logger_util.error(f"记忆召回失败: {e}")
@@ -164,7 +178,7 @@ class ChatService:
         # 构造 OpenAI 请求参数
         system_prompt = [{'role': 'system', 'content': f'{conversation.system_prompt}'}]
         history_messages = await cls._build_openai_messages(message_data.conv_id)
-        current_message = [{'role': 'user', 'content': f'{final_query}'}]
+        current_message = [{'role': 'user', 'content': final_query}]
         messages = system_prompt + history_messages + current_message
         logger_util.debug(f"当前请求模型完整请求消息: {messages}")
 
@@ -173,7 +187,7 @@ class ChatService:
             user_msg = await MessageDao.create_message(
                 conv_id=message_data.conv_id,
                 role="user",
-                content=message_data.message,
+                content=json.dumps(first_query, ensure_ascii=False),
                 source=None
             )
             user_msg_id = user_msg.id
@@ -222,7 +236,7 @@ class ChatService:
                 await MessageDao.create_message(
                     conv_id=message_data.conv_id,
                     role="assistant",
-                    content=assistant_content,
+                    content=json.dumps(assistant_content, ensure_ascii=False),
                     source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False),
                 )
                 logger_util.debug(f"保存助手响应消息: {assistant_content}")
@@ -251,7 +265,7 @@ class ChatService:
     async def _build_openai_messages(cls, conv_id: str):
         """构建 OpenAI 需要的消息格式"""
         messages = await MessageDao.get_conversation_messages(conv_id)
-        return [{"role": msg.role, "content": msg.content} for msg in messages]
+        return [{"role": msg.role, "content": json.loads(msg.content)} for msg in messages]
 
     @classmethod
     async def _format_conversation_response(cls, conv: Conversation):
@@ -324,10 +338,11 @@ class ChatService:
         web_search_info = ""
         source_list: List[SourceMsg] = []
         # 一级检索
+        now = datetime.now().strftime("%Y年%m月%d日")
+        now_query = f"{now}{query}"
         search_results = search_tool.search_baidu(query, size=3, lm=3)
         # 二级检索
         for search_item in search_results:
-            # TODO 拼接检索内容到提示词final_query
             search_content = search_tool.get_page_detail(search_item.url)
             if search_content is not None:
                 source_list.append(SourceMsg(source="web", title=search_item.name, url=search_item.url))
@@ -383,15 +398,18 @@ class ChatService:
         return f"data: {json.dumps(stream_resp, ensure_ascii=False)}\n\n"
 
     @classmethod
-    def _init_user_query(cls, message):
-        return f"""
-        【生成要求】
-        请基于上下文参考内容，用自然对话的方式响应用户提问。注意:
-        1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
-        2. 不要直接引用上下文中的标题或元数据.
-        3. 聚焦用户提问，若上下文内容与用户提问无关，则忽略它们直接回答.
-        
-        【用户提问】
-        {message}
-
-        """
+    def _init_user_query(cls, message, is_vl_query):
+        if is_vl_query is True:
+            return message, message
+        else:
+            return f"""
+            【生成要求】
+            请基于上下文参考内容，用自然对话的方式响应用户提问。注意:
+            1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
+            2. 不要直接引用上下文中的标题或元数据.
+            3. 聚焦用户提问，若上下文内容与用户提问无关，则忽略它们直接回答.
+            
+            【用户提问】
+            {message}
+    
+            """, message
