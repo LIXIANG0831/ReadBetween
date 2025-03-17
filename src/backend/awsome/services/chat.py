@@ -324,10 +324,10 @@ class ChatService:
 
         if recall_chunk:
             return f"""
-                    【上下文参考】
-                    {recall_chunk.strip()}
-                    
-                    {message}
+**RAG Retrieval Information:** This is relevant information retrieved from a knowledge base, which may contain the answer to the question or related background knowledge.
+{recall_chunk.strip()}
+
+{message}
             """, source_list
         else:
             return message, None
@@ -349,10 +349,10 @@ class ChatService:
                 web_search_info += f"Title: {search_item.name}\nContent: {search_content}\n\n"
         if web_search_info:
             return f"""
-                【网络检索内容】
-                {web_search_info}
-                
-                {message}
+**Web Search Information:** This is relevant information gathered from internet searches, which may contain the latest information or different perspectives.
+{web_search_info}
+
+{message}
             """, source_list
         else:
             return message, None
@@ -376,10 +376,10 @@ class ChatService:
             return message
         else:
             return f"""
-                【用户相关记忆】
-                {memory_str}
-                
-                {message}
+**User Memory Information:** This is information about the user's past conversations and preferences, which can help you better understand the user's needs.
+{memory_str}
+
+{message}
             """
 
     @classmethod
@@ -403,13 +403,15 @@ class ChatService:
             return message, message
         else:
             return f"""
-            【生成要求】
-            请基于上下文参考内容，用自然对话的方式响应用户提问。注意:
-            1. 不要使用"根据检索内容"、"根据资料"、"根据记忆"等暴露检索过程的表述.
-            2. 不要直接引用上下文中的标题或元数据.
-            3. 聚焦用户提问，若上下文内容与用户提问无关，则忽略无关上下文内容进行回答.
-            
-            【用户提问】
-            {message}
-    
+**User Question:** {message}
+
+**Your task is to:**
+
+1.  Carefully read and understand all the information above.
+2.  Comprehensively consider all information sources and determine which information is relevant, accurate, and reliable.
+3.  Based on this information, generate a clear, concise, and helpful response that directly answers the user's question.
+4.  If there are conflicts between information sources, try to reconcile different viewpoints or explicitly point out the existence of conflicts.
+5.  Avoid generating information that is irrelevant to the question.
+6.  **Please respond in Chinese.**
+
             """, message
