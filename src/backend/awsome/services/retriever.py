@@ -129,7 +129,7 @@ class RetrieverService(BaseService):
 
         # 在 Milvus 中进行向量检索
         try:
-            milvus_results = milvus_client.search_vectors(
+            milvus_results = milvus_client.search_vectors(  # 自动PCA
                 query_vectors=query_vector,
                 collection_names=milvus_collection_names,
                 top_k=top_k,

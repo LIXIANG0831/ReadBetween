@@ -7,20 +7,24 @@ from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.memory_util import MemoryUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.minio_util import MinioUtil
-from awsome.utils.logger_util import logger_util
 from awsome.utils.model_factory import ModelFactory
 from awsome.utils.tools import PdfExtractTool
 from awsome.services.constant import (milvus_default_fields_768,  # 默认字段
-                                      milvus_default_index_params  # 默认索引配置
+                                      milvus_default_index_params, milvus_default_fields_1024  # 默认索引配置
                                       )
 from awsome.services.knowledge_file import KnowledgeFileService
+from celery.utils.log import get_task_logger
+
+logger_util = get_task_logger("ReadBetween")
+
+
 @ywjz_celery.task(
     bind=True,
     autoretry_for=(Exception,),  # 自动重试所有异常
-    max_retries=3,               # 最大重试次数
-    retry_backoff=True,          # 启用退避策略
-    retry_backoff_max=30,        # 最大重试间隔为 30 秒
-    retry_backoff_factor=2       # 退避因子为 2
+    max_retries=3,  # 最大重试次数
+    retry_backoff=True,  # 启用退避策略
+    retry_backoff_max=30,  # 最大重试间隔为 30 秒
+    retry_backoff_factor=2  # 退避因子为 2
 )
 def celery_add_memory(self, query: str, user_id: str):
     try:
@@ -34,10 +38,10 @@ def celery_add_memory(self, query: str, user_id: str):
 @ywjz_celery.task(
     bind=True,
     autoretry_for=(Exception,),  # 自动重试所有异常
-    max_retries=3,               # 最大重试次数
-    retry_backoff=True,          # 启用退避策略
-    retry_backoff_max=30,        # 最大重试间隔为 30 秒
-    retry_backoff_factor=2       # 退避因子为 2
+    max_retries=3,  # 最大重试次数
+    retry_backoff=True,  # 启用退避策略
+    retry_backoff_max=30,  # 最大重试间隔为 30 秒
+    retry_backoff_factor=2  # 退避因子为 2
 )
 def celery_text_vectorize(self, task_json):
     knowledge_file_vectorize_task = KnowledgeFileVectorizeTasks.parse_obj(task_json)
@@ -65,7 +69,7 @@ def celery_text_vectorize(self, task_json):
         file_name = file_info["file_name"]
         file_id = file_info["file_id"]
         file_object_name = file_info["file_object_name"]
-        logger_util.debug(f"====》开始向量化文件{file_name}")
+        logger_util.info(f"====》开始向量化文件{file_name}")
         try:
             if file_save_path == "": raise Exception("文件下载失败")
             # TODO 没有对separator进行支持
@@ -105,15 +109,15 @@ def celery_text_vectorize(self, task_json):
 
                 # 创建索引
                 es_client.save_document(save_document)
-            logger_util.debug("====》ES插入完成")
+            logger_util.info("====》ES插入完成")
             """
             插入Milvus
             bbox | start_page[chunk片段最小页码] | source | title | chunk_index[分片索引] | extra | file_id | knowledge_id | text | vector | pk[auto_id]
             """
             if not milvus_client.check_collection_exists(target_collection_name):
-                logger_util.debug(f"新建集合{target_index_name}")
-                milvus_client.create_collection(target_collection_name, milvus_default_fields_768)
-                logger_util.debug(f"完成集合{target_index_name}新建")
+                logger_util.info(f"新建集合{target_index_name}")
+                milvus_client.create_collection(target_collection_name, milvus_default_fields_1024)
+                logger_util.info(f"完成集合{target_index_name}新建")
             # milvus 插入数据
             insert_data = []
             for m_extract_result in extract_results:
@@ -142,13 +146,13 @@ def celery_text_vectorize(self, task_json):
             milvus_client.insert_data(target_collection_name, insert_data)
             # Desperate----- 创建Collection时已完成索引创建
             # milvus_client.create_index_on_field(target_collection_name, "vector", milvus_default_index_params)
-            logger_util.debug("====》Milvus插入完成")
+            logger_util.info("====》Milvus插入完成")
 
             # 完成向量化修改状态
             update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)
             update_file.status = 1
             KnowledgeFileService.update_file(update_file)
-            logger_util.debug("====》数据库数据更新状态")
+            logger_util.info("====》数据库数据更新状态")
 
             return "ok"
         except Exception as e:

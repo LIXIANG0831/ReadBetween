@@ -144,6 +144,7 @@ class MilvusUtil:
                         result_dict["collection_name"] = collection_name
                         results.append(result_dict)
 
+            logger_util.info(f"Milvus查询成功，返回结果数量: {len(results)}")
             return results
         except MilvusException as e:
             logger_util.error(f"搜索向量失败：{e}")

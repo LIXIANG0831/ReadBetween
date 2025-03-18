@@ -110,7 +110,7 @@ class ElasticSearchUtil:
                 }
                 for hit in response.hits
             ]
-            logger_util.info(f"查询成功，返回结果数量: {len(results)}")
+            logger_util.info(f"ES查询成功，返回结果数量: {len(results)}")
             return results
         except Exception as e:
             logger_util.error(f"在索引 {index_names} 中搜索文档时发生错误: {e}")

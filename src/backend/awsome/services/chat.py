@@ -180,7 +180,8 @@ class ChatService:
         history_messages = await cls._build_openai_messages(message_data.conv_id)
         current_message = [{'role': 'user', 'content': final_query}]
         messages = system_prompt + history_messages + current_message
-        logger_util.debug(f"当前请求模型完整请求消息: {messages}")
+        logger_util.debug(f"\n本次请求模型Query信息:\n {final_query}")
+        logger_util.debug(f"\n本次请求模型完整Query消息\n: {messages}")
 
         # 保存用户消息并记录ID
         try:
@@ -311,15 +312,18 @@ class ChatService:
                 top_k=3
             )
             for retrieve_result in retrieve_resp:
+                # print(retrieve_result.source)
+                # print(retrieve_result.score)
+                # print(retrieve_result)
                 # 返回object_name minio获取预签名链接
                 minio_object_name = retrieve_result.metadata['source']
                 minio_file_url = minio_client.get_presigned_url(object_name=minio_object_name)
                 # 保存来源信息
                 source_list.append(SourceMsg(source="kb", title=retrieve_result.metadata['title'], url=minio_file_url))
                 # TODO 考虑是否抽象为配置项
-                if retrieve_result.source == 'milvus' and float(retrieve_result.score) > 0.8:
+                if retrieve_result.source == 'milvus' and float(retrieve_result.score) > 0.75:
                     recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
-                if retrieve_result.source == 'es' and float(retrieve_result.score) < 4:
+                if retrieve_result.source == 'es' and float(retrieve_result.score) < 5:
                     recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
 
         if recall_chunk:
