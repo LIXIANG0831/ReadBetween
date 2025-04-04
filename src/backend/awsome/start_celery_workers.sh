@@ -28,7 +28,8 @@ fi
 for ((i=1; i<=NUM_WORKERS; i++)); do
     worker_name="worker${i}"
     log_file="$SCRIPT_DIR/logs/${worker_name}.log"
-    nohup celery -A awsome.core.celery_app worker -n "${worker_name}@%h" --loglevel=info --logfile="$log_file" > /dev/null 2>&1 &
+    # --pool=solo 启用单线程池 解决模型推理问题
+    nohup celery -A awsome.core.celery_app worker -n "${worker_name}@%h" --pool=solo --loglevel=info --logfile="$log_file" > /dev/null 2>&1 &
 done
 
 echo "所有 Celery worker 已启动，日志保存在 $SCRIPT_DIR/logs/ 下。"

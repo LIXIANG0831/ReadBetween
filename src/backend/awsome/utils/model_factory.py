@@ -9,6 +9,7 @@ from awsome.utils.tools import EncryptionTool
 
 encryption_tool = EncryptionTool()
 
+
 class BaseModelProvider(ABC):
     @abstractmethod
     async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
@@ -16,7 +17,9 @@ class BaseModelProvider(ABC):
 
     @abstractmethod
     def get_embeddings(self, inputs=None, **kwargs):
-        pass
+        from awsome.core.dependencies import get_local_embed_manager
+        glem = get_local_embed_manager()
+        return glem.embed(inputs=inputs)
 
 
 class OpenAIModelProvider(BaseModelProvider):
@@ -40,12 +43,13 @@ class OpenAIModelProvider(BaseModelProvider):
 
     def get_embeddings(self, inputs=None, **kwargs):
         # OpenAI模型的嵌入向量生成逻辑
-        response = self.client.embeddings.create(
-            input=inputs,
-            model=self.embedding_name,
-            **kwargs
-        )
-        return response
+        # response = self.client.embeddings.create(
+        #     input=inputs,
+        #     model=self.embedding_name,
+        #     **kwargs
+        # )
+        # return response
+        return super().get_embeddings(inputs=inputs, **kwargs)
 
 
 class CompatibleOpenAIModelProvider(BaseModelProvider):
@@ -69,12 +73,13 @@ class CompatibleOpenAIModelProvider(BaseModelProvider):
 
     def get_embeddings(self, inputs=None, **kwargs):
         # OpenAI模型的嵌入向量生成逻辑
-        response = self.client.embeddings.create(
-            input=inputs,
-            model=self.embedding_name,
-            **kwargs
-        )
-        return response
+        # response = self.client.embeddings.create(
+        #     input=inputs,
+        #     model=self.embedding_name,
+        #     **kwargs
+        # )
+        # return response
+        return super().get_embeddings(inputs=inputs, **kwargs)
 
 
 class QwenModelProvider(BaseModelProvider):
@@ -98,20 +103,21 @@ class QwenModelProvider(BaseModelProvider):
         return response
 
     def get_embeddings(self, inputs=None, **kwargs):
-        response = dashscope.TextEmbedding.call(
-            api_key=self.api_key,
-            model=self.embedding_name,
-            input=inputs,
-            **kwargs
-        )
-        return response
+        # response = dashscope.TextEmbedding.call(
+        #     api_key=self.api_key,
+        #     model=self.embedding_name,
+        #     input=inputs,
+        #     **kwargs
+        # )
+        # return response
+        return super().get_embeddings(inputs=inputs, **kwargs)
 
 
 # 工厂类
 class ModelFactory:
     _default_model_cfg = None
     redis_util = RedisUtil()
-    _client_cache = {} # 全局缓存模型调用Client
+    _client_cache = {}  # 全局缓存模型调用Client
 
     @classmethod
     def _get_default_model_config(cls):

@@ -35,6 +35,7 @@ def celery_add_memory(self, query: str, user_id: str):
     except Exception as e:
         logger_util.error(f"任务失败: {e}，正在重试，重试次数：{self.request.retries}")
 
+
 @ywjz_celery.task(
     bind=True,
     autoretry_for=(Exception,),  # 自动重试所有异常
@@ -121,11 +122,7 @@ def celery_text_vectorize(self, task_json):
             # milvus 插入数据
             insert_data = []
             for m_extract_result in extract_results:
-                chunk_vector_resp = client.get_embeddings(inputs=m_extract_result.get("chunk", ""))
-                chunk_vector = chunk_vector_resp.data[0].embedding
-
-                # 统一进行维度调整
-                chunk_vector = milvus_client.unified_pca([chunk_vector], 1024)[0]
+                chunk_vector = client.get_embeddings(inputs=[m_extract_result.get("chunk", "")])[0]
 
                 data = {
                     "bbox": str(m_extract_result.get("chunk_bboxes", "")),

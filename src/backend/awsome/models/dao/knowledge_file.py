@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String, INT, select, bindparam, Integer
+from sqlalchemy import Column, String, INT, select, bindparam, Integer, Text
 from sqlmodel import Field, DateTime, text
 from awsome.core.context import session_getter, async_session_getter
 from datetime import datetime
@@ -19,7 +19,7 @@ class KnowledgeFileBase(AwsomeDBModel):
     object_name: Optional[str] = Field(sa_column=Column(String(255), nullable=False), description="MinIO Object Name")
     status: int = Field(default=0, sa_column=Column(INT, nullable=False),
                         description="是否完成向量化, 0/1/-1/未完成/完成/异常失败")
-    extra: Optional[str] = Field(sa_column=Column(String(255), nullable=True),
+    extra: Optional[str] = Field(sa_column=Column(Text, nullable=True),
                                  description="为空未开始向量化|不为空为向量化异常信息")
     # 删除标识
     delete: int = Field(default=0, sa_column=Column(Integer, nullable=False), description="删除标志")

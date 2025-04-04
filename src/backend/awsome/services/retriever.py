@@ -125,11 +125,12 @@ class RetrieverService(BaseService):
             raise ValueError("未指定 Milvus 集合名称列表")
 
         # 获取查询向量
-        query_vector = model_client.get_embeddings(query).data[0].embedding
+        query_vector = model_client.get_embeddings(inputs=[query])[0]
+        # query_vector = model_client.get_embeddings(query).data[0].embedding
 
         # 在 Milvus 中进行向量检索
         try:
-            milvus_results = milvus_client.search_vectors(  # 自动PCA
+            milvus_results = milvus_client.search_vectors(
                 query_vectors=query_vector,
                 collection_names=milvus_collection_names,
                 top_k=top_k,

@@ -1,5 +1,5 @@
 from typing import List
-
+from awsome.utils.local_embedding_manager import LocalEmbedManager
 from awsome.models.dao.model_provider_cfg import ModelProviderCfg
 from awsome.services.model_provider_cfg import ModelProviderCfgService
 from awsome.utils.redis_util import RedisUtil
@@ -34,3 +34,14 @@ def init_database():
             raise RuntimeError('创建数据库和表错误') from e
         finally:
             redis_client.delete('init_database')
+
+
+def init_embed_model():
+    embedding_model = get_config("system.models.embedding.name")
+    model_dir = get_config("system.models.base_dir")
+
+    lem = LocalEmbedManager()
+    lem.initialize(
+        model_name=embedding_model,
+        model_dir=model_dir
+    )

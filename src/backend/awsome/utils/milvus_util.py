@@ -124,8 +124,6 @@ class MilvusUtil:
                 # 如果用户没有指定输出字段，则默认返回所有字段（除了向量字段本身）
                 if output_fields is None:
                     output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
-                # 统一进行维度调整
-                query_vectors = MilvusUtil.unified_pca([query_vectors], 1024)[0]
                 result: SearchResult = collection.search(
                     data=[query_vectors],
                     anns_field="vector",
@@ -241,6 +239,7 @@ class MilvusUtil:
 
     @staticmethod
     def unified_pca(vectors, target_dim=1024):
+        # 调用示例 ::: query_vectors = MilvusUtil.unified_pca([query_vectors], 1024)[0]
         if isinstance(vectors, list):
             vectors = np.array(vectors)
         original_dim = vectors.shape[1]
