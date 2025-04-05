@@ -36,15 +36,3 @@ async def query_memory(memory_query: MemoryQuery):
         return resp_500(message=str(e))
 
 
-@router.get("/memory/get_info")
-async def get_memory_setting_info():
-    try:
-        memory_setting = get_config("memory_only")
-        if redis_util.exists("memory_setting"):
-            return resp_200(data=json.loads(redis_util.get("memory_setting")))
-        else:
-            redis_util.set("memory_setting", json.dumps(memory_setting))
-            return resp_200(data=memory_setting)
-    except Exception as e:
-        logger_util.error(f"查询Neo4J数据失败: {str(e)}")
-        return resp_500(message=str(e))

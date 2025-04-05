@@ -19,7 +19,7 @@ class ChatRequest(BaseModel):
 class ChatCreate(BaseModel):
     # user_id: str = Field(..., description="用户 ID")
     title: Optional[str] = Field("新对话", description="对话标题")
-    model: str = Field("gemini-2.0-flash-exp", description="使用的模型名称")  # 从默认系统配置模型进行获取
+    # model: str = Field("gemini-2.0-flash-exp", description="使用的模型名称")  # 从默认系统配置模型进行获取
     system_prompt: str = Field("你是一个有用的助手", description="系统提示")
     temperature: float = Field(0.3, ge=0, le=2, description="控制生成文本的随机性")
     knowledge_base_ids: Optional[List[str]] = Field(default=[], description="绑定的知识库ID列表")

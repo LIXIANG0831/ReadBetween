@@ -24,7 +24,7 @@ class ConversationBase(AwsomeDBModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="会话ID")
     title: Optional[str] = Field(sa_column=Column(String(255), index=True), description="对话标题")
-    model: str = Field(sa_column=Column(String(50), nullable=False), default="gpt-3.5-turbo", description="使用模型")
+    # model: str = Field(sa_column=Column(String(50), nullable=False), default="gpt-3.5-turbo", description="使用模型")
     system_prompt: str = Field(sa_column=Column(Text), default="你是一个有用的助手", description="系统提示词")
     temperature: float = Field(default=0.7, ge=0, le=2, description="生成温度")
     delete: int = Field(default=0, index=True, description="删除标志")

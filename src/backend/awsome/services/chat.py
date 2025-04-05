@@ -34,7 +34,7 @@ class ChatService:
 
         conv = await ConversationDao.create(
             title=create_data.title,
-            model=create_data.model,
+            # model=create_data.model,
             system_prompt=create_data.system_prompt,
             temperature=create_data.temperature,
             use_memory=create_data.use_memory
@@ -91,7 +91,7 @@ class ChatService:
         return PageModel(total=total, data=[{
             "id": conv.id,
             "title": conv.title,
-            "model": conv.model,
+            # "model": conv.model,
             "use_memory": conv.use_memory,
             "system_prompt": conv.system_prompt,
             "temperature": conv.temperature,
@@ -100,7 +100,7 @@ class ChatService:
                     "id": kb.id,
                     "name": kb.name,
                     "desc": kb.desc,
-                    "model": kb.model,
+                    # "model": kb.model,
                     "collection_name": kb.collection_name,
                     "index_name": kb.index_name,
                 }
@@ -200,7 +200,7 @@ class ChatService:
 
         try:
             # 创建模型调用客户端
-            client = ModelFactory.create_client(llm_name=conversation.model)
+            client = ModelFactory.create_client()
             # 完整的模型回复
             full_response = []
             try:
@@ -273,7 +273,7 @@ class ChatService:
         return {
             "id": conv.id,
             "title": conv.title,
-            "model": conv.model,
+            # "model": conv.model,
             "system_prompt": conv.system_prompt,
             "temperature": conv.temperature,
             "knowledge_bases": [
@@ -281,7 +281,7 @@ class ChatService:
                     "id": kb.id,
                     "name": kb.name,
                     "desc": kb.desc,
-                    "model": kb.model,
+                    # "model": kb.model,
                     "collection_name": kb.collection_name,
                     "index_name": kb.index_name,
                 }
