@@ -225,8 +225,8 @@ const commonChatOuterStyle = {
 // 表单数据
 const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
-  model: '',
   system_prompt: '你是我的AI助手',
+  model: '',
   temperature: 0.3,
   knowledge_base_ids: [],
   use_memory: true, // 默认启用记忆
@@ -734,7 +734,7 @@ const handleEdit = (item) => {
   const knowledgeBaseIds = item.knowledge_bases.map((kb) => kb.id);
   CreateConversationForm.value = {
     title: item.title,
-    model: item.model,
+    model: defaultModelStore.defaultModelCfg?.llm_name,
     system_prompt: item.system_prompt,
     temperature: item.temperature,
     knowledge_base_ids: knowledgeBaseIds,
@@ -771,7 +771,7 @@ const handleModalClose = () => {
   isEditing.value = false;
   CreateConversationForm.value = {
     title: '新渠道',
-    model: defaultModelStore.defaultModelCfg?.llm_name || '',
+    model: defaultModelStore.defaultModelCfg?.llm_name,
     system_prompt: '你是我的AI助手',
     temperature: 0.3,
     knowledge_base_ids: [],

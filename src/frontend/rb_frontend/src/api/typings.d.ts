@@ -79,7 +79,6 @@ declare namespace Api {
    */
   type BaseConversationParams = {
     title?: string | null;
-    model: string;
     system_prompt: string;
     temperature: number;
     knowledge_base_ids?: string[] | null;
