@@ -99,6 +99,7 @@ class DatabaseClient:
 
         # 遍历所有表并尝试创建
         for table in SQLModel.metadata.sorted_tables:
+            logger_util.debug(f'检查 {table} 中...')
             try:
                 table.create(DatabaseClient.engine, checkfirst=True)  # 使用类级别引擎创建表，如果已存在则跳过
             except OperationalError as oe:

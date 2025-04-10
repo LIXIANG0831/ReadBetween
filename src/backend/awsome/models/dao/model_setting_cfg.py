@@ -21,8 +21,8 @@ class ModelCfgWithProvider(BaseModel):
     mark: str
 
 
-class ModelCfgBase(AwsomeDBModel):
-    __tablename__ = "model_cfg"
+class ModelSettingCfgBase(AwsomeDBModel):
+    __tablename__ = "model_setting_cfg"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="模型ID")
 
@@ -52,13 +52,13 @@ class ModelCfgBase(AwsomeDBModel):
     )
 
 
-class ModelCfg(ModelCfgBase, table=True):
+class ModelSettingCfg(ModelSettingCfgBase, table=True):
     __table_args__ = {"extend_existing": True}  # 允许扩展现有的表
 
 
-class ModelCfgDao:
+class ModelSettingCfgDao:
     @staticmethod
-    def insert(model_cfg: ModelCfg):
+    def insert(model_cfg: ModelSettingCfg):
         with session_getter() as session:
             session.add(model_cfg)
             session.commit()
@@ -67,7 +67,7 @@ class ModelCfgDao:
 
     @staticmethod
     def delete_by_id(id):
-        delete_model_cfg = ModelCfgDao.select_one(id)
+        delete_model_cfg = ModelSettingCfgDao.select_one(id)
         if delete_model_cfg is None:
             return None
         with session_getter() as session:
@@ -78,8 +78,8 @@ class ModelCfgDao:
     @staticmethod
     def select_all():
         with (session_getter() as session):
-            results = session.query(ModelCfg, ModelProviderCfg) \
-                .join(ModelProviderCfg, ModelCfg.provider_id == ModelProviderCfg.id) \
+            results = session.query(ModelSettingCfg, ModelProviderCfg) \
+                .join(ModelProviderCfg, ModelSettingCfg.provider_id == ModelProviderCfg.id) \
                 .all()
 
             final_results = []
@@ -98,17 +98,17 @@ class ModelCfgDao:
     @staticmethod
     def select_one(id):
         with session_getter() as session:
-            return session.query(ModelCfg).filter(ModelCfg.id == id).first()
+            return session.query(ModelSettingCfg).filter(ModelSettingCfg.id == id).first()
 
     @staticmethod
     def select_one_by_model_name(model_name: str):
         with session_getter() as session:
-            return session.query(ModelCfg).filter(ModelCfg.f_model_name == model_name).first()
+            return session.query(ModelSettingCfg).filter(ModelSettingCfg.f_model_name == model_name).first()
 
     @staticmethod
     def select_one_with_provider(model_cfg_id: str):
         with session_getter() as session:
-            return session.query(ModelCfg.id, ModelCfg.api_key, ModelCfg.base_url, ModelProviderCfg.mark) \
-                .join(ModelProviderCfg, ModelCfg.provider_id == ModelProviderCfg.id) \
-                .where(ModelCfg.id == model_cfg_id) \
+            return session.query(ModelSettingCfg.id, ModelSettingCfg.api_key, ModelSettingCfg.base_url, ModelProviderCfg.mark) \
+                .join(ModelProviderCfg, ModelSettingCfg.provider_id == ModelProviderCfg.id) \
+                .where(ModelSettingCfg.id == model_cfg_id) \
                 .first()

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from awsome.models.dao.model_cfg import ModelCfg
+from awsome.models.dao.model_setting_cfg import ModelSettingCfg
 from awsome.models.dao.model_provider_cfg import ModelProviderCfg
 
 

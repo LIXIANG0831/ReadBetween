@@ -1,23 +1,22 @@
 import copy
 import json
-from copy import deepcopy
 
 from awsome.utils.tools import EncryptionTool
 from fastapi import HTTPException, APIRouter, UploadFile, File, BackgroundTasks
-from awsome.models.v1.model_cfg import ModelCfgCreate, ModelCfgSetting
+from awsome.models.v1.model_setting_cfg import ModelCfgCreate, ModelCfgSetting
 from awsome.models.schemas.response import resp_200, resp_500
 from awsome.utils.logger_util import logger_util
 from awsome.services.model_provider_cfg import ModelProviderCfgService
-from awsome.services.model_cfg import ModelCfgService
+from awsome.services.model_setting_cfg import ModelCfgService
 from awsome.utils.redis_util import RedisUtil
 
-router = APIRouter(tags=["模型配置管理"])
+router = APIRouter(tags=["模型供应商配置管理"])
 
 encryption_tool = EncryptionTool()
 redis_util = RedisUtil()
 
 
-@router.get("/model_cfg/providers")
+@router.get("/model_setting_cfg/providers")
 async def get_model_cfg_providers():
     try:
         providers = ModelProviderCfgService.select_providers()
@@ -27,7 +26,7 @@ async def get_model_cfg_providers():
         return resp_500(message=str(e))
 
 
-@router.post("/model_cfg/create")
+@router.post("/model_setting_cfg/create")
 async def create_model_cfg(model_cfg_create: ModelCfgCreate):
     try:
         model_cfg_create.api_key = encryption_tool.encrypt(model_cfg_create.api_key)  # 加密
@@ -38,7 +37,7 @@ async def create_model_cfg(model_cfg_create: ModelCfgCreate):
         return resp_500(message=str(e))
 
 
-@router.post("/model_cfg/delete")
+@router.post("/model_setting_cfg/delete")
 async def delete_model_cfg(id):
     try:
         return resp_200(ModelCfgService.delete_model_cfg(id))
@@ -47,7 +46,7 @@ async def delete_model_cfg(id):
         return resp_500(message=str(e))
 
 
-@router.get("/model_cfg/list")
+@router.get("/model_setting_cfg/list")
 async def list_model_cfg():
     try:
         model_cfg_list = ModelCfgService.get_model_cfg()
@@ -66,7 +65,7 @@ async def list_model_cfg():
         return resp_500(message=str(e))
 
 
-@router.get("/model_cfg/available")
+@router.get("/model_setting_cfg/available_list")
 async def list_available_model_cfg(id):
     try:
         model_available = ModelCfgService.get_available_model_cfg_by_id(id)
@@ -76,7 +75,7 @@ async def list_available_model_cfg(id):
         return resp_500(message=str(e))
 
 
-@router.post("/model_cfg/setting")
+@router.post("/model_setting_cfg/setting", deprecated=True)  ## 即将废除
 async def setting_default_model_cfg(model_cfg_setting: ModelCfgSetting):
     try:
         from awsome.services.constant import redis_default_model_key
@@ -108,7 +107,7 @@ async def setting_default_model_cfg(model_cfg_setting: ModelCfgSetting):
         return resp_500(message=str(e))
 
 
-@router.get("/model_cfg/default")
+@router.get("/model_setting_cfg/default", deprecated=True)  ## 即将废除
 async def get_default_model_cfg():
     try:
         from awsome.services.constant import redis_default_model_key

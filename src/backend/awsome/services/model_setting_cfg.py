@@ -1,9 +1,9 @@
 import requests
 
-from awsome.models.v1.model_cfg import ModelCfgCreate
+from awsome.models.v1.model_setting_cfg import ModelCfgCreate
 from awsome.services.base import BaseService
-from awsome.models.dao.model_cfg import ModelCfgDao
-from awsome.models.dao.model_cfg import ModelCfg
+from awsome.models.dao.model_setting_cfg import ModelSettingCfgDao
+from awsome.models.dao.model_setting_cfg import ModelSettingCfg
 from awsome.utils.tools import EncryptionTool
 
 encryption_tool = EncryptionTool()
@@ -12,20 +12,20 @@ class ModelCfgService(BaseService):
 
     @classmethod
     def create_model_cfg(cls, model_cfg_create: ModelCfgCreate):
-        model_cfg = ModelCfg(**model_cfg_create.dict())
-        return ModelCfgDao.insert(model_cfg)
+        model_cfg = ModelSettingCfg(**model_cfg_create.dict())
+        return ModelSettingCfgDao.insert(model_cfg)
 
     @classmethod
     def delete_model_cfg(cls, id):
-        return ModelCfgDao.delete_by_id(id)
+        return ModelSettingCfgDao.delete_by_id(id)
 
     @classmethod
     def get_model_cfg(cls):
-        return ModelCfgDao.select_all()
+        return ModelSettingCfgDao.select_all()
 
     @classmethod
     def get_available_model_cfg_by_id(cls, id):
-        model_cfg: ModelCfg = ModelCfgDao.select_one(id)
+        model_cfg: ModelSettingCfg = ModelSettingCfgDao.select_one(id)
         api_key = encryption_tool.decrypt(model_cfg.api_key)
         base_url = model_cfg.base_url
 
@@ -43,4 +43,4 @@ class ModelCfgService(BaseService):
 
     @classmethod
     def get_model_cfg_by_id(cls, model_cfg_id):
-        return ModelCfgDao.select_one_with_provider(model_cfg_id)
+        return ModelSettingCfgDao.select_one_with_provider(model_cfg_id)
