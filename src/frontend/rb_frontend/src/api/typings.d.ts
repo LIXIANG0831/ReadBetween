@@ -69,6 +69,12 @@ declare namespace Api {
     embedding_name: string;
   };
 
+  type addAvailableModelCfgParams = {
+    setting_id: string;
+    name: string;
+    type: string;
+  };
+
   /**
    * 创建会话的参数。
    * @param {string | null} [title] - 会话的标题，可选。

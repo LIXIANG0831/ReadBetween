@@ -1,6 +1,6 @@
 // stores/useDefaultModelStore.ts
 import { defineStore } from 'pinia';
-import { getDefaultCfg } from '@/api/model_cfg';
+import { getAvailableModelCfgList } from '@/api/model_cfg';
 
 export const useDefaultModelStore = defineStore('defaultModelStore', {
   state: () => ({
@@ -11,14 +11,14 @@ export const useDefaultModelStore = defineStore('defaultModelStore', {
     async loadDefaultModelCfg() {
       this.isLoading = true; // 开始加载
       try {
-        const { data } = await getDefaultCfg();
+        const { data } = await getAvailableModelCfgList();
         if (data.status_code === 200) {
           this.defaultModelCfg = data.data; // 设置默认模型配置
         } else {
-          console.error(data.status_message || '获取默认配置失败');
+          console.error(data.status_message || '获取可用模型失败');
         }
       } catch (error) {
-        console.error('获取默认模型配置失败:', error);
+        console.error('获取可用模型失败:', error);
       } finally {
         this.isLoading = false; // 加载完成
       }

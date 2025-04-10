@@ -21,13 +21,80 @@
     </div>
 
     <!-- 默认模型展示区域 -->
-    <a-card v-if="defaultModelCfg" class="default-model-card">
-      <h3>📌 当前默认模型配置</h3>
-      <p><strong>🏢 供应商:</strong> {{ getProviderName(defaultModelCfg.mark) }}</p>
-      <p><strong>🔑 API Key:</strong> {{ defaultModelCfg.api_key }}</p>
-      <p><strong>🌍 Base URL:</strong> {{ defaultModelCfg.base_url }}</p>
-      <p><strong>🧬 向量模型:</strong> {{ defaultModelCfg.embedding_name || '未设置' }}</p>
-      <p><strong>💬 大语言模型:</strong> {{ defaultModelCfg.llm_name || '未设置' }}</p>
+    <a-card v-if="groupedDefaultModelCfg" class="default-model-card">
+      <h3>📌 可用模型配置</h3>
+
+      <a-collapse>
+        <!-- 大语言模型区域 -->
+        <a-collapse-panel header="💬 大语言模型" key="1">
+          <div v-if="groupedDefaultModelCfg.llm.length > 0" class="model-type-section">
+            <a-card
+              v-for="model in groupedDefaultModelCfg.llm"
+              :key="model.id"
+              class="available-model-card"
+              size="small"
+            >
+              <template #title>
+                <div class="model-card-title">
+                  {{ model.name }}
+                  <a-popconfirm
+                    title="删除该大语言模型，会同步删除已创建的会话渠道，是否确认删除？"
+                    @confirm="handleDeleteAvailableModel(model)"
+                  >
+                    <a-button type="link" danger class="action-button">
+                      <template #icon><DeleteOutlined /></template>
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </template>
+              <p><strong>🏢 供应商:</strong> {{ getProviderName(model.mark) }}</p>
+              <p><strong>🔑 API Key:</strong> {{ model.api_key }}</p>
+              <p><strong>🌍 Base URL:</strong> {{ model.base_url }}</p>
+            </a-card>
+          </div>
+          <div v-else class="model-type-section">
+            <p>暂无可用大语言模型。</p>
+          </div>
+        </a-collapse-panel>
+
+        <!-- 向量模型区域 -->
+        <a-collapse-panel header="🧬 向量模型【暂不生效使用系统内置向量模型】" key="2">
+          <div v-if="groupedDefaultModelCfg.embedding.length > 0" class="model-type-section">
+            <a-card
+              v-for="model in groupedDefaultModelCfg.embedding"
+              :key="model.id"
+              class="available-model-card"
+              size="small"
+            >
+              <template #title>
+                <div class="model-card-title">
+                  {{ model.name }}
+                  <a-popconfirm
+                    title="删除该向量模型，会同步删除已创建的知识库，是否确认删除？"
+                    @confirm="handleDeleteAvailableModel(model)"
+                  >
+                    <a-button type="link" danger class="action-button">
+                      <template #icon><DeleteOutlined /></template>
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </div>
+              </template>
+              <p><strong>🏢 供应商:</strong> {{ getProviderName(model.mark) }}</p>
+              <p><strong>🔑 API Key:</strong> {{ model.api_key }}</p>
+              <p><strong>🌍 Base URL:</strong> {{ model.base_url }}</p>
+            </a-card>
+          </div>
+          <div v-else class="model-type-section">
+            <p>暂无可用向量模型。</p>
+          </div>
+        </a-collapse-panel>
+      </a-collapse>
+    </a-card>
+    <a-card v-else class="default-model-card">
+      <h3>📌 可用模型配置</h3>
+      <p>暂无可用模型配置。</p>
     </a-card>
 
     <div class="models-container">
@@ -39,11 +106,11 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'action'">
+            <a-button type="link" @click="handleSetDefault(record)" class="action-link">
+              ⭐ 添加模型
+            </a-button>
             <a-button type="link" @click="handleDeleteModel(record)" class="action-link">
               🗑️ 删除
-            </a-button>
-            <a-button type="link" @click="handleSetDefault(record)" class="action-link">
-              ⭐ 设默认
             </a-button>
           </template>
         </template>
@@ -78,30 +145,34 @@
     <!-- 设置默认弹窗 -->
     <a-modal
       v-model:open="setDefaultDialogVisible"
-      title="⭐ 设置为默认配置"
+      title="⭐ 添加可用模型"
       centered
       :destroyOnClose="true"
       @cancel="setDefaultDialogVisible = false"
     >
       <a-form :model="setDefaultForm" :label-col="{ span: 4 }">
-        <a-form-item label="🧬 向量模型" required>
+        <a-form-item label="模型类型" required>  <!-- 修改 Label 为 "模型类型" -->
           <a-select
-            v-model:value="setDefaultForm.embedding_name"
-            placeholder="请选择向量模型"
-            :options="availableModels"
+            v-model:value="setDefaultForm.modelType" 
+            placeholder="请选择模型类型"
+            :options="[  //  模型类型选项
+              { label: '🧬 向量模型', value: 'embedding' },
+              { label: '💬 大语言模型', value: 'llm' },
+            ]"
           />
         </a-form-item>
-        <a-form-item label="💬大语言模型" required>
+
+        <a-form-item label="选择模型" required>  <!-- 修改 Label 为 "选择模型" -->
           <a-select
-            v-model:value="setDefaultForm.llm_name"
-            placeholder="请选择大语言模型"
+            v-model:value="setDefaultForm.selectedModelName"
+            placeholder="请选择模型"
             :options="availableModels"
           />
         </a-form-item>
       </a-form>
       <template #footer>
         <a-button @click="setDefaultDialogVisible = false">取消</a-button>
-        <a-button type="primary" @click="saveSetDefault">保存</a-button>
+        <a-button type="primary" @click="addAvailableModel">添加</a-button>
       </template>
     </a-modal>
   </div>
@@ -114,13 +185,22 @@ import {
   listProviders, 
   createModelCfg, 
   deleteModelCfg, 
-  setDefaultModelCfg, 
   listModelCfg, 
   getAvailableModelCfg,
-  getDefaultCfg
+  getAvailableModelCfgList,
+  addAvailableModelCfg,
+  deleteAvailableModelCfg,
 } from '@/api/model_cfg';
 import { useDefaultModelStore } from '@/store/useDefaultModelStore';
 
+import {
+  CheckOutlined,
+  CloseOutlined,
+  PlusOutlined,
+  EyeOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from '@ant-design/icons-vue'
 
 interface Provider {
   id: string;
@@ -144,13 +224,13 @@ interface AvailableModel {
   value: string;
 }
 
-const defaultModelCfg = ref<ModelCfg | null>(null);
+const defaultModelCfg = ref<ModelCfg[] | null>(null);
 const providers = ref<Provider[]>([]);
 const models = ref<ModelCfg[]>([]);
 const addDialogVisible = ref(false);
 const setDefaultDialogVisible = ref(false);
 const addForm = ref<ModelCfg>({ id: '', mark: '', api_key: '', base_url: '' });
-const setDefaultForm = ref({ embedding_name: '', llm_name: '', model_cfg_id: '' });
+const setDefaultForm = ref({ modelType: '', selectedModelName: '', model_cfg_id: '' });
 const availableModels = ref<AvailableModel[]>([]);
 
 const modelColumns = [
@@ -159,6 +239,41 @@ const modelColumns = [
   { title: 'Base URL', dataIndex: 'base_url', key: 'base_url' },
   { title: '操作', key: 'action', scopedSlots: { customRender: 'action' } },
 ];
+
+const groupedDefaultModelCfg = computed(() => {
+  if (!defaultModelCfg.value) {
+    return { llm: [], embedding: [] }; //  返回空数组，避免空指针错误
+  }
+
+  const llmModels: ModelCfg[] = [];
+  const embeddingModels: ModelCfg[] = [];
+
+  defaultModelCfg.value.forEach(model => {
+    if (model.type === 'llm') {
+      llmModels.push(model);
+    } else if (model.type === 'embedding') {
+      embeddingModels.push(model);
+    }
+  });
+
+  return {
+    llm: llmModels,
+    embedding: embeddingModels,
+  };
+});
+
+const handleDeleteAvailableModel = async (model: ModelCfg) => {
+  try {
+    const { data } = await deleteAvailableModelCfg({ id: model.id });
+    if (data.status_code !== 200) throw new Error(data.status_message || '删除可用模型失败');
+
+    message.success('可用模型删除成功');
+    await fetchDefaultModelCfg(); // Refresh the model list
+  } catch (error) {
+    handleAPIError(error);
+  }
+};
+
 
 const handleAPIError = (error: any) => {
   const errorMessage = error.response?.data?.message || '请求处理失败，请稍后重试';
@@ -186,8 +301,8 @@ const fetchProviders = async () => {
 
 const fetchDefaultModelCfg = async () => {
   try {
-    const { data } = await getDefaultCfg();
-    if (data.status_code !== 200) throw new Error(data.status_message || '获取默认配置失败');
+    const { data } = await getAvailableModelCfgList();
+    if (data.status_code !== 200) throw new Error(data.status_message || '获取可用模型列表失败');
     defaultModelCfg.value = data.data;
 
     const defaultModelStore = useDefaultModelStore();
@@ -272,20 +387,20 @@ const handleSetDefault = async (model: ModelCfg) => {
   }
 };
 
-const saveSetDefault = async () => {
+const addAvailableModel = async () => {
   try {
-    const { data } = await setDefaultModelCfg({
-      model_cfg_id: setDefaultForm.value.model_cfg_id,
-      embedding_name: setDefaultForm.value.embedding_name,
-      llm_name: setDefaultForm.value.llm_name,
+    const { data } = await addAvailableModelCfg({
+      setting_id: setDefaultForm.value.model_cfg_id,
+      name: setDefaultForm.value.selectedModelName,
+      type: setDefaultForm.value.modelType,
     });
     
-    if (data.status_code !== 200) throw new Error(data.status_message || '设置默认失败');
+    if (data.status_code !== 200) throw new Error(data.status_message || '模型添加失败');
     
     setDefaultDialogVisible.value = false;
     await fetchDefaultModelCfg();
 
-    message.success('默认配置设置成功');
+    message.success('模型添加成功');
   } catch (error) {
     handleAPIError(error);
   }
