@@ -78,7 +78,18 @@
           <a-input v-model:value="CreateConversationForm.title" placeholder="请输入会话标题" />
         </a-form-item>
         <a-form-item label="模型" name="model" required>
-          <a-input v-model:value="CreateConversationForm.model" disabled />
+          <a-select
+            v-model:value="CreateConversationForm.model"
+            placeholder="请选择模型"
+          >
+            <a-select-option
+              v-for="model in defaultModelStore.defaultModelCfg"
+              :key="model.id"
+              :value="model.id"
+            >
+              {{ model.name }}
+            </a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="系统提示" name="system_prompt">
           <a-textarea v-model:value="CreateConversationForm.system_prompt" :rows="4" />
@@ -184,6 +195,7 @@ interface StreamMessage {
 interface CreateConversationParams extends Api.BaseConversationParams {
   use_memory: boolean;
   conv_id: string;
+  model: any;
 }
 
 
@@ -226,7 +238,7 @@ const commonChatOuterStyle = {
 const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
   system_prompt: '你是我的AI助手',
-  model: '',
+  model: defaultModelStore.defaultModelCfg && defaultModelStore.defaultModelCfg.length > 0 ? defaultModelStore.defaultModelCfg[0].id : null, 
   temperature: 0.3,
   knowledge_base_ids: [],
   use_memory: true, // 默认启用记忆
@@ -264,7 +276,7 @@ const fetchMessageHistory = async (convId: string) => {
         source: JSON.parse(msg.source),
         timestamp: new Date(msg.timestamp).getTime()
       }));
-      console.log(chats.value)
+      // console.log(chats.value)
     }
     else {
       console.error('获取消息历史失败:', res.data); // 打印错误信息
@@ -730,11 +742,15 @@ const handleDelete = async (convId: string) => {
 const handleEdit = (item) => {
   isEditing.value = true;
   isCreateDialogVisible.value = true;
+
   // 提取 knowledge_bases 中每个元素的 id
   const knowledgeBaseIds = item.knowledge_bases.map((kb) => kb.id);
+  // 查找匹配的模型对象，使用 available_model_id 进行匹配
+  const selectedModel = defaultModelStore.defaultModelCfg.find(model => model.id === item.available_model_id);
+  
   CreateConversationForm.value = {
     title: item.title,
-    model: defaultModelStore.defaultModelCfg?.llm_name,
+    model: selectedModel.name || null,
     system_prompt: item.system_prompt,
     temperature: item.temperature,
     knowledge_base_ids: knowledgeBaseIds,
@@ -746,16 +762,26 @@ const handleEdit = (item) => {
 // 提交会话创建/更新
 const handleConversationSubmit = async () => {
   try {
+    if (!CreateConversationForm.value.model) {
+      message.error('请选择模型'); // 提示用户选择模型
+      return;
+    }
+
+    // 使用对象解构排除 model 字段
+    const { model, ...rest } = CreateConversationForm.value;
     const submitForm = {
-      ...CreateConversationForm.value,
+      ...rest,
+      available_model_id: CreateConversationForm.value.model,
       use_memory: CreateConversationForm.value.use_memory ? 1 : 0 // Convert boolean to 1 or 0
     };
+
+    // console.log(submitForm)
 
     if (isEditing.value) {
       await updateConversation(submitForm as Api.UpdateConversationParams); // 强制类型转换
       message.success('会话更新成功');
     } else {
-      await createConversation(submitForm);
+      await createConversation(submitForm as Api.CreateConversationParams);
       message.success('会话创建成功');
     }
     await fetchConversations();
@@ -771,7 +797,7 @@ const handleModalClose = () => {
   isEditing.value = false;
   CreateConversationForm.value = {
     title: '新渠道',
-    model: defaultModelStore.defaultModelCfg?.llm_name,
+    model: defaultModelStore.defaultModelCfg && defaultModelStore.defaultModelCfg.length > 0 ? defaultModelStore.defaultModelCfg[0].id : null,
     system_prompt: '你是我的AI助手',
     temperature: 0.3,
     knowledge_base_ids: [],
@@ -792,14 +818,12 @@ onMounted(async () => {
   await fetchConversations();
   await fetchKnowledgeList();
   defaultModelStore.loadDefaultModelCfg();
-  CreateConversationForm.value.model = defaultModelStore.defaultModelCfg?.llm_name || '';
-  // console.log(activeKey.value)
 });
 
 // 监听模型配置变化
 watch(() => defaultModelStore.defaultModelCfg, (newVal) => {
-  if (newVal) {
-    CreateConversationForm.value.model = newVal.llm_name;
+  if (newVal && !CreateConversationForm.value.model && newVal.length > 0) {
+    CreateConversationForm.value.model = newVal[0];
   }
 }, { immediate: true });
 </script>

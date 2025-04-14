@@ -100,7 +100,7 @@ declare namespace Api {
    */
   type CreateConversationParams = {
     title?: string | null;
-    model: string;
+    available_model_id: string;
     system_prompt: string;
     temperature: number;
     knowledge_base_ids?: string[] | null;
@@ -130,6 +130,7 @@ declare namespace Api {
     temperature?: number | null;
     knowledge_base_ids?: string[] | null;
     use_memory?: number | null;
+    available_model_id?: string | null;
   };
 
   /**
