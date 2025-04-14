@@ -1,12 +1,14 @@
+from __future__ import annotations
 import uuid
 from typing import Optional
 
 from pydantic import BaseModel
+from sqlalchemy.orm import relationship
 
 from awsome.core.context import session_getter
 from awsome.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, ForeignKey
-from sqlmodel import Field, DateTime, text
+from sqlmodel import Field, DateTime, text, Relationship
 from datetime import datetime
 
 from awsome.models.dao.model_provider_cfg import ModelProviderCfg
@@ -20,6 +22,9 @@ class ModelAvailableCfgBase(AwsomeDBModel):
 
     setting_id: str = Field(sa_column=Column(String(255), ForeignKey('model_setting_cfg.id', ondelete='CASCADE'),
                                              index=True, nullable=False), description="模型供应商实质化ID")
+    # model_setting_cfg: Optional["ModelSettingCfg"] = Relationship(
+    #     sa_relationship=relationship("ModelSettingCfg", backref="model_available_cfg")
+    # )
 
     name: str = Field(sa_column=Column(String(255), index=False, nullable=False),
                       description="模型名称")
@@ -103,3 +108,11 @@ class ModelAvailableCfgDao:
             session.delete(delete_model_cfg)
             session.commit()
             return delete_model_cfg
+
+    @staticmethod
+    def select_cfg_info_by_id(id):
+        with session_getter() as session:
+                return session.query(ModelAvailableCfg, ModelSettingCfg, ModelProviderCfg) \
+                    .join(ModelSettingCfg, ModelAvailableCfg.setting_id == ModelSettingCfg.id) \
+                    .join(ModelProviderCfg, ModelSettingCfg.provider_id == ModelProviderCfg.id) \
+                    .filter(ModelAvailableCfg.id == id).first()

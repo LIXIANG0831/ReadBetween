@@ -1,4 +1,4 @@
-from awsome.models.dao.model_avaliable_cfg import ModelAvailableCfgDao, ModelAvailableCfg
+from awsome.models.dao.model_available_cfg import ModelAvailableCfgDao, ModelAvailableCfg
 from awsome.services.base import BaseService
 
 

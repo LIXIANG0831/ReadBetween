@@ -2,6 +2,14 @@ from pymilvus import FieldSchema, DataType
 
 from awsome.settings import get_config
 
+# 模型类型
+ModelType_LLM = "llm"
+ModelType_Embedding = "embedding"
+
+# Redis前缀
+PrefixRedisConversation = "conv_cfg_info:"
+Ex_PrefixRedisConversation = 30 * 60
+
 """
 Milvus 默认配置项
 """

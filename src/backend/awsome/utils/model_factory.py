@@ -3,6 +3,8 @@ import json
 from abc import ABC, abstractmethod
 import dashscope
 from openai import OpenAI
+
+from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from awsome.utils.redis_util import RedisUtil
 from awsome.services.constant import redis_default_model_key
 from awsome.utils.tools import EncryptionTool
@@ -24,10 +26,14 @@ class BaseModelProvider(ABC):
 
 class OpenAIModelProvider(BaseModelProvider):
     def __init__(self, config):
-        self.api_key = config.get("api_key")
-        self.base_url = config.get("base_url", "https://api.openai.com/v1")
-        self.llm_name = config.get("llm_name")
-        self.embedding_name = config.get("embedding_name")
+        self.api_key = config.api_key
+        self.base_url = config.base_url
+        if config.type == "llm":
+            self.llm_name = config.name
+            self.embedding_name = ""
+        elif config.type == "embedding":
+            self.embedding_name = config.name
+            self.llm_name = ""
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
@@ -54,10 +60,14 @@ class OpenAIModelProvider(BaseModelProvider):
 
 class CompatibleOpenAIModelProvider(BaseModelProvider):
     def __init__(self, config):
-        self.api_key = config.get("api_key")
-        self.base_url = config.get("base_url")
-        self.llm_name = config.get("llm_name")
-        self.embedding_name = config.get("embedding_name")
+        self.api_key = config.api_key
+        self.base_url = config.base_url
+        if config.type == "llm":
+            self.llm_name = config.name
+            self.embedding_name = ""
+        elif config.type == "embedding":
+            self.embedding_name = config.name
+            self.llm_name = ""
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
     async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
@@ -85,8 +95,8 @@ class CompatibleOpenAIModelProvider(BaseModelProvider):
 class QwenModelProvider(BaseModelProvider):
     def __init__(self, config):
         self.api_key = encryption_tool.decrypt(config.get("api_key"))
-        self.base_url = config.get("base_url")
-        self.llm_name = config.get("llm_name")
+        self.base_url = config.get("base_url") or ""
+        self.llm_name = config.get("llm_name") or ""
         self.embedding_name = config.get("embedding_name")
 
     async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
@@ -135,27 +145,21 @@ class ModelFactory:
         return cls._default_model_cfg
 
     @classmethod
-    def create_client(cls, config=None, **kwargs):
-        if config is None:
-            config = ModelFactory._get_default_model_config()
+    def create_client(cls, config: ModelAvailableCfgInfo = None, **kwargs):
+        # if config is None:
+        #     config = ModelFactory._get_default_model_config()
 
-        # 默认配置外 程序中可单独指定默认供应商的其他模型
-        if kwargs.get("embedding_name") is not None:
-            config["embedding_name"] = kwargs.get("embedding_name")
-        if kwargs.get("llm_name") is not None:
-            config["llm_name"] = kwargs.get("llm_name")
-
-        provider = config.get("mark")
-
+        # 解密API_KEY
+        config.api_key = encryption_tool.decrypt(config.api_key)
         # 构造缓存键
-        cache_key = json.dumps(config, sort_keys=True)
+        cache_key = json.dumps(config.model_dump_json(), sort_keys=True)
         # 检查缓存
         if cache_key in cls._client_cache:
             return cls._client_cache[cache_key]
-
-        if provider == "openai":
+        # 匹配模型供应商
+        if config.mark == "openai":  # 模型供应商标识
             client = OpenAIModelProvider(config)
-        elif provider == "openai-compatible":
+        elif config.mark == "openai-compatible":
             client = CompatibleOpenAIModelProvider(config)
         else:
             raise ValueError("Unsupported model provider")

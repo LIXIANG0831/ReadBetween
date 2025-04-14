@@ -19,11 +19,11 @@ def init_database():
             """获取配置文件模型供应商, 写入初始库"""
             default_model_provider_cfg: List[dict] = get_config("system.default_model_provider")
             default_model_provider = []
-            for model_provider in default_model_provider_cfg:
+            for model_provider in default_model_provider_cfg:  # 获取系统设置的供应商
                 for provider, mark in model_provider.items():
                     logger_util.debug(f"初始化模型供应商:{provider=}|{mark=}")
                     default_model_provider.append(ModelProviderCfg(provider=provider, mark=mark))
-            for model_provider in default_model_provider:
+            for model_provider in default_model_provider:  # 检查供应商是否已存在
                 if ModelProviderCfgService.search_provider(model_provider) is False:  # 供应商已存在
                     logger_util.debug(f"模型供应商:{model_provider.provider}已存在")
                     continue

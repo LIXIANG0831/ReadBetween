@@ -2,7 +2,7 @@ import json
 from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, HTTPException
 from awsome.models.schemas.response import resp_200, resp_500
-from awsome.models.v1.chat import ChatRequest
+from awsome.models.v1.chat import ChatRequest, ChatMessageSendPlus
 from awsome.utils.logger_util import logger_util
 from awsome.utils.model_factory import ModelFactory
 from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
@@ -50,9 +50,16 @@ async def list_conversations(page: int = 1, size: int = 10):
 @router.post("/conversations/messages/send", response_class=StreamingResponse)
 async def send_message(message_data: ChatMessageSend):
     try:
+        # 获取详细会话配置信息 通过缓存避免重复查询
+        conversation_info = await ChatService.get_conversation_info(message_data.conv_id)
         # 返回StreamingResponse包装的生成器
         return StreamingResponse(
-            ChatService.stream_chat_response(message_data),
+            ChatService.stream_chat_response(
+                ChatMessageSendPlus(
+                    **message_data.dict(),  # 解包ChatMessageSend
+                    conversation_info=conversation_info,
+                )
+            ),
             media_type="text/event-stream"  # 设置正确的媒体类型
         )
     except Exception as e:

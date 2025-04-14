@@ -1,8 +1,10 @@
+from __future__ import annotations
 import uuid
 from typing import Optional
+from sqlalchemy.orm import relationship
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String
-from sqlmodel import Field, DateTime, text
+from sqlalchemy import Column, String, ForeignKey
+from sqlmodel import Field, DateTime, text, Relationship
 from pydantic import BaseModel
 from awsome.models.dao.model_provider_cfg import ModelProviderCfg
 from awsome.core.context import session_getter
@@ -26,7 +28,11 @@ class ModelSettingCfgBase(AwsomeDBModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="模型ID")
 
-    provider_id: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型供应商ID")
+    provider_id:  str = Field(sa_column=Column(String(255), ForeignKey('model_provider_cfg.id', ondelete='CASCADE'),
+                                             index=True, nullable=False), description="模型供应商ID")
+    # model_provider_cfg: Optional["ModelProviderCfg"] = Relationship(
+    #     sa_relationship=relationship("ModelProviderCfg", backref="model_setting_cfg")
+    # )
     # f_model_class: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型种类")
     # f_model_name: str = Field(sa_column=Column(String(255), index=True, nullable=False), description="模型名称")
     api_key: str = Field(sa_column=Column(String(255), index=False, nullable=False), description="模型API_KEY")

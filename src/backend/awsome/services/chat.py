@@ -1,14 +1,20 @@
 import json
 from datetime import datetime
+
+from awsome.models.dao.model_available_cfg import ModelAvailableCfgDao
 from awsome.models.schemas.source import SourceMsg
 from awsome.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from awsome.models.dao.conversations import ConversationDao, Conversation
 from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
 from awsome.models.dao.messages import MessageDao
 from awsome.models.schemas.response import PageModel
-from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
+from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend, ChatMessageSendPlus
 from fastapi import HTTPException
 from typing import Generator, List
+
+from awsome.models.v1.chat import ConversationInfo
+from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
+from awsome.services.constant import ModelType_LLM, PrefixRedisConversation, Ex_PrefixRedisConversation
 from awsome.services.retriever import RetrieverService
 from awsome.services.tasks import celery_add_memory
 from awsome.utils.logger_util import logger_util
@@ -16,8 +22,11 @@ from awsome.utils.memory_util import MemoryUtil
 from awsome.utils.minio_util import MinioUtil
 from awsome.utils.model_factory import ModelFactory
 from awsome.utils.tools import WebSearchTool
+from awsome.utils.redis_util import RedisUtil
 
 minio_client = MinioUtil()
+redis_client = RedisUtil()
+
 
 class ChatService:
 
@@ -30,11 +39,19 @@ class ChatService:
             if len(existing_kbs) != len(create_data.knowledge_base_ids):
                 invalid_ids = set(create_data.knowledge_base_ids) - {kb.id for kb in existing_kbs}
                 raise HTTPException(status_code=404,
-                                    detail=f"Invalid knowledge base IDs: {invalid_ids}")
+                                    detail=f"无效的知识库ID: {invalid_ids}")
 
+        # 验证 available_model_id 是否符合要求
+        if create_data.available_model_id:
+            is_valid = ModelAvailableCfgDao.select_one(create_data.available_model_id).type == ModelType_LLM
+            if not is_valid:
+                raise HTTPException(status_code=500,
+                                    detail=f"模型类型有误 {create_data.available_model_id}")
+
+        # 创建会话渠道
         conv = await ConversationDao.create(
             title=create_data.title,
-            # model=create_data.model,
+            available_model_id=create_data.available_model_id,
             system_prompt=create_data.system_prompt,
             temperature=create_data.temperature,
             use_memory=create_data.use_memory
@@ -63,6 +80,8 @@ class ChatService:
             from awsome.services.constant import memory_config
             memory_util = MemoryUtil(memory_config)
             memory_util.delete_all_memories(user_id=conv_id)
+        # 再删除缓存
+        redis_client.delete(f"{PrefixRedisConversation}{conv_id}")
         # 再删除对话
         return await ConversationDao.soft_delete(conv_id)
 
@@ -76,8 +95,13 @@ class ChatService:
             system_prompt=update_data.system_prompt,
             temperature=update_data.temperature,
             knowledge_base_ids=update_data.knowledge_base_ids,
-            use_memory=update_data.use_memory
+            use_memory=update_data.use_memory,
+            available_model_id=update_data.available_model_id
         )
+
+        # 更新模型 则删除配置缓存
+        if update_data.available_model_id is not None:
+            redis_client.delete(f"{PrefixRedisConversation}{update_data.conv_id}")
 
         return await cls._format_conversation_response(
             await ConversationDao.one_with_kb(update_data.conv_id)
@@ -91,7 +115,7 @@ class ChatService:
         return PageModel(total=total, data=[{
             "id": conv.id,
             "title": conv.title,
-            # "model": conv.model,
+            "available_model_id": conv.available_model_id,
             "use_memory": conv.use_memory,
             "system_prompt": conv.system_prompt,
             "temperature": conv.temperature,
@@ -123,13 +147,14 @@ class ChatService:
         return await MessageDao.delete_conversation_messages(conv_id)
 
     @classmethod
-    async def stream_chat_response(cls, message_data: ChatMessageSend) -> Generator:
+    async def stream_chat_response(cls, message_data: ChatMessageSendPlus) -> Generator:
         """流式聊天处理"""
         # 来源信息
         source_msg_list: List[SourceMsg] = []
         # 获取对话配置
-        conversation: Conversation = await ConversationDao.get(message_data.conv_id)
-        if not conversation:
+        # TODO 通过 message_data 获取 conversation
+        conversation_info: ConversationInfo = message_data.conversation_info
+        if not conversation_info:
             raise HTTPException(status_code=404, detail="对话不存在")
 
         # 判断问答类型
@@ -149,10 +174,10 @@ class ChatService:
         final_query, first_query = cls._init_user_query(content, is_vl_query)
         # 获取知识库召回内容
         kb_source_list = None
-        if len(conversation.knowledge_bases) > 0 and is_vl_query is False:
+        if len(conversation_info.conversation.knowledge_bases) > 0 and is_vl_query is False:
             logger_util.debug(f"用户开启并使用知识库检索")
             try:
-                final_query, kb_source_list = await cls._append_kb_recall_msg(conversation.knowledge_bases, final_query)
+                final_query, kb_source_list = await cls._append_kb_recall_msg(conversation_info.conversation.knowledge_bases, final_query)
             except Exception as e:
                 logger_util.error(f"知识库召回内容失败: {e}")
 
@@ -166,7 +191,7 @@ class ChatService:
                 logger_util.error(f"网络检索失败：{e}")
 
         # 添加/召回记忆
-        if conversation.use_memory == 1 and is_vl_query is False:
+        if conversation_info.conversation.use_memory == 1 and is_vl_query is False:
             logger_util.debug(f"用户开启并使用记忆")
             try:
                 final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 1)
@@ -176,7 +201,7 @@ class ChatService:
 
         # 获取 历史记录
         # 构造 OpenAI 请求参数
-        system_prompt = [{'role': 'system', 'content': f'{conversation.system_prompt}'}]
+        system_prompt = [{'role': 'system', 'content': f'{conversation_info.conversation.system_prompt}'}]
         history_messages = await cls._build_openai_messages(message_data.conv_id)
         current_message = [{'role': 'user', 'content': final_query}]
         messages = system_prompt + history_messages + current_message
@@ -199,14 +224,16 @@ class ChatService:
             return
 
         try:
+            # 获取当前会话渠道模型配置
+            model_cfg: ModelAvailableCfgInfo = conversation_info.model_cfg
             # 创建模型调用客户端
-            client = ModelFactory.create_client()
+            client = ModelFactory.create_client(config=model_cfg)
             # 完整的模型回复
             full_response = []
             try:
                 response = await client.generate_text(
                     messages=messages,
-                    temperature=message_data.temperature or conversation.temperature,
+                    temperature=message_data.temperature or conversation_info.conversation.temperature,
                     max_tokens=message_data.max_tokens,
                     stream=True
                 )
@@ -247,7 +274,8 @@ class ChatService:
 
             if len(source_msg_list) != 0:
                 # yield f"data: [SOURCE] {[source_msg.to_dict() for source_msg in list(set(source_msg_list))]}\n\n"
-                yield cls._format_stream_response(event="SOURCE", text="", extra=[source_msg.to_dict() for source_msg in list(set(source_msg_list))])
+                yield cls._format_stream_response(event="SOURCE", text="", extra=[source_msg.to_dict() for source_msg in
+                                                                                  list(set(source_msg_list))])
             # yield f"data: [END]\n\n"
             yield cls._format_stream_response(event="END", text="")
 
@@ -273,7 +301,7 @@ class ChatService:
         return {
             "id": conv.id,
             "title": conv.title,
-            # "model": conv.model,
+            "available_model_id": conv.available_model_id,
             "system_prompt": conv.system_prompt,
             "temperature": conv.temperature,
             "knowledge_bases": [
@@ -419,3 +447,34 @@ class ChatService:
 6.  **Please respond in Chinese.**
 
             """, message
+
+    @classmethod
+    async def get_conversation_info(cls, conv_id):
+        # 拼接 Redis Key
+        conv_info_key = f"{PrefixRedisConversation}{conv_id}"
+        if redis_client.exists(conv_info_key):  # 缓存存在 直接返回
+            conv_info_from_redis = json.loads(redis_client.get(conv_info_key))
+            return ConversationInfo(
+                conversation=Conversation.parse_obj(conv_info_from_redis.get("conversation", {})),
+                model_cfg=ModelAvailableCfgInfo.parse_obj(conv_info_from_redis.get("model_cfg", {}))
+            )
+
+        conversation: Conversation = await ConversationDao.get(conv_id)
+        available, setting, provider = ModelAvailableCfgDao.select_cfg_info_by_id(conversation.available_model_id)
+        conversation_info = ConversationInfo(
+            conversation=conversation,
+            model_cfg=ModelAvailableCfgInfo(
+                type=available.type,
+                name=available.name,
+                api_key=setting.api_key,
+                base_url=setting.base_url,
+                mark=provider.mark
+            )
+        )
+
+        # 加入缓存 30分钟
+        redis_client.set(conv_info_key, conversation_info.model_dump_json(), Ex_PrefixRedisConversation)
+
+        return conversation_info
+
+

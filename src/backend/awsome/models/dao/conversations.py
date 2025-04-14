@@ -1,5 +1,10 @@
 from __future__ import annotations
+
+import copy
 from typing import List, Optional, TYPE_CHECKING
+
+from . import ModelAvailableCfg, ModelSettingCfg
+
 if TYPE_CHECKING:
     from .messages import Message
     from .conversation_knowledge_link import ConversationKnowledgeLink, ConversationKnowledgeLinkDao
@@ -9,7 +14,7 @@ import uuid
 from sqlalchemy.orm import Mapped, relationship, selectinload
 from sqlmodel import Field, Relationship
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, text, select, func
+from sqlalchemy import Column, String, Text, DateTime, text, select, func, ForeignKey, join
 
 from awsome.core.context import async_session_getter
 from awsome.models.dao.base import AwsomeDBModel
@@ -24,7 +29,6 @@ class ConversationBase(AwsomeDBModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="会话ID")
     title: Optional[str] = Field(sa_column=Column(String(255), index=True), description="对话标题")
-    # model: str = Field(sa_column=Column(String(50), nullable=False), default="gpt-3.5-turbo", description="使用模型")
     system_prompt: str = Field(sa_column=Column(Text), default="你是一个有用的助手", description="系统提示词")
     temperature: float = Field(default=0.7, ge=0, le=2, description="生成温度")
     delete: int = Field(default=0, index=True, description="删除标志")
@@ -46,6 +50,14 @@ class ConversationBase(AwsomeDBModel):
         ),
         description="更新时间"
     )
+    # 新增 available_model_id 字段，关联 model_available_cfg 表
+    available_model_id: Optional[str] = Field(
+        sa_column=Column(String(255), ForeignKey('model_available_cfg.id', ondelete='CASCADE'),  # CASCADE级联删除
+                         index=True, nullable=True), description="使用的可用模型配置ID")
+    # model_available_cfg: Optional["ModelAvailableCfg"] = Relationship(
+    #     sa_relationship=relationship("ModelAvailableCfg", backref="conversations")
+    #     # 添加 relationship，方便访问关联的 ModelAvailableCfg 对象
+    # )
 
 
 class Conversation(ConversationBase, table=True):
@@ -106,6 +118,11 @@ class ConversationDao:
             offset = (page - 1) * page_size
             stmt = (
                 select(Conversation)
+                # select(Conversation, ModelAvailableCfg.name, ModelAvailableCfg.type, ModelSettingCfg.api_key, ModelSettingCfg.base_url)
+                # .select_from(join(Conversation, ModelAvailableCfg,
+                #                   Conversation.available_model_id == ModelAvailableCfg.id,
+                #                   isouter=True))  # 使用 isouter=True 进行 LEFT JOIN
+                # .outerjoin(ModelSettingCfg, ModelAvailableCfg.setting_id == ModelSettingCfg.id)
                 .where(Conversation.delete == 0)
                 .options(
                     selectinload(Conversation.knowledge_links).selectinload(ConversationKnowledgeLink.knowledge)
@@ -146,7 +163,7 @@ class ConversationDao:
     @staticmethod
     async def update(conv_id: str, title: Optional[str] = None, system_prompt: Optional[str] = None,
                      temperature: Optional[float] = None, knowledge_base_ids: Optional[List[str]] = None,
-                     use_memory: Optional[int] = None):
+                     use_memory: Optional[int] = None, available_model_id: Optional[str] = None,):
 
         async with async_session_getter() as session:
             stmt = select(Conversation).where(
@@ -165,6 +182,8 @@ class ConversationDao:
                     conv.temperature = temperature
                 if use_memory is not None:
                     conv.use_memory = use_memory
+                if available_model_id is not None:
+                    conv.available_model_id = available_model_id
 
                 conv.updated_at = datetime.utcnow()  # 更新更新时间
                 await session.commit()
