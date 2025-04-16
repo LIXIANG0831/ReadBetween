@@ -51,11 +51,11 @@ import { theme } from 'ant-design-vue';
 import {
   listConversations,
 } from '@/api/conversations';
-import { useDefaultModelStore } from '@/store/useDefaultModelStore';
+import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import KnowledgeGraph from '@/components/KnowledgeGraph.vue'; // 引入 KnowledgeGraph 组件
 
 
-const defaultModelStore = useDefaultModelStore();
+const availableModelStore = useAvailableModelStore();
 const { token } = theme.useToken();
 
 // 状态管理
@@ -90,7 +90,7 @@ const handleConversationClick = ({ key }: { key: string }) => {
 // 初始化
 onMounted(async () => {
   await fetchConversations();
-  defaultModelStore.loadDefaultModelCfg();
+  availableModelStore.loadAvailableModelCfg();
 });
 
 // 筛选 use_memory 为 1 的会话

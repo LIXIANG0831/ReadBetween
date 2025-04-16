@@ -235,8 +235,8 @@ type SendMessageParams = {
     name: string;
     /** 知识库描述信息 */
     desc?: string;
-    /** 向量化模型 */
-    model?: string;
+    /** 可用向量化模型ID */
+    available_model_id?: string;
     /** collection名称 */
     collection_name?: string;
     /** index名称 */

@@ -191,7 +191,7 @@ import {
   addAvailableModelCfg,
   deleteAvailableModelCfg,
 } from '@/api/model_cfg';
-import { useDefaultModelStore } from '@/store/useDefaultModelStore';
+import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 
 import {
   CheckOutlined,
@@ -305,8 +305,8 @@ const fetchDefaultModelCfg = async () => {
     if (data.status_code !== 200) throw new Error(data.status_message || '获取可用模型列表失败');
     defaultModelCfg.value = data.data;
 
-    const defaultModelStore = useDefaultModelStore();
-    defaultModelStore.setDefaultModelCfg(data.data);
+    const availableModelStore = useAvailableModelStore();
+    availableModelStore.setAvailableModelCfg(data.data);
 
   } catch (error) {
     handleAPIError(error);

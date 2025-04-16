@@ -65,6 +65,9 @@
         <a-form-item label="知识库名称">
           <a-input v-model:value="editForm.name" />
         </a-form-item>
+        <a-form-item label="嵌入模型" required>
+          <a-input v-model:value="editForm.embedding_name" disabled />
+        </a-form-item>
         <a-form-item label="描述">
           <a-textarea v-model:value="editForm.desc" />
         </a-form-item>
@@ -86,24 +89,22 @@
         <a-form-item label="知识库名称" required>
           <a-input v-model:value="createForm.name" />
         </a-form-item>
+        <a-form-item label="嵌入模型" required>
+          <a-select
+            v-model:value="createForm.available_model_id"
+            placeholder="请选择嵌入模型"
+          >
+            <a-select-option
+              v-for="model in embeddingModelCfg"
+              :key="model.id"
+              :value="model.id"
+            >
+              {{ model.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="描述">
           <a-textarea v-model:value="createForm.desc" />
-        </a-form-item>
-        <a-form-item label="向量模型" required>
-          <a-input
-            v-model:value="createForm.model"
-            placeholder="请输入向量模型名称"
-            disabled
-          />
-          <!-- <a-select
-            v-model:value="createForm.model"
-            placeholder="请选择向量模型"
-          >
-            <a-select-option value="text-embedding-004"
-              >text-embedding-004</a-select-option
-            >
-            <a-select-option value="model2">模型2</a-select-option>
-          </a-select> -->
         </a-form-item>
         <a-form-item label="启用版面识别">
           <a-switch
@@ -124,7 +125,7 @@
 <script lang="ts" setup>
 import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDefaultModelStore } from '@/store/useDefaultModelStore';
+import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import {
   CheckOutlined,
   CloseOutlined,
@@ -144,14 +145,15 @@ interface Knowledge {
   id: string
   name: string
   desc: string
-  model: string
+  available_model_id: string
+  embedding_name?: string;
   enable_layout: number
   create_time: string
   update_time: string
 }
 
-const defaultModelStore = useDefaultModelStore();
-const defaultModelCfg = ref(null);
+const availableModelStore = useAvailableModelStore();
+const embeddingModelCfg = ref(null);
 const search = ref('')
 const tableData = ref<Knowledge[]>([])
 const editDialogVisible = ref(false)
@@ -160,7 +162,8 @@ const editForm = ref<Knowledge>({
   id: '',
   name: '',
   desc: '',
-  model: '',
+  available_model_id: '',
+  embedding_name: '',
   enable_layout: 0,
   create_time: '',
   update_time: '',
@@ -169,7 +172,7 @@ const createForm = ref<Knowledge>({
   id: '',
   name: '',
   desc: '',
-  model: '',
+  available_model_id: '',
   enable_layout: 0,
   create_time: '',
   update_time: '',
@@ -194,9 +197,9 @@ const columns = [
     key: 'desc',
   },
   {
-    title: '向量模型',
-    dataIndex: 'model',
-    key: 'model',
+    title: '嵌入模型',
+    dataIndex: 'embedding_name',
+    key: 'embedding_name',
   },
   {
     title: '启用版面识别',
@@ -237,17 +240,18 @@ const fetchKnowledgeList = async () => {
 onMounted(() => {
   fetchKnowledgeList();
   // 在组件挂载时加载默认模型配置
-  defaultModelStore.loadDefaultModelCfg();
-  defaultModelCfg.value = defaultModelStore.defaultModelCfg;
-  // console.log(defaultModelCfg.value)
+  availableModelStore.loadAvailableModelCfg();
+  embeddingModelCfg.value = availableModelStore.embeddingAvailableModelCfg;
+  // console.log(embeddingModelCfg.value)
 });
 
+// TODO 正确的监听变化
 // 监听 defaultModelCfg 的变化
-watch(defaultModelCfg, (newVal) => {
-  if (newVal) {
-    createForm.value.model = newVal.embedding_name || '未设置默认模型配置';
-  }
-}, { immediate: true });
+// watch(defaultModelCfg, (newVal) => {
+//   if (newVal) {
+//     createForm.value.model = newVal.embedding_name || '未设置默认模型配置';
+//   }
+// }, { immediate: true });
 
 const filterTableData = computed(() =>
   tableData.value.filter(
@@ -293,7 +297,7 @@ const handleCreate = () => {
     id: '',
     name: '',
     desc: '',
-    model: defaultModelCfg.value?.embedding_name || '',
+    available_model_id: embeddingModelCfg.value[0].id || '',
     enable_layout: 0,
     create_time: '',
     update_time: '',

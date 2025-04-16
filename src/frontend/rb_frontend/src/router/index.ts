@@ -3,7 +3,7 @@ import NProgress from 'nprogress';
 import exceptionRoutes from './route.exception';
 import asyncRoutes from './route.async';
 import commonRoutes from './route.common';
-import { useDefaultModelStore } from '../store/useDefaultModelStore';
+import { useAvailableModelStore } from '../store/useAvailableModelStore';
 import { message } from 'ant-design-vue';
 
 const routes: Array<RouteRecordRaw> = [
@@ -31,13 +31,13 @@ router.beforeEach((to, from) => {
   console.log('全局路由前置守卫：to,from\n', to, from);
   // 设置页面标题
   document.title = (to.meta.title as string) || import.meta.env.VITE_APP_TITLE;
-  const defaultModelStore = useDefaultModelStore();
+  const defaultModelStore = useAvailableModelStore();
   // 如果正在加载中，直接返回 true，允许导航继续
   if (defaultModelStore.isLoading) {
     return true;
   }
   // console.log('当前默认模型配置:', defaultModelStore.defaultModelCfg);
-  if (to.name !== 'model_cfg' && !defaultModelStore.defaultModelCfg) {
+  if (to.name !== 'model_cfg' && !defaultModelStore.allAvailableModelCfg) {
     message.error('未设置默认模型配置，请前往配置页面设置。');
     return { name: 'model_cfg' }; // 跳转到配置页面
   }

@@ -83,7 +83,7 @@
             placeholder="请选择模型"
           >
             <a-select-option
-              v-for="model in defaultModelStore.defaultModelCfg"
+              v-for="model in availableModelStore.llmAvailableModelCfg"
               :key="model.id"
               :value="model.id"
             >
@@ -170,7 +170,7 @@ import {
   sendMessage
 } from '@/api/conversations';
 import { listKnowledge } from '@/api/knowledge';
-import { useDefaultModelStore } from '@/store/useDefaultModelStore';
+import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 // import ChatInput from '@/components/ChatInput.vue';
 import { IconGlobeStroke } from '@kousum/semi-icons-vue';
@@ -212,7 +212,7 @@ const roleConfig = ref({
 
 
 
-const defaultModelStore = useDefaultModelStore();
+const availableModelStore = useAvailableModelStore();
 const { token } = theme.useToken();
 
 // 状态管理
@@ -238,7 +238,7 @@ const commonChatOuterStyle = {
 const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
   system_prompt: '你是我的AI助手',
-  model: defaultModelStore.defaultModelCfg && defaultModelStore.defaultModelCfg.length > 0 ? defaultModelStore.defaultModelCfg[0].id : null, 
+  model: availableModelStore.llmAvailableModelCfg && availableModelStore.llmAvailableModelCfg.length > 0 ? availableModelStore.llmAvailableModelCfg[0].id : null, 
   temperature: 0.3,
   knowledge_base_ids: [],
   use_memory: true, // 默认启用记忆
@@ -746,7 +746,7 @@ const handleEdit = (item) => {
   // 提取 knowledge_bases 中每个元素的 id
   const knowledgeBaseIds = item.knowledge_bases.map((kb) => kb.id);
   // 查找匹配的模型对象，使用 available_model_id 进行匹配
-  const selectedModel = defaultModelStore.defaultModelCfg.find(model => model.id === item.available_model_id);
+  const selectedModel = availableModelStore.llmAvailableModelCfg.find(model => model.id === item.available_model_id);
   
   CreateConversationForm.value = {
     title: item.title,
@@ -797,7 +797,7 @@ const handleModalClose = () => {
   isEditing.value = false;
   CreateConversationForm.value = {
     title: '新渠道',
-    model: defaultModelStore.defaultModelCfg && defaultModelStore.defaultModelCfg.length > 0 ? defaultModelStore.defaultModelCfg[0].id : null,
+    model: availableModelStore.llmAvailableModelCfg && availableModelStore.llmAvailableModelCfg.length > 0 ? availableModelStore.llmAvailableModelCfg[0].id : null,
     system_prompt: '你是我的AI助手',
     temperature: 0.3,
     knowledge_base_ids: [],
@@ -817,15 +817,15 @@ const handleConversationClick = ({ key }: { key: string }) => {
 onMounted(async () => {
   await fetchConversations();
   await fetchKnowledgeList();
-  defaultModelStore.loadDefaultModelCfg();
+  availableModelStore.loadAvailableModelCfg();
 });
 
 // 监听模型配置变化
-watch(() => defaultModelStore.defaultModelCfg, (newVal) => {
-  if (newVal && !CreateConversationForm.value.model && newVal.length > 0) {
-    CreateConversationForm.value.model = newVal[0];
-  }
-}, { immediate: true });
+// watch(() => availableModelStore.allAvailableModelCfg, (newVal) => {
+//   if (newVal && !CreateConversationForm.value.model && newVal.length > 0) {
+//     CreateConversationForm.value.model = newVal[0];
+//   }
+// }, { immediate: true });
 </script>
 
 <style scoped>
