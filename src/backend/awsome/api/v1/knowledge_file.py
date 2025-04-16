@@ -7,6 +7,7 @@ from fastapi import HTTPException, APIRouter, UploadFile, File, BackgroundTasks
 
 from awsome.models.dao.knowledge import Knowledge
 from awsome.models.dao.knowledge_file import KnowledgeFile
+from awsome.models.v1.knowledge import KnowledgeInfo
 from awsome.models.v1.knowledge_file import KnowledgeFileExecute, KnowledgeFileVectorizeTasks
 from awsome.services.tasks import celery_text_vectorize #bg_text_vectorize
 from awsome.settings import get_config
@@ -86,7 +87,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
             raise Exception(f"知识库{target_kb_id}不存在")
         # 上传文件列表到对应知识库
         enable_layout_flag = target_knowledge.enable_layout
-        embedding_name = target_knowledge.model
+        available_model_id = target_knowledge.available_model_id
         result: List[KnowledgeFile] = KnowledgeFileService.upload_files_to_kb(file_object_names, target_kb_id)
         if knowledge_file_execute.auto is False:
             # 不进行自动解析
@@ -133,6 +134,10 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
             for future in futures:  # 收集异步执行结果
                 file_info_list.append(future.result())
 
+            # 通过available_model_id获取embedding_cfg_info
+            knowledge_info: KnowledgeInfo = await KnowledgeService.get_knowledge_info(target_kb_id)
+            embedding_cfg_info = knowledge_info.model_cfg
+
             # 构建后台任务所需参数
             new_task = KnowledgeFileVectorizeTasks(target_kb_id=target_kb_id,
                                                    index_name=target_index_name,
@@ -142,7 +147,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
                                                    repeat_size=knowledge_file_execute.repeat_size,
                                                    separator=knowledge_file_execute.separator,
                                                    enable_layout=enable_layout_flag,
-                                                   embedding_name=embedding_name)
+                                                   embedding_cfg_info=embedding_cfg_info)
 
             # Desperate 后台执行任务
             # background_tasks.add_task(bg_text_vectorize, new_task)

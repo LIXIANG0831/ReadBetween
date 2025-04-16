@@ -146,9 +146,6 @@ class ModelFactory:
 
     @classmethod
     def create_client(cls, config: ModelAvailableCfgInfo = None, **kwargs):
-        # if config is None:
-        #     config = ModelFactory._get_default_model_config()
-
         # 解密API_KEY
         config.api_key = encryption_tool.decrypt(config.api_key)
         # 构造缓存键

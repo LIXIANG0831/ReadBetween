@@ -3,6 +3,7 @@ from awsome.core.celery_app import celery as ywjz_celery
 from awsome.models.dao.knowledge_file import KnowledgeFile
 from awsome.models.schemas.es.save_document import SaveDocument
 from awsome.models.v1.knowledge_file import KnowledgeFileVectorizeTasks
+from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.memory_util import MemoryUtil
 from awsome.utils.milvus_util import MilvusUtil
@@ -55,7 +56,8 @@ def celery_text_vectorize(self, task_json):
         # 实例化es
         es_client = ElasticSearchUtil()
         # 获取默认模型配置客户端
-        client = ModelFactory.create_client(embedding_name=knowledge_file_vectorize_task.embedding_name)
+        embed_config = ModelAvailableCfgInfo.parse_obj(knowledge_file_vectorize_task.embedding_cfg_info)
+        embed_client = ModelFactory.create_client(config=embed_config)
     except Exception as e:
         file_vectorize_err_msg += f"实例化异常:{e}\n"
         logger_util.exception(file_vectorize_err_msg)
@@ -122,7 +124,7 @@ def celery_text_vectorize(self, task_json):
             # milvus 插入数据
             insert_data = []
             for m_extract_result in extract_results:
-                chunk_vector = client.get_embeddings(inputs=[m_extract_result.get("chunk", "")])[0]
+                chunk_vector = embed_client.get_embeddings(inputs=[m_extract_result.get("chunk", "")])[0]
 
                 data = {
                     "bbox": str(m_extract_result.get("chunk_bboxes", "")),

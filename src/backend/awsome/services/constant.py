@@ -10,6 +10,8 @@ ModelType_Embedding = "embedding"
 PrefixRedisConversation = "conv_cfg_info:"
 Ex_PrefixRedisConversation = 30 * 60
 
+PrefixRedisKnowledge = "know_cfg_info:"
+
 """
 Milvus 默认配置项
 """
@@ -57,6 +59,7 @@ milvus_default_index_params = {
 常量
 """
 # 系统默认启用模型
+# Deprecated
 redis_default_model_key = "awsome_default_system_model"
 
 """

@@ -5,12 +5,15 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy.orm import Mapped, relationship
 
 from awsome.models.dao.base import AwsomeDBModel
-from sqlalchemy import Column, String, INT, select, func
+from sqlalchemy import Column, String, INT, select, func, ForeignKey
 from sqlmodel import Field, DateTime, text, Relationship
 from awsome.core.context import session_getter, async_session_getter
 from awsome.utils.logger_util import logger_util
 from datetime import datetime
 from fastapi import HTTPException
+
+from . import ModelAvailableCfg
+from ..v1.knowledge_file import KnowledgeMsg
 
 if TYPE_CHECKING:
     from .conversation_knowledge_link import ConversationKnowledgeLink
@@ -22,7 +25,6 @@ class KnowledgeBase(AwsomeDBModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True, index=True, description="主键ID")
     name: Optional[str] = Field(sa_column=Column(String(255), index=True, nullable=False), description="知识库名称")
     desc: Optional[str] = Field(default=None, sa_column=Column(String(255), index=False), description="知识库描述")
-    model: Optional[str] = Field(default=None, sa_column=Column(String(255)), description="向量化模型")
     collection_name: Optional[str] = Field(default=None, sa_column=Column(String(255)), description="Collection 名称")
     index_name: Optional[str] = Field(default=None, sa_column=Column(String(255)), description="Index 名称")
     enable_layout: Optional[int] = Field(default=0, sa_column=Column(INT), description="是否启用布局识别")
@@ -46,6 +48,10 @@ class KnowledgeBase(AwsomeDBModel):
             onupdate=text('CURRENT_TIMESTAMP')
         )
     )
+    # 新增 available_model_id 字段，关联 model_available_cfg 表
+    available_model_id: Optional[str] = Field(
+        sa_column=Column(String(255), ForeignKey('model_available_cfg.id', ondelete='CASCADE'),  # CASCADE级联删除
+                         index=True, nullable=True), description="使用的可用模型配置ID")
 
 
 class Knowledge(KnowledgeBase, table=True):
@@ -70,9 +76,9 @@ class Knowledge(KnowledgeBase, table=True):
 
 class KnowledgeDao:
     @classmethod
-    async def insert(cls, name, desc, model, collection_name, index_name, enable_layout):
+    async def insert(cls, name, desc, available_model_id, collection_name, index_name, enable_layout):
         async with async_session_getter() as session:
-            new_knowledge = Knowledge(name=name, desc=desc, model=model, collection_name=collection_name,
+            new_knowledge = Knowledge(name=name, desc=desc, available_model_id=available_model_id, collection_name=collection_name,
                                       index_name=index_name,
                                       enable_layout=enable_layout)
             session.add(new_knowledge)
@@ -115,11 +121,33 @@ class KnowledgeDao:
     @classmethod
     async def select(cls, kb_id=None, page=None, page_size=None):
         async with (async_session_getter() as session):
-            stmt = select(Knowledge).where(Knowledge.delete == 0).order_by(Knowledge.create_time.desc())
+            # 构造查询语句
+            stmt = (
+                select(Knowledge, ModelAvailableCfg.name)
+                .join(ModelAvailableCfg, Knowledge.available_model_id == ModelAvailableCfg.id)
+                .where(Knowledge.delete == 0)
+                .order_by(Knowledge.create_time.desc())
+            )
+
             if kb_id is not None:  # 查特定记录
-                knowledge = await session.execute(stmt.filter(Knowledge.id == kb_id))
-                knowledge = knowledge.scalar_one_or_none()
-                return knowledge
+                result = await session.execute(stmt.filter(Knowledge.id == kb_id))
+                knowledge = result.first()  # 获取单条记录
+                if knowledge:
+                    knowledge_data = {
+                        "id": knowledge[0].id,
+                        "name": knowledge[0].name,
+                        "desc": knowledge[0].desc,
+                        "collection_name": knowledge[0].collection_name,
+                        "index_name": knowledge[0].index_name,
+                        "enable_layout": knowledge[0].enable_layout,
+                        "create_time": knowledge[0].create_time,
+                        "update_time": knowledge[0].update_time,
+
+                        "embedding_name": knowledge[1]
+                    }
+                    return KnowledgeMsg(**knowledge_data)
+                else:
+                    return None
             else:  # 分页查询全部
                 if page is not None and page_size is not None:
                     offset = (page - 1) * page_size
@@ -127,9 +155,24 @@ class KnowledgeDao:
                 else:
                     result = await session.execute(stmt)
 
-                all_knowledge = result.scalars().all()
+                all_knowledge = result.all()
                 logger_util.info("Fetched all Knowledge entries.")
-                return all_knowledge
+                # 将结果转换为字典列表
+                all_knowledge_dicts = [
+                    KnowledgeMsg(
+                        id=knowledge[0].id,
+                        name=knowledge[0].name,
+                        desc=knowledge[0].desc,
+                        collection_name=knowledge[0].collection_name,
+                        index_name=knowledge[0].index_name,
+                        enable_layout=knowledge[0].enable_layout,
+                        create_time=knowledge[0].create_time,
+                        update_time=knowledge[0].update_time,
+
+                        embedding_name=knowledge[1]
+                    ) for knowledge in all_knowledge
+                ]
+                return all_knowledge_dicts
 
     @classmethod
     async def cnt_knowledge_total(cls):

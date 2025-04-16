@@ -1,4 +1,5 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -29,4 +30,19 @@ class KnowledgeFileVectorizeTasks(BaseModel):
     repeat_size: int
     separator: str
     enable_layout: int
+    embedding_cfg_info: dict
+
+
+class KnowledgeMsg(BaseModel):
+    id: str
+    name: Optional[str]
+    desc: Optional[str]
+    collection_name: Optional[str]
+    index_name: Optional[str]
+    enable_layout: Optional[int]
+    # 创建时间
+    create_time: Optional[datetime]
+    # 修改时间
+    update_time: Optional[datetime]
+    # 模型名称
     embedding_name: str

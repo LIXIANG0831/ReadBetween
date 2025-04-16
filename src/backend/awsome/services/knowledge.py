@@ -1,12 +1,16 @@
 import json
 
-from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate
+from awsome.core.init_app import redis_client
+from awsome.models.dao.model_available_cfg import ModelAvailableCfgDao
+from awsome.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate, KnowledgeInfo
+from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from awsome.services.base import BaseService
-from awsome.models.dao.knowledge import KnowledgeDao
+from awsome.models.dao.knowledge import KnowledgeDao, Knowledge
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.redis_util import RedisUtil
-from awsome.services.constant import milvus_default_index_params, milvus_default_fields_768, milvus_default_fields_1024
+from awsome.services.constant import milvus_default_index_params, milvus_default_fields_768, milvus_default_fields_1024, \
+    PrefixRedisKnowledge
 from fastapi import HTTPException
 import uuid
 from awsome.services.constant import redis_default_model_key
@@ -29,11 +33,6 @@ class KnowledgeService(BaseService):
         # TODO 同时创建Milvus-Collection
         new_milvus_collection_name = f"c_awsome_{uuid.uuid4().hex}"
         new_elastic_index_name = f"i_awsome_{uuid.uuid4().hex}"
-        # 允许knowledge_create模型为空 为空获取默认模型
-        if knowledge_create.model is None or knowledge_create.model == "":
-            if not redis_util.exists(redis_default_model_key):
-                raise HTTPException(status_code=500, detail=f"未设置默认模型配置")
-            knowledge_create.model = json.loads(redis_util.get(redis_default_model_key)).get("embedding_name")
         try:
             # 创建MilvusCollection
             milvus_client.create_collection(new_milvus_collection_name,  # 集合名
@@ -59,7 +58,7 @@ class KnowledgeService(BaseService):
 
         return await KnowledgeDao.insert(knowledge_create.name,
                                          knowledge_create.desc,
-                                         knowledge_create.model,
+                                         knowledge_create.available_model_id,
                                          knowledge_create.collection_name,
                                          knowledge_create.index_name,
                                          knowledge_create.enable_layout)
@@ -77,6 +76,10 @@ class KnowledgeService(BaseService):
             drop_es_index_name = drop_knowledge.index_name
             es_client.delete_index(drop_es_index_name)
 
+            # 拼接 Redis Key
+            know_info_key = f"{PrefixRedisKnowledge}{id}"
+            redis_client.delete(know_info_key)
+
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"删除Milvus集合异常: {str(e)}")
         await KnowledgeDao.delete_by_id(id)
@@ -84,6 +87,9 @@ class KnowledgeService(BaseService):
 
     @classmethod
     async def update_knowledge(cls, knowledge_update: KnowledgeUpdate):
+        # 拼接 Redis Key
+        know_info_key = f"{PrefixRedisKnowledge}{knowledge_update.id}"
+        redis_client.delete(know_info_key)
         return await KnowledgeDao.update(knowledge_update.id,
                                          knowledge_update.name,
                                          knowledge_update.desc)
@@ -97,3 +103,31 @@ class KnowledgeService(BaseService):
     @classmethod
     async def get_knowledge_by_id(cls, id):
         return await KnowledgeDao.select(id)
+
+    @classmethod
+    async def get_knowledge_info(cls, target_kb_id):
+        # 拼接 Redis Key
+        know_info_key = f"{PrefixRedisKnowledge}{target_kb_id}"
+        if redis_client.exists(know_info_key):  # 缓存存在 直接返回
+            conv_info_from_redis = json.loads(redis_client.get(know_info_key))
+            return KnowledgeInfo(
+                knowledge=Knowledge.parse_obj(conv_info_from_redis.get("knowledge", {})),
+                model_cfg=ModelAvailableCfgInfo.parse_obj(conv_info_from_redis.get("model_cfg", {}))
+            )
+
+        knowledge: Knowledge = await KnowledgeDao.select(target_kb_id)
+        available, setting, provider = ModelAvailableCfgDao.select_cfg_info_by_id(knowledge.available_model_id)
+        knowledge_info = KnowledgeInfo(
+            knowledge=knowledge,
+            model_cfg=ModelAvailableCfgInfo(
+                type=available.type,
+                name=available.name,
+                api_key=setting.api_key,
+                base_url=setting.base_url,
+                mark=provider.mark
+            )
+        )
+        # 加入缓存 不过期
+        redis_util.set(know_info_key, knowledge_info.model_dump_json())
+
+        return knowledge_info
