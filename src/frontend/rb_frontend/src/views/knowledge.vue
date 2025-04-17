@@ -8,7 +8,7 @@
         创建知识库 📚
       </a-button>
       <a-input
-        v-model:value="search"
+        v-model:value="searchKeyword"
         placeholder="🔍 输入知识库名称搜索"
         style="width: 200px"
         class="search-input"
@@ -45,9 +45,9 @@
 
     <!-- 分页组件 -->
     <a-pagination
-      v-model:current="pagination.current"
-      v-model:pageSize="pagination.pageSize"
-      :total="pagination.total"
+      v-model:current="paginationConfig.current"
+      v-model:pageSize="paginationConfig.pageSize"
+      :total="paginationConfig.total"
       show-size-changer
       @change="handlePageChange"
       @showSizeChange="handlePageChange"
@@ -56,46 +56,49 @@
 
     <!-- 编辑弹窗 -->
     <a-modal
-      v-model:open="editDialogVisible"
+      v-model:open="isEditDialogVisible"
       title="📝 编辑知识库"
-      @cancel="editDialogVisible = false"
+      @cancel="isEditDialogVisible = false"
       class="edit-modal"
     >
-      <a-form :model="editForm" :label-col="{ span: 4 }">
+      <a-form :model="editFormData" :label-col="{ span: 4 }">
         <a-form-item label="知识库名称">
-          <a-input v-model:value="editForm.name" />
+          <a-input v-model:value="editFormData.name" />
         </a-form-item>
         <a-form-item label="嵌入模型" required>
-          <a-input v-model:value="editForm.embedding_name" disabled />
+          <a-input v-model:value="editFormData.embedding_name" disabled />
         </a-form-item>
         <a-form-item label="描述">
-          <a-textarea v-model:value="editForm.desc" />
+          <a-textarea v-model:value="editFormData.desc" />
         </a-form-item>
       </a-form>
       <template #footer>
-        <a-button @click="editDialogVisible = false">取消</a-button>
+        <a-button @click="isEditDialogVisible = false">取消</a-button>
         <a-button type="primary" @click="saveEdit">保存</a-button>
       </template>
     </a-modal>
 
     <!-- 创建知识库弹窗 -->
     <a-modal
-      v-model:open="createDialogVisible"
+      v-model:open="isCreateDialogVisible"
       title="📚 创建知识库"
-      @cancel="createDialogVisible = false"
+      @cancel="isCreateDialogVisible = false"
       class="create-modal"
     >
-      <a-form :model="createForm" :label-col="{ span: 4 }">
+      <a-form :model="createFormData" :label-col="{ span: 4 }">
         <a-form-item label="知识库名称" required>
-          <a-input v-model:value="createForm.name" />
+          <a-input v-model:value="createFormData.name" />
         </a-form-item>
         <a-form-item label="嵌入模型" required>
           <a-select
-            v-model:value="createForm.available_model_id"
+            v-model:value="createFormData.available_model_id"
             placeholder="请选择嵌入模型"
           >
+            <a-select-option value="">
+              系统内置嵌入模型
+            </a-select-option>
             <a-select-option
-              v-for="model in embeddingModelCfg"
+              v-for="model in embeddingModelList"
               :key="model.id"
               :value="model.id"
             >
@@ -104,18 +107,18 @@
           </a-select>
         </a-form-item>
         <a-form-item label="描述">
-          <a-textarea v-model:value="createForm.desc" />
+          <a-textarea v-model:value="createFormData.desc" />
         </a-form-item>
         <a-form-item label="启用版面识别">
           <a-switch
-            v-model:checked="createForm.enable_layout"
+            v-model:checked="createFormData.enable_layout"
             :checkedValue="1"
             :unCheckedValue="0"
           />
         </a-form-item>
       </a-form>
       <template #footer>
-        <a-button @click="createDialogVisible = false">取消</a-button>
+        <a-button @click="isCreateDialogVisible = false">取消</a-button>
         <a-button type="primary" @click="saveCreate">创建</a-button>
       </template>
     </a-modal>
@@ -145,7 +148,7 @@ interface Knowledge {
   id: string
   name: string
   desc: string
-  available_model_id: string
+  available_model_id?: string | null;
   embedding_name?: string;
   enable_layout: number
   create_time: string
@@ -153,12 +156,12 @@ interface Knowledge {
 }
 
 const availableModelStore = useAvailableModelStore();
-const embeddingModelCfg = ref(null);
-const search = ref('')
-const tableData = ref<Knowledge[]>([])
-const editDialogVisible = ref(false)
-const createDialogVisible = ref(false)
-const editForm = ref<Knowledge>({
+const embeddingModelList = ref([]);
+const searchKeyword = ref('')
+const knowledgeList = ref<Knowledge[]>([])
+const isEditDialogVisible = ref(false)
+const isCreateDialogVisible = ref(false)
+const editFormData = ref<Knowledge>({
   id: '',
   name: '',
   desc: '',
@@ -168,7 +171,7 @@ const editForm = ref<Knowledge>({
   create_time: '',
   update_time: '',
 })
-const createForm = ref<Knowledge>({
+const createFormData = ref<Knowledge>({
   id: '',
   name: '',
   desc: '',
@@ -179,7 +182,7 @@ const createForm = ref<Knowledge>({
 })
 const router = useRouter()
 
-const pagination = ref({
+const paginationConfig = ref({
   current: 1,
   pageSize: 10,
   total: 0,
@@ -225,12 +228,12 @@ const columns = [
 const fetchKnowledgeList = async () => {
   try {
     const response = await listKnowledge({
-      page: pagination.value.current,
-      size: pagination.value.pageSize,
+      page: paginationConfig.value.current,
+      size: paginationConfig.value.pageSize,
     })
     if (response.data.status_code === 200) {
-      tableData.value = response.data.data.data || []
-      pagination.value.total = response.data.data.total || 0
+      knowledgeList.value = response.data.data.data || []
+      paginationConfig.value.total = response.data.data.total || 0
     }
   } catch (error) {
     console.error('请求知识库列表时发生错误:', error)
@@ -241,22 +244,23 @@ onMounted(() => {
   fetchKnowledgeList();
   // 在组件挂载时加载默认模型配置
   availableModelStore.loadAvailableModelCfg();
-  embeddingModelCfg.value = availableModelStore.embeddingAvailableModelCfg;
-  // console.log(embeddingModelCfg.value)
 });
 
-// TODO 正确的监听变化
-// 监听 defaultModelCfg 的变化
-// watch(defaultModelCfg, (newVal) => {
-//   if (newVal) {
-//     createForm.value.model = newVal.embedding_name || '未设置默认模型配置';
-//   }
-// }, { immediate: true });
+// 监听 embeddingAvailableModelCfg 的变化
+watch(
+  () => availableModelStore.embeddingAvailableModelCfg,
+  (newVal) => {
+    if (newVal) {
+      embeddingModelList.value = newVal;
+    }
+  },
+  { immediate: true }
+);
 
 const filterTableData = computed(() =>
-  tableData.value.filter(
+  knowledgeList.value.filter(
     (data) =>
-      !search.value || data.name.toLowerCase().includes(search.value.toLowerCase())
+      !searchKeyword.value || data.name.toLowerCase().includes(searchKeyword.value.toLowerCase())
   )
 )
 
@@ -265,15 +269,15 @@ const handleView = (kbId: string) => {
 }
 
 const handleEdit = (row: Knowledge) => {
-  editForm.value = { ...row }
-  editDialogVisible.value = true
+  editFormData.value = { ...row }
+  isEditDialogVisible.value = true
 }
 
 const saveEdit = async () => {
   try {
-    const updateResponse = await updateKnowledge(editForm.value)
+    const updateResponse = await updateKnowledge(editFormData.value)
     if (updateResponse.data.status_code === 200) {
-      editDialogVisible.value = false
+      isEditDialogVisible.value = false
       fetchKnowledgeList()
     }
   } catch (error) {
@@ -293,23 +297,27 @@ const handleDelete = async (id: string) => {
 }
 
 const handleCreate = () => {
-  createForm.value = {
+  createFormData.value = {
     id: '',
     name: '',
     desc: '',
-    available_model_id: embeddingModelCfg.value[0].id || '',
+    available_model_id: '',
     enable_layout: 0,
     create_time: '',
     update_time: '',
   }
-  createDialogVisible.value = true
+  isCreateDialogVisible.value = true
 }
 
 const saveCreate = async () => {
   try {
-    const createResponse = await createKnowledge(createForm.value)
+    // 如果选择的是"系统内置嵌入模型"，则将 available_model_id 设置为 null
+    if (createFormData.value.available_model_id === '') {
+      createFormData.value.available_model_id = null;
+    }
+    const createResponse = await createKnowledge(createFormData.value)
     if (createResponse.data.status_code === 200) {
-      createDialogVisible.value = false
+      isCreateDialogVisible.value = false
       fetchKnowledgeList()
     }
   } catch (error) {
@@ -318,8 +326,8 @@ const saveCreate = async () => {
 }
 
 const handlePageChange = (page: number, pageSize: number) => {
-  pagination.value.current = page
-  pagination.value.pageSize = pageSize
+  paginationConfig.value.current = page
+  paginationConfig.value.pageSize = pageSize
   fetchKnowledgeList()
 }
 </script>

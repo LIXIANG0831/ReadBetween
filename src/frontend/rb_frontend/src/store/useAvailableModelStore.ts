@@ -1,8 +1,22 @@
 import { defineStore } from 'pinia';
 import { getAvailableModelCfgList } from '@/api/model_cfg';
 
+interface ModelConfig {
+  id: string;
+  name: string;
+  type: string;
+  // 添加其他必要的字段
+}
+
+interface AvailableModelState {
+  allAvailableModelCfg: ModelConfig[] | null;
+  llmAvailableModelCfg: ModelConfig[];
+  embeddingAvailableModelCfg: ModelConfig[];
+  isLoading: boolean;
+}
+
 export const useAvailableModelStore = defineStore('availableModelStore', {
-  state: () => ({
+  state: (): AvailableModelState => ({
     allAvailableModelCfg: null, // 所有模型配置
     llmAvailableModelCfg: [], // LLM 类型的模型配置
     embeddingAvailableModelCfg: [], // Embedding 类型的模型配置
@@ -28,7 +42,7 @@ export const useAvailableModelStore = defineStore('availableModelStore', {
         this.isLoading = false; // 加载完成
       }
     },
-    setAvailableModelCfg(cfg) {
+    setAvailableModelCfg(cfg: ModelConfig[]) {
       this.allAvailableModelCfg = cfg; // 更新所有模型配置
       // 同时更新分类后的模型配置
       this.llmAvailableModelCfg = cfg.filter((model) => model.type === 'llm');

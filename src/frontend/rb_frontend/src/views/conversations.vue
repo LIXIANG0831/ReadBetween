@@ -817,15 +817,15 @@ const handleConversationClick = ({ key }: { key: string }) => {
 onMounted(async () => {
   await fetchConversations();
   await fetchKnowledgeList();
-  availableModelStore.loadAvailableModelCfg();
+  await availableModelStore.loadAvailableModelCfg();
 });
 
 // 监听模型配置变化
-// watch(() => availableModelStore.allAvailableModelCfg, (newVal) => {
-//   if (newVal && !CreateConversationForm.value.model && newVal.length > 0) {
-//     CreateConversationForm.value.model = newVal[0];
-//   }
-// }, { immediate: true });
+watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
+  if (newVal && newVal.length > 0 && !CreateConversationForm.value.model) {
+    CreateConversationForm.value.model = newVal[0].id;
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>
