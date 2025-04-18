@@ -10,7 +10,7 @@ COPY . /app
 RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 暴露端口
-EXPOSE 7999
+EXPOSE 8080
 
 # 环境变量区分应用
 ENV APP_ENV=prod
