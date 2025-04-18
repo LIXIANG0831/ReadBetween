@@ -299,7 +299,7 @@ const handleDelete = async (id: string) => {
 const handleCreate = () => {
   createFormData.value = {
     id: '',
-    name: '',
+    name: '新知识库',
     desc: '',
     available_model_id: '',
     enable_layout: 0,
