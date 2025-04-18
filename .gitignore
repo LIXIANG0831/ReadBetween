@@ -1,8 +1,8 @@
 # Byte-compiled / optimized / DLL files
-/src/backend/awsome/core/config_dev.yaml
-/src/backend/awsome/core/config_prod.yaml
-/src/backend/awsome/core/config_test.yaml
-/src/backend/awsome/static
+/src/backend/readbetween/core/config_dev.yaml
+/src/backend/readbetween/core/config_prod.yaml
+/src/backend/readbetween/core/config_test.yaml
+/src/backend/readbetween/static
 /src/backend/test/mineru/*/
 node_modules
 
