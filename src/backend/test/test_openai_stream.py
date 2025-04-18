@@ -1,8 +1,8 @@
 import asyncio
 import json
-from awsome.utils.logger_util import logger_util
+from readbetween.utils.logger_util import logger_util
 import openai
-from awsome.settings import get_config
+from readbetween.settings import get_config
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 

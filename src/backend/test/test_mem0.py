@@ -1,6 +1,6 @@
 import os
 from mem0 import Memory
-from awsome.settings import get_config
+from readbetween.settings import get_config
 
 # os.environ["OPENAI_API_KEY"] = get_config("api.openai.api_key")
 # os.environ["OPENAI_BASE_URL"] = get_config("api.openai.base_url")

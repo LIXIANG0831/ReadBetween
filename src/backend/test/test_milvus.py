@@ -1,6 +1,6 @@
 from openai import OpenAI
 from pymilvus import connections, Collection, CollectionSchema, FieldSchema, DataType, utility, Index
-from awsome.settings import get_config
+from readbetween.settings import get_config
 from pymilvus import MilvusClient
 from pymilvus.milvus_client.milvus_client import IndexParams
 

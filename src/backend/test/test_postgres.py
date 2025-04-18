@@ -4,7 +4,7 @@ import signal
 import sys
 import json
 from bs4 import BeautifulSoup
-from awsome.settings import get_config
+from readbetween.settings import get_config
 
 # 数据库 URI
 db_uri = get_config("storage.postgres.uri")

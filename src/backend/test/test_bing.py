@@ -1,5 +1,5 @@
 from langchain_community.utilities import BingSearchAPIWrapper
-from awsome.settings import get_config
+from readbetween.settings import get_config
 
 BING_SEARCH_URL = get_config("api.bing.endpoint")
 BING_SUBSCRIPTION_KEY = get_config("api.bing.api_key")

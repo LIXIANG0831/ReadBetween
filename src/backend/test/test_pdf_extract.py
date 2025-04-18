@@ -3,7 +3,7 @@ import copy
 import os
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextBox, LTTextLine
-from awsome.core.context import file_open
+from readbetween.core.context import file_open
 
 
 async def extract(pdf_file='/Users/lixiang/Documents/Test_Material/延长石油获过哪些荣誉.pdf', chunk_size=1000,

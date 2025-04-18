@@ -1,7 +1,7 @@
 from elasticsearch_dsl import Document, Date, Integer, Text, Keyword, connections, Long, Index, Search, analyzer, \
     token_filter, tokenizer, Nested
-from awsome.settings import get_config
-from awsome.utils.logger_util import logger_util
+from readbetween.settings import get_config
+from readbetween.utils.logger_util import logger_util
 
 es_hosts = get_config("storage.es.hosts")
 es_timeout = get_config("storage.es.timeout")

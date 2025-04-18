@@ -1,7 +1,7 @@
 import asyncio
 from typing import List, Dict, Any
-from awsome.settings import get_config
-from awsome.utils.logger_util import logger_util
+from readbetween.settings import get_config
+from readbetween.utils.logger_util import logger_util
 from tavily import TavilyClient
 from tavily.errors import UsageLimitExceededError
 from fastapi import HTTPException

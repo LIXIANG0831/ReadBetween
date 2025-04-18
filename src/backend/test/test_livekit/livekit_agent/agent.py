@@ -17,7 +17,7 @@ from livekit.agents import (
 from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import openai, silero, deepgram, cartesia
 
-from awsome.settings import get_config
+from readbetween.settings import get_config
 load_dotenv()
 
 logger = logging.getLogger("voice-assistant")
