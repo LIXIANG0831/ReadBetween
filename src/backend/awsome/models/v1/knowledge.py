@@ -8,7 +8,7 @@ from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
 class KnowledgeCreate(BaseModel):
     name: str = Field(..., examples=["新建知识库1"], description="知识库名称")
     desc: str = Field(None, examples=["知识库描述信息"], description="知识库描述信息")
-    available_model_id: str = Field(None, examples=["xxx-xxx-xxx-xxx"],
+    available_model_id: Optional[str] = Field(None, examples=["xxx-xxx-xxx-xxx"],
                                     description="可用向量化模型ID，None时使用系统内置模型")
     collection_name: str = Field(None, examples=[""], description="collection名称")
     index_name: str = Field(None, examples=[""], description="index名称")

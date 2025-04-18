@@ -6,6 +6,9 @@ from awsome.settings import get_config
 ModelType_LLM = "llm"
 ModelType_Embedding = "embedding"
 
+# 系统内置嵌入模型显示名称
+System_Embedding_Name = "系统内置嵌入模型"
+
 # Redis前缀
 PrefixRedisConversation = "conv_cfg_info:"
 Ex_PrefixRedisConversation = 30 * 60

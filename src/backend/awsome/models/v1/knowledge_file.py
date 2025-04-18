@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
+
 
 class UploadFileInfo(BaseModel):
     file_name: str = Field(..., examples=["测试.pdf"], description="数据库保存的文件名，用于前端展示")
@@ -30,7 +32,7 @@ class KnowledgeFileVectorizeTasks(BaseModel):
     repeat_size: int
     separator: str
     enable_layout: int
-    embedding_cfg_info: dict
+    embedding_cfg_info: ModelAvailableCfgInfo
 
 
 class KnowledgeMsg(BaseModel):

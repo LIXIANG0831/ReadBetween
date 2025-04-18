@@ -123,6 +123,24 @@ class QwenModelProvider(BaseModelProvider):
         return super().get_embeddings(inputs=inputs, **kwargs)
 
 
+class SystemModelProvider(BaseModelProvider):
+    def __init__(self, config):
+        self.api_key = config.api_key
+        self.base_url = config.base_url
+        if config.type == "llm":
+            self.llm_name = config.name
+            self.embedding_name = ""
+        elif config.type == "embedding":
+            self.embedding_name = config.name
+            self.llm_name = ""
+
+    async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
+        return None
+
+    def get_embeddings(self, inputs=None, **kwargs):
+        return super().get_embeddings(inputs=inputs, **kwargs)
+
+
 # 工厂类
 class ModelFactory:
     _default_model_cfg = None
@@ -130,7 +148,7 @@ class ModelFactory:
     _client_cache = {}  # 全局缓存模型调用Client
 
     @classmethod
-    def _get_default_model_config(cls):
+    def _get_default_model_config(cls):  # 已弃用
         if cls._default_model_cfg is None:
             default_model_cfg = cls.redis_util.get(redis_default_model_key)
             if default_model_cfg:
@@ -147,7 +165,7 @@ class ModelFactory:
     @classmethod
     def create_client(cls, config: ModelAvailableCfgInfo = None, **kwargs):
         # 解密API_KEY
-        config.api_key = encryption_tool.decrypt(config.api_key)
+        config.api_key = encryption_tool.decrypt(config.api_key) if config.api_key != "" else config.api_key
         # 构造缓存键
         cache_key = json.dumps(config.model_dump_json(), sort_keys=True)
         # 检查缓存
@@ -158,6 +176,8 @@ class ModelFactory:
             client = OpenAIModelProvider(config)
         elif config.mark == "openai-compatible":
             client = CompatibleOpenAIModelProvider(config)
+        elif config.mark == "system":  # 系统内置模型专用标识
+            client = SystemModelProvider(config)
         else:
             raise ValueError("Unsupported model provider")
 

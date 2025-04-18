@@ -10,7 +10,7 @@ from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.milvus_util import MilvusUtil
 from awsome.utils.redis_util import RedisUtil
 from awsome.services.constant import milvus_default_index_params, milvus_default_fields_768, milvus_default_fields_1024, \
-    PrefixRedisKnowledge
+    PrefixRedisKnowledge, System_Embedding_Name
 from fastapi import HTTPException
 import uuid
 from awsome.services.constant import redis_default_model_key
@@ -116,17 +116,29 @@ class KnowledgeService(BaseService):
             )
 
         knowledge: Knowledge = await KnowledgeDao.select(target_kb_id)
-        available, setting, provider = ModelAvailableCfgDao.select_cfg_info_by_id(knowledge.available_model_id)
-        knowledge_info = KnowledgeInfo(
-            knowledge=knowledge,
-            model_cfg=ModelAvailableCfgInfo(
-                type=available.type,
-                name=available.name,
-                api_key=setting.api_key,
-                base_url=setting.base_url,
-                mark=provider.mark
+        if knowledge.available_model_id:
+            available, setting, provider = ModelAvailableCfgDao.select_cfg_info_by_id(knowledge.available_model_id)
+            knowledge_info = KnowledgeInfo(
+                knowledge=knowledge,
+                model_cfg=ModelAvailableCfgInfo(
+                    type=available.type,
+                    name=available.name,
+                    api_key=setting.api_key,
+                    base_url=setting.base_url,
+                    mark=provider.mark
+                )
             )
-        )
+        else:
+            knowledge_info = KnowledgeInfo(
+                knowledge=knowledge,
+                model_cfg=ModelAvailableCfgInfo(
+                    type="embedding",
+                    name=System_Embedding_Name,
+                    api_key="",
+                    base_url="",
+                    mark="system"
+                )
+            )
         # 加入缓存 不过期
         redis_util.set(know_info_key, knowledge_info.model_dump_json())
 

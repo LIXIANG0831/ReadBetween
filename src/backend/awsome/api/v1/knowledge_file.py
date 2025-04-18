@@ -87,7 +87,6 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
             raise Exception(f"知识库{target_kb_id}不存在")
         # 上传文件列表到对应知识库
         enable_layout_flag = target_knowledge.enable_layout
-        available_model_id = target_knowledge.available_model_id
         result: List[KnowledgeFile] = KnowledgeFileService.upload_files_to_kb(file_object_names, target_kb_id)
         if knowledge_file_execute.auto is False:
             # 不进行自动解析

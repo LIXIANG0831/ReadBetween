@@ -10,11 +10,13 @@ from awsome.models.dao.messages import MessageDao
 from awsome.models.schemas.response import PageModel
 from awsome.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend, ChatMessageSendPlus
 from fastapi import HTTPException
-from typing import Generator, List
+from typing import Generator, List, Dict
 
 from awsome.models.v1.chat import ConversationInfo
+from awsome.models.v1.knowledge import KnowledgeInfo
 from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from awsome.services.constant import ModelType_LLM, PrefixRedisConversation, Ex_PrefixRedisConversation
+from awsome.services.knowledge import KnowledgeService
 from awsome.services.retriever import RetrieverService
 from awsome.services.tasks import celery_add_memory
 from awsome.utils.logger_util import logger_util
@@ -152,7 +154,6 @@ class ChatService:
         # 来源信息
         source_msg_list: List[SourceMsg] = []
         # 获取对话配置
-        # TODO 通过 message_data 获取 conversation
         conversation_info: ConversationInfo = message_data.conversation_info
         if not conversation_info:
             raise HTTPException(status_code=404, detail="对话不存在")
@@ -324,13 +325,20 @@ class ChatService:
         recall_chunk = ""
         source_list: List[SourceMsg] = []
         if knowledge_bases:
+            # 收集知识库及知识库所用模型信息
+            milvus_knowledge_info: Dict[ModelAvailableCfgInfo, List[Knowledge]] = {}
+            for knowledge in knowledge_bases:
+                knowledge_info: KnowledgeInfo = await KnowledgeService.get_knowledge_info(knowledge.id)
+                model_cfg = knowledge_info.model_cfg
+                knowledge_obj = knowledge_info.knowledge
+                if model_cfg not in milvus_knowledge_info:
+                    milvus_knowledge_info[model_cfg] = []
+                milvus_knowledge_info[model_cfg].append(knowledge_obj)
+
             retrieve_resp = await RetrieverService.retrieve(
                 query=message,
                 mode="both",
-                milvus_collection_names=[
-                    knowledge_base.collection_name
-                    for knowledge_base in knowledge_bases
-                ],
+                milvus_knowledge_info=milvus_knowledge_info,
                 milvus_fields=['text', 'title', 'source'],
                 es_index_names=[
                     knowledge_base.index_name

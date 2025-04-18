@@ -14,6 +14,7 @@ from fastapi import HTTPException
 
 from . import ModelAvailableCfg
 from ..v1.knowledge_file import KnowledgeMsg
+from ...services.constant import System_Embedding_Name
 
 if TYPE_CHECKING:
     from .conversation_knowledge_link import ConversationKnowledgeLink
@@ -123,31 +124,22 @@ class KnowledgeDao:
         async with (async_session_getter() as session):
             # 构造查询语句
             stmt = (
-                select(Knowledge, ModelAvailableCfg.name)
-                .join(ModelAvailableCfg, Knowledge.available_model_id == ModelAvailableCfg.id)
+                select(
+                    Knowledge,
+                    func.coalesce(ModelAvailableCfg.name, System_Embedding_Name).label("embedding_name")
+                )
+                .join(ModelAvailableCfg, Knowledge.available_model_id == ModelAvailableCfg.id, isouter=True)
                 .where(Knowledge.delete == 0)
                 .order_by(Knowledge.create_time.desc())
             )
-
+            """
+            查询特定知识库 仅返回Knowledge
+            分页查询知识库 返回KnowledgeMsg【Knowledge + embedding_name】
+            """
             if kb_id is not None:  # 查特定记录
                 result = await session.execute(stmt.filter(Knowledge.id == kb_id))
-                knowledge = result.first()  # 获取单条记录
-                if knowledge:
-                    knowledge_data = {
-                        "id": knowledge[0].id,
-                        "name": knowledge[0].name,
-                        "desc": knowledge[0].desc,
-                        "collection_name": knowledge[0].collection_name,
-                        "index_name": knowledge[0].index_name,
-                        "enable_layout": knowledge[0].enable_layout,
-                        "create_time": knowledge[0].create_time,
-                        "update_time": knowledge[0].update_time,
-
-                        "embedding_name": knowledge[1]
-                    }
-                    return KnowledgeMsg(**knowledge_data)
-                else:
-                    return None
+                knowledge = result.scalar_one_or_none()  # 获取单条记录
+                return knowledge
             else:  # 分页查询全部
                 if page is not None and page_size is not None:
                     offset = (page - 1) * page_size

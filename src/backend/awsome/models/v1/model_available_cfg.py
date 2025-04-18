@@ -15,3 +15,7 @@ class ModelAvailableCfgInfo(BaseModel):
     api_key: str = Field(..., examples=["sk-fe0253c8-84e8-418f-8cbf-2605ec520988"], description="API key")
     base_url: str = Field(..., examples=["https://dashscope.aliyuncs.com/compatible-mode/v1"], description="Base URL")
     mark: str = Field(..., examples=["openai"], description="供应商标识")
+
+    # 保障 ModelAvailableCfgInfo 作为 字典 key 时 能被正常hash
+    def __hash__(self):
+        return hash((self.type, self.name, self.api_key, self.base_url, self.mark))

@@ -3,7 +3,9 @@ import json
 import threading
 from typing import List, Dict, Union, Optional
 
+from awsome.models.dao import Knowledge
 from awsome.models.schemas.retriever import RetrieverResult
+from awsome.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from awsome.services.base import BaseService
 from awsome.utils.elasticsearch_util import ElasticSearchUtil
 from awsome.utils.logger_util import logger_util
@@ -15,7 +17,7 @@ class RetrieverService(BaseService):
     # 添加类属性
     _milvus_client = None
     _es_client = None
-    _model_client = None
+    # _model_client = None
 
     @classmethod
     def _get_clients(cls):
@@ -25,9 +27,7 @@ class RetrieverService(BaseService):
                 cls._milvus_client = MilvusUtil()
             if cls._es_client is None:
                 cls._es_client = ElasticSearchUtil()
-            if cls._model_client is None:
-                cls._model_client = ModelFactory().create_client()
-        return cls._milvus_client, cls._es_client, cls._model_client
+        return cls._milvus_client, cls._es_client
 
     @classmethod
     def _convert_milvus_result_to_retriever_result(cls, milvus_result: Dict) -> RetrieverResult:
@@ -74,7 +74,7 @@ class RetrieverService(BaseService):
             cls,
             query: str,
             mode: str = "both",  # 检索模式：'milvus', 'es', 'both'
-            milvus_collection_names: Optional[List[str]] = None,
+            milvus_knowledge_info: Dict[ModelAvailableCfgInfo, List[Knowledge]] = {},
             milvus_fields: List[str] = None,
             milvus_expr: str = None,
             milvus_search_params: str = None,
@@ -87,7 +87,7 @@ class RetrieverService(BaseService):
         检索服务，支持通过 Milvus 和 Elasticsearch 进行检索。
         :param query: 查询内容。
         :param mode: 检索模式，可选值为 'milvus'、'es' 或 'both'。
-        :param milvus_collection_names: Milvus 集合名称列表。
+        :param milvus_knowledge_info: Milvus 需要使用的知识库以知识库模型配置信息
         :param milvus_fields: Milvus 返回的字段列表。
         :param milvus_expr: Milvus条件过滤式
         :param milvus_search_params 索引查询参数
@@ -99,13 +99,13 @@ class RetrieverService(BaseService):
         """
 
         # 复用客户端
-        milvus_client, es_client, model_client = cls._get_clients()
+        milvus_client, es_client = cls._get_clients()
 
         # 并行执行
         tasks = []
         # 检索模式：仅使用 Milvus
         if mode in ["milvus", "both"]:
-            tasks.append(cls._milvus_search(milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, milvus_search_params, model_client))
+            tasks.append(cls._milvus_search(milvus_client, milvus_knowledge_info, query, top_k, milvus_fields, milvus_expr, milvus_search_params))
         # 检索模式：仅使用 Elasticsearch
         if mode in ["es", "both"]:
             tasks.append(cls._es_search(es_client, es_index_names, query, top_k, es_fields, es_query))
@@ -119,27 +119,35 @@ class RetrieverService(BaseService):
         return results
 
     @classmethod
-    async def _milvus_search(cls, milvus_client, milvus_collection_names, query, top_k, milvus_fields, milvus_expr, milvus_search_params, model_client):
-        if not milvus_collection_names:
-            logger_util.error("未指定 Milvus 集合名称列表")
-            raise ValueError("未指定 Milvus 集合名称列表")
+    async def _milvus_search(cls, milvus_client, milvus_knowledge_info: Dict[ModelAvailableCfgInfo, List[Knowledge]], query, top_k, milvus_fields, milvus_expr, milvus_search_params):
+        if not milvus_knowledge_info:
+            logger_util.error("未指定 Milvus 所需知识库配置信息")
+            raise ValueError("未指定 Milvus 所需知识库配置信息")
 
         # 获取查询向量
-        query_vector = model_client.get_embeddings(inputs=[query])[0]
+        # query_vector = model_client.get_embeddings(inputs=[query])[0]
         # query_vector = model_client.get_embeddings(query).data[0].embedding
 
         # 在 Milvus 中进行向量检索
         try:
-            milvus_results = milvus_client.search_vectors(
-                query_vectors=query_vector,
-                collection_names=milvus_collection_names,
-                top_k=top_k,
-                output_fields=milvus_fields,
-                expr=milvus_expr,
-                search_params=milvus_search_params
-            )  # List[Dict]
+            all_milvus_results = []
+            for key, value in milvus_knowledge_info.items():
+                # key 为 模型配置
+                # value 为 知识库信息
+                query_vector = ModelFactory().create_client(config=key).get_embeddings(inputs=[query])[0]
+                target_collections = [kb.collection_name for kb in value]
+
+                current_milvus_results = milvus_client.similarity_search(
+                    query_vector=query_vector,
+                    collection_names=target_collections,
+                    top_k=top_k,
+                    output_fields=milvus_fields,
+                    expr=milvus_expr,
+                    search_params=milvus_search_params
+                )  # List[Dict]
+                all_milvus_results.extend(current_milvus_results)
             # 转换 milvus_results 为统一检索数据结构
-            return [cls._convert_milvus_result_to_retriever_result(milvus_result) for milvus_result in milvus_results]
+            return [cls._convert_milvus_result_to_retriever_result(milvus_result) for milvus_result in all_milvus_results]
         except Exception as e:
             logger_util.error(f"Milvus 检索失败: {e}")
 

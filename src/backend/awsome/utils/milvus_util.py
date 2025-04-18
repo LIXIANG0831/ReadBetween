@@ -99,12 +99,12 @@ class MilvusUtil:
             raise MilvusException(message=f"向{collection_name}集合插入向量失败:{e}")
 
     @classmethod
-    def search_vectors(cls, query_vectors, collection_names, search_params=None, top_k=5, expr=None,
+    def similarity_search(cls, query_vector, collection_names, search_params=None, top_k=5, expr=None,
                        output_fields=None):
         """
         根据向量进行相似性搜索。
 
-        :param query_vectors: 查询向量。
+        :param query_vector: 查询向量。
         :param collection_names: 要搜索的集合名称列表。
         :param search_params: 搜索参数，如 {"metric_type": "L2", "params": {"nprobe": 10}}。
         :param top_k: 返回的最相似结果数量，默认为 5。
@@ -125,7 +125,7 @@ class MilvusUtil:
                 if output_fields is None:
                     output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
                 result: SearchResult = collection.search(
-                    data=[query_vectors],
+                    data=[query_vector],
                     anns_field="vector",
                     param=search_params,
                     limit=top_k,
