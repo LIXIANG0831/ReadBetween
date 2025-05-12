@@ -750,7 +750,7 @@ const handleEdit = (item) => {
   
   CreateConversationForm.value = {
     title: item.title,
-    model: selectedModel.name || null,
+    model: selectedModel?.id || null,  // 使用 id 而不是 name
     system_prompt: item.system_prompt,
     temperature: item.temperature,
     knowledge_base_ids: knowledgeBaseIds,
@@ -771,11 +771,9 @@ const handleConversationSubmit = async () => {
     const { model, ...rest } = CreateConversationForm.value;
     const submitForm = {
       ...rest,
-      available_model_id: CreateConversationForm.value.model,
+      available_model_id: model,  // 直接使用 model 值，因为它已经是 id
       use_memory: CreateConversationForm.value.use_memory ? 1 : 0 // Convert boolean to 1 or 0
     };
-
-    // console.log(submitForm)
 
     if (isEditing.value) {
       await updateConversation(submitForm as Api.UpdateConversationParams); // 强制类型转换

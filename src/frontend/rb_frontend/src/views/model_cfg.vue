@@ -180,7 +180,7 @@
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import { 
   listProviders, 
   createModelCfg, 
@@ -362,16 +362,24 @@ const saveAddModel = async () => {
   }
 };
 
-const handleDeleteModel = async (model: ModelCfg) => {
-  try {
-    const { data } = await deleteModelCfg({ id: model.id });
-    if (data.status_code !== 200) throw new Error(data.status_message || '删除配置失败');
-    
-    await fetchModels();
-    message.success('配置删除成功');
-  } catch (error) {
-    handleAPIError(error);
-  }
+const handleDeleteModel = async (record) => {
+  Modal.confirm({
+    title: '确认删除',
+    content: '删除该供应商渠道，会同步删除所有级联配置，是否确认删除？',
+    okText: '确认',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        const { data } = await deleteModelCfg({ id: record.id });
+        if (data.status_code !== 200) throw new Error(data.status_message || '删除配置失败');
+        
+        message.success('删除成功');
+        await fetchModels();
+      } catch (error) {
+        handleAPIError(error);
+      }
+    },
+  });
 };
 
 const handleSetDefault = async (model: ModelCfg) => {
