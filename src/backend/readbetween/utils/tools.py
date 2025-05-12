@@ -1,14 +1,12 @@
 import base64
 import binascii
-import json
 import time
 from typing import List, Dict, Optional
 from DrissionPage._pages.session_page import SessionPage
-import ast
-from readbetween.settings import get_config
+
+from readbetween.services.constant import SALT
 from cryptography.fernet import Fernet, InvalidToken
 import hashlib
-import asyncio
 import copy
 import os
 from pdfminer.high_level import extract_pages
@@ -91,10 +89,9 @@ class EncryptionTool:
     @staticmethod
     def get_salt() -> str:
         """从配置中获取盐值"""
-        # 假设 get_config 是一个从配置文件中获取值的函数
-        salt = get_config("extra.salt")
+        salt = SALT
         if not salt:
-            raise ValueError("Salt value is not configured. Please set the 'extra.salt' configuration.")
+            raise ValueError("Salt value is not configured. Please set the SALT in constant.py.")
         return salt
 
     def generate_key(self) -> bytes:

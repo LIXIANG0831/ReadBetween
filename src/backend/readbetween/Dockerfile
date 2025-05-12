@@ -12,9 +12,6 @@ RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 暴露端口
 EXPOSE 8080
 
-# 环境变量区分应用
-ENV APP_ENV=prod
-
 #设置时区
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone

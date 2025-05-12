@@ -390,3 +390,4 @@ yarg==0.1.9
 yarl==1.15.5
 zhconv==1.4.3
 zipp==3.21.0
+pydantic_settings==2.6.0

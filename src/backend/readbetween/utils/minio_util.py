@@ -1,7 +1,7 @@
 import os
 import tempfile
 from datetime import timedelta
-from readbetween.settings import get_config
+from readbetween.config import settings
 from readbetween.utils.logger_util import logger_util
 from minio import Minio
 from minio.error import S3Error
@@ -9,13 +9,13 @@ from minio.error import S3Error
 class MinioUtil:
 
     # 默认桶
-    default_bucket_name = get_config("storage.minio.default_bucket")
+    default_bucket_name = settings.storage.minio.default_bucket
 
     def __init__(self, endpoint=None, access_key=None, secret_key=None, secure=None):
-        secure = secure or get_config("storage.minio.secure")
-        endpoint = endpoint or get_config("storage.minio.minio_endpoint")
-        access_key = access_key or get_config("storage.minio.minio_access_key")
-        secret_key = secret_key or get_config("storage.minio.minio_secret_key")
+        secure = secure or settings.storage.minio.secure
+        endpoint = endpoint or settings.storage.minio.endpoint
+        access_key = access_key or settings.storage.minio.access_key
+        secret_key = secret_key or settings.storage.minio.secret_key
         self.client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
 
     def bucket_exists(self, bucket_name: str) -> bool:
@@ -39,6 +39,8 @@ class MinioUtil:
     def upload_file(self, file_path: str, object_name: str, bucket_name: str = default_bucket_name):
         """上传文件到 MinIO"""
         try:
+            if self.bucket_exists(bucket_name) is False:
+                self.create_bucket(bucket_name)
             with open(file_path, 'rb') as file_data:
                 file_stat = os.stat(file_path)
                 self.client.put_object(bucket_name, object_name, file_data, file_stat.st_size)

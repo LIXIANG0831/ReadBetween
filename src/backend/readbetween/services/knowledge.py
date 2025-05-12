@@ -1,6 +1,4 @@
 import json
-
-from readbetween.core.init_app import redis_client
 from readbetween.models.dao.model_available_cfg import ModelAvailableCfgDao
 from readbetween.models.v1.knowledge import KnowledgeCreate, KnowledgeUpdate, KnowledgeInfo
 from readbetween.models.v1.model_available_cfg import ModelAvailableCfgInfo
@@ -24,6 +22,9 @@ redis_util = RedisUtil()
 
 # 实例化es
 es_client = ElasticSearchUtil()
+
+# 实例化redis
+redis_client = RedisUtil()
 
 
 class KnowledgeService(BaseService):

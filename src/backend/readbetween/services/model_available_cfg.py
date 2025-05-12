@@ -9,8 +9,14 @@ class ModelAvailableCfgService(BaseService):
         return ModelAvailableCfgDao.insert(model_available_cfg_add)
 
     @classmethod
-    def delete_model_available_cfg(cls, id):
-        return ModelAvailableCfgDao.delete_by_id(id)
+    async def delete_model_available_cfg(cls, id):
+        from readbetween.models.dao.conversations import ConversationDao
+        from readbetween.models.dao.knowledge import KnowledgeDao
+        # 删除关联该模型的会话
+        await ConversationDao.delete_by_available_id(id)
+        # 删除关联该模型的知识库
+        await KnowledgeDao.delete_by_available_id(id)
+        return await ModelAvailableCfgDao.delete_by_id(id)
 
     @classmethod
     def get_model_available_cfg_list(cls):

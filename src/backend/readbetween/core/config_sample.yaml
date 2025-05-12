@@ -17,8 +17,6 @@ storage:
     default_bucket: "awsome"
   milvus:
     uri: "[http/https]://[HOST]:[PORT]"
-    host: "[HOST]"
-    port: "[PORT]"
   es:
     hosts: ["[http/https]://[HOST]:[PORT]"]
     timeout: 200
@@ -57,8 +55,6 @@ memory_only:
     dimension: 768
   milvus_memory_name: "[DIY_COLLECTION_NAME]"
 
-extra:
-  salt: "awsome" # 加密盐
 
 logger:
   base_log_path: "/Users/lixiang/Desktop/awsome_log"

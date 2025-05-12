@@ -1,11 +1,10 @@
-import subprocess
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from contextlib import asynccontextmanager
-from settings import get_config
 from core.init_app import init_database, init_embed_model
 from middleware import log_access
+import os
 
 
 @asynccontextmanager
@@ -40,8 +39,8 @@ def create_app():
         allow_headers=["*"],
     )
 
-    app.middleware("http")(log_access)
-    # TODO 添加中间件判断是否设置默认模型
+    # Deprecated 全局记录用户操作
+    # app.middleware("http")(log_access)
 
     from api.router import root_router
     app.include_router(root_router)
@@ -54,5 +53,4 @@ app = create_app()
 if __name__ == '__main__':
     import uvicorn
 
-    port = get_config("app.port")  # 运行端口
-    uvicorn.run(app, host='0.0.0.0', port=port, workers=1)
+    uvicorn.run(app, host='0.0.0.0', port=int(os.getenv("APP__PORT", 8080)), workers=1)

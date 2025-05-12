@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import copy
 from typing import List, Optional, TYPE_CHECKING
 
-from . import ModelAvailableCfg, ModelSettingCfg
 
 if TYPE_CHECKING:
     from .messages import Message
@@ -230,3 +228,30 @@ class ConversationDao:
 
             logger_util.info(f"Total count of Concersation entries: {total_count}")
             return total_count
+
+    @classmethod
+    async def delete_by_available_id(cls, id: str):
+        async with async_session_getter() as session:
+            # 查询所有与指定 model_available_cfg ID 相关联的 Conversation 记录
+            stmt = select(Conversation).where(
+                Conversation.available_model_id == id,
+                Conversation.delete == 0
+            )
+            result = await session.execute(stmt)
+            conversations = result.scalars().all()
+
+            # 如果没有找到相关记录，直接返回
+            if not conversations:
+                logger_util.info(f"No conversations found for model_available_cfg ID: {id}")
+                return
+
+            # 删除每个 Conversation 记录及其相关联的 ConversationKnowledgeLink 记录
+            for conv in conversations:
+                # 删除与 Conversation 相关联的 ConversationKnowledgeLink 记录
+                await ConversationKnowledgeLinkDao.delete(conv.id)
+                # 标记 Conversation 记录为已删除
+                conv.delete = 1
+
+            # 提交事务
+            await session.commit()
+            logger_util.info(f"Deleted conversations and their associated links for model_available_cfg ID: {id}")

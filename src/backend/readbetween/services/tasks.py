@@ -48,6 +48,7 @@ def celery_add_memory(self, query: str, user_id: str):
 def celery_text_vectorize(self, task_json):
     knowledge_file_vectorize_task = KnowledgeFileVectorizeTasks.parse_obj(task_json)
     file_vectorize_err_msg = ""  # 记录异常信息
+    logger_util.info("====》Celery 文档向量化任务开始执行")
     try:
         # 实例化minio_client
         minio_client = MinioUtil()
@@ -152,7 +153,7 @@ def celery_text_vectorize(self, task_json):
             update_file.status = 1
             KnowledgeFileService.update_file(update_file)
             logger_util.info("====》数据库数据更新状态")
-
+            logger_util.info("====》Celery 文档向量化任务执行结束")
             return "ok"
         except Exception as e:
             logger_util.error(f"任务失败，正在重试，重试次数：{self.request.retries}")
@@ -165,6 +166,7 @@ def celery_text_vectorize(self, task_json):
             update_file.extra = file_vectorize_err_msg
             KnowledgeFileService.update_file(update_file)
             logger_util.info("====》解析异常数据库更新状态")
+            logger_util.info("====》Celery 文档向量化任务执行异常")
 
             file_vectorize_err_msg = ""  # 清除错误信息
             logger_util.exception(file_vectorize_err_msg)

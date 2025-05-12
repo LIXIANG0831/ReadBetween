@@ -213,3 +213,27 @@ class KnowledgeDao:
                     status_code=500,
                     detail=f"数据库查询错误: {str(e)}"
                 )
+
+    @classmethod
+    async def delete_by_available_id(cls, id: str):
+        async with async_session_getter() as session:
+            # 查询所有与指定 model_available_cfg ID 相关联的 Knowledge 记录
+            stmt = select(Knowledge).where(
+                Knowledge.available_model_id == id,
+                Knowledge.delete == 0
+            )
+            result = await session.execute(stmt)
+            knowledges = result.scalars().all()
+
+            # 如果没有找到相关记录，直接返回
+            if not knowledges:
+                logger_util.info(f"No knowledges found for model_available_cfg ID: {id}")
+                return
+
+            # 删除每个 Knowledge 记录
+            for knowledge in knowledges:
+                knowledge.delete = 1
+
+            # 提交事务
+            await session.commit()
+            logger_util.info(f"Deleted knowledges for model_available_cfg ID: {id}")

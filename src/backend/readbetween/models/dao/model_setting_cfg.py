@@ -6,6 +6,7 @@ from readbetween.models.dao.base import AwsomeDBModel
 from sqlalchemy import Column, String, ForeignKey
 from sqlmodel import Field, DateTime, text, Relationship
 from pydantic import BaseModel
+
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.core.context import session_getter
 from datetime import datetime
@@ -77,6 +78,7 @@ class ModelSettingCfgDao:
         if delete_model_cfg is None:
             return None
         with session_getter() as session:
+            # 级联删除已配置的会话和知识库
             session.delete(delete_model_cfg)
             session.commit()
             return delete_model_cfg

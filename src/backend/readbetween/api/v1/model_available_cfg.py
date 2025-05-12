@@ -24,7 +24,7 @@ async def add_model_available_cfg(model_available_cfg_add: ModelAvailableCfgAdd)
 @router.post("/model_available_cfg/delete")
 async def delete_model_available_cfg(id):
     try:
-        return resp_200(ModelAvailableCfgService.delete_model_available_cfg(id))
+        return resp_200(await ModelAvailableCfgService.delete_model_available_cfg(id))
     except Exception as e:
         logger_util.error(f"删除可用模型配置异常: {e}")
         return resp_500(message=str(e))

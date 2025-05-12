@@ -1,5 +1,3 @@
-import asyncio
-import json
 from sklearn.decomposition import PCA
 import numpy as np
 from pymilvus import (
@@ -9,24 +7,20 @@ from pymilvus import (
     CollectionSchema,
     DataType, MilvusException, SearchResult
 )
-from readbetween.settings import get_config
+from readbetween.config import settings
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.model_factory import ModelFactory
 
 
 class MilvusUtil:
-    def __init__(self, host=None, port=None):
+    def __init__(self, uri=None):
         """
         初始化 MilvusUtil 实例并建立连接。
 
-        :param host: Milvus 服务的主机地址，默认从配置文件中获取。
-        :param port: Milvus 服务的端口号，默认从配置文件中获取。
+        :param uri: Milvus 服务的地址。
         """
         try:
-            host = host or get_config("storage.milvus.host")
-            port = port or get_config("storage.milvus.port")
-            self.host = host
-            self.port = port
+            self.url = uri or settings.storage.milvus.uri
             self.connect()
         except Exception as e:
             logger_util.error(f"初始化MilvusUtil失败：{e}")
@@ -39,7 +33,7 @@ class MilvusUtil:
         :return: None
         """
         try:
-            connections.connect("default", host=self.host, port=self.port)
+            connections.connect("default", uri=self.url)
         except MilvusException as e:
             logger_util.error(f"连接到Milvus失败:{e}")
             raise MilvusException(message=f"连接到Milvus失败:{e}")

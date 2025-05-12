@@ -100,7 +100,7 @@ class ModelAvailableCfgDao:
             return session.query(ModelAvailableCfg).filter(ModelAvailableCfg.id == id).first()
 
     @staticmethod
-    def delete_by_id(id):
+    async def delete_by_id(id):
         delete_model_cfg = ModelAvailableCfgDao.select_one(id)
         if delete_model_cfg is None:
             return None
@@ -108,6 +108,20 @@ class ModelAvailableCfgDao:
             session.delete(delete_model_cfg)
             session.commit()
             return delete_model_cfg
+
+    @staticmethod
+    def delete_by_setting_id(setting_id):
+        with session_getter() as session:
+            # 查询出所有需要删除的记录
+            delete_model_cfgs = session.query(ModelAvailableCfg).filter(
+                ModelAvailableCfg.setting_id == setting_id).all()
+            if not delete_model_cfgs:
+                return 0
+            # 删除记录
+            for delete_model_cfg in delete_model_cfgs:
+                session.delete(delete_model_cfg)
+            session.commit()
+            return len(delete_model_cfgs)
 
     @staticmethod
     def select_cfg_info_by_id(id):

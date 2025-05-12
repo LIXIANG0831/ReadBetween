@@ -4,6 +4,7 @@ from readbetween.utils.logger_util import logger_util
 from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
+from readbetween.config import settings
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
@@ -16,13 +17,13 @@ class DatabaseClient:
     engine: 'Engine' = None
     async_engine: 'AsyncEngine' = None
 
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str = None):
         """初始化数据库服务。
 
         Args:
             database_url (str): 数据库连接字符串。
         """
-        self.database_url = database_url
+        self.database_url = database_url or settings.storage.mysql.uri
         self.async_database_url = self.database_url.replace("pymysql","aiomysql")  # 支持异步的数据库链接
 
         # 检查类级别引擎是否已创建，如果未创建则创建
@@ -109,7 +110,3 @@ class DatabaseClient:
                 raise RuntimeError(f'建表异常 {table}') from exc  # 抛出运行时异常
 
         logger_util.debug('创建数据库表成功')  # 记录成功创建数据库和表的信息
-
-
-database_url = get_config("storage.mysql.uri")
-database_client: 'DatabaseClient' = DatabaseClient(database_url)

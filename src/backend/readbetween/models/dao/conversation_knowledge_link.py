@@ -12,7 +12,6 @@ from sqlmodel import Field, Relationship
 from readbetween.models.dao.knowledge import Knowledge
 from readbetween.utils.logger_util import logger_util
 
-
 if TYPE_CHECKING:
     from .conversations import Conversation
     from .knowledge import Knowledge
@@ -21,8 +20,8 @@ if TYPE_CHECKING:
 class ConversationKnowledgeLinkBase(AwsomeDBModel):
     __tablename__ = "conversation_knowledge_link"
 
-    conversation_id: str = Field(..., foreign_key="conversations.id", primary_key=True)
-    knowledge_base_id: str = Field(..., foreign_key="knowledge.id", primary_key=True)
+    conversation_id: str = Field(..., foreign_key="conversations.id", primary_key=True, ondelete="CASCADE")
+    knowledge_base_id: str = Field(..., foreign_key="knowledge.id", primary_key=True, ondelete="CASCADE")
 
     created_at: datetime = Field(
         sa_column=Column(
@@ -69,7 +68,8 @@ class ConversationKnowledgeLinkDao:
     @staticmethod
     async def create(conversation_id: str, knowledge_id: str) -> ConversationKnowledgeLink:
         async with async_session_getter() as session:
-            new_conv_kb_link = ConversationKnowledgeLink(conversation_id=conversation_id, knowledge_base_id=knowledge_id)
+            new_conv_kb_link = ConversationKnowledgeLink(conversation_id=conversation_id,
+                                                         knowledge_base_id=knowledge_id)
             session.add(new_conv_kb_link)
             await session.commit()
             await session.refresh(new_conv_kb_link)
@@ -96,8 +96,28 @@ class ConversationKnowledgeLinkDao:
                 logger_util.warning(
                     f"No conversation_knowledge_link found for deletion with conversation_id: {conv_id}")
 
-    @classmethod
-    async def get_active_links(cls, conv_id: str):
+    @staticmethod
+    async def delete_by_kb_id(kb_id: str):
+        async with async_session_getter() as session:
+            # 查询要删除的记录
+            stmt = select(ConversationKnowledgeLink).where(
+                ConversationKnowledgeLink.knowledge_base_id == kb_id
+            )
+            result = await session.execute(stmt)
+            links_to_delete = result.scalars().all()
+
+            # 如果有记录，执行删除
+            if links_to_delete:
+                for link in links_to_delete:
+                    await session.delete(link)
+                await session.commit()
+                logger_util.info(f"Hard deleted all conversation_knowledge_link for knowledge_base_id: {kb_id}")
+            else:
+                logger_util.warning(
+                    f"No conversation_knowledge_link found for deletion with knowledge_base_id: {kb_id}")
+
+    @staticmethod
+    async def get_active_links(conv_id: str):
         """获取会话所有有效知识库关联"""
         async with async_session_getter() as session:
             stmt = select(ConversationKnowledgeLink).where(
@@ -105,7 +125,6 @@ class ConversationKnowledgeLinkDao:
             )
             result = await session.execute(stmt)
             return result.scalars().all()
-
 
     @classmethod
     async def get_attached_knowledge(cls, conv_id: str) -> List[Knowledge]:

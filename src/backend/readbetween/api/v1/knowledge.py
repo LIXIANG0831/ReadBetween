@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+
+from readbetween.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
 from readbetween.services.knowledge import KnowledgeService
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.services.knowledge_file import KnowledgeFileService
@@ -22,6 +24,8 @@ async def delete_knowledge(id: str):
     try:
         # 删除对应文件记录
         await KnowledgeFileService.delete_by_kb_id(id)
+        # 删除会话-知识库关联信息
+        await ConversationKnowledgeLinkDao.delete_by_kb_id(id)
         logger_util.info(f"delete_knowledge_files done {id=}")
         return resp_200(await KnowledgeService.delete_knowledge(id))
     except Exception as e:

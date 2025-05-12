@@ -1,6 +1,8 @@
 from pymilvus import FieldSchema, DataType
-
 from readbetween.settings import get_config
+
+# 盐
+SALT = "readbetween"
 
 # 模型类型
 ModelType_LLM = "llm"

@@ -16,6 +16,7 @@ from readbetween.models.v1.chat import ConversationInfo
 from readbetween.models.v1.knowledge import KnowledgeInfo
 from readbetween.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation, Ex_PrefixRedisConversation
+from readbetween.services.conversation_knowledge_link import ConversationKnowledgeLinkService
 from readbetween.services.knowledge import KnowledgeService
 from readbetween.services.retriever import RetrieverService
 from readbetween.services.tasks import celery_add_memory
@@ -74,7 +75,7 @@ class ChatService:
         """软删除对话"""
         # 先删除关联消息
         await MessageDao.delete_conversation_messages(conv_id)
-        # 再删除知识库关联关系
+        # 再删除会话-知识库关联关系
         await ConversationKnowledgeLinkDao.delete(conv_id)
         # 再删除记忆
         conversation: Conversation = await ConversationDao.get(conv_id)
@@ -160,31 +161,32 @@ class ChatService:
 
         # 判断问答类型
         content = json.loads(message_data.message)
-        is_vl_query = False
+        is_multimodal_query = False
         if isinstance(content, str):  # 普通问答
             logger_util.debug("普通问答")
         elif isinstance(content, list):  # 多模态问答
             logger_util.debug("多模态问答")
             # 多模态问答时 忽略知识库/网络检索/记忆功能
-            is_vl_query = True
+            is_multimodal_query = True
         else:
             logger_util.error("数据类型既不是 str 也不是 list")
             raise Exception("数据类型既不是 str 也不是 list")
 
         # 最终给模型的用户输入[+RAG/Web等参考信息] 和 用户初始输入
-        final_query, first_query = cls._init_user_query(content, is_vl_query)
+        final_query, first_query = cls._init_user_query(content, is_multimodal_query)
         # 获取知识库召回内容
         kb_source_list = None
-        if len(conversation_info.conversation.knowledge_bases) > 0 and is_vl_query is False:
+        knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(conversation_info.conversation.id)  # 获取关联KB
+        if len(knowledge_bases) > 0 and is_multimodal_query is False:
             logger_util.debug(f"用户开启并使用知识库检索")
             try:
-                final_query, kb_source_list = await cls._append_kb_recall_msg(conversation_info.conversation.knowledge_bases, final_query)
+                final_query, kb_source_list = await cls._append_kb_recall_msg(knowledge_bases, final_query)
             except Exception as e:
                 logger_util.error(f"知识库召回内容失败: {e}")
 
         # 获取网络搜索内容
         web_source_list = None
-        if message_data.search is True and is_vl_query is False:
+        if message_data.search is True and is_multimodal_query is False:
             logger_util.debug(f"用户开启并使用网络检索")
             try:
                 final_query, web_source_list = await cls._append_web_search_msg(content, final_query)
@@ -192,7 +194,7 @@ class ChatService:
                 logger_util.error(f"网络检索失败：{e}")
 
         # 添加/召回记忆
-        if conversation_info.conversation.use_memory == 1 and is_vl_query is False:
+        if conversation_info.conversation.use_memory == 1 and is_multimodal_query is False:
             logger_util.debug(f"用户开启并使用记忆")
             try:
                 final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 1)
@@ -242,11 +244,17 @@ class ChatService:
                 # yield f"data: [START]\n\n"
                 yield cls._format_stream_response(event="START", text="")
                 for chunk in response:
-                    content = chunk.choices[0].delta.content or ""
-                    if content is not None:
-                        full_response.append(content)
-                        # yield f"data: {content}\n\n"
-                        yield cls._format_stream_response(event="MESSAGE", text=content)
+                    if hasattr(chunk, 'choices') and chunk.choices:
+                        if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+                            content = chunk.choices[0].delta.content or ""
+                            if content is not None:
+                                full_response.append(content)
+                                # yield f"data: {content}\n\n"
+                                yield cls._format_stream_response(event="MESSAGE", text=content)
+                        else:
+                            logger_util.debug("No delta or content in choices")
+                    else:
+                        logger_util.debug("No choices in chunk")
 
                         # await asyncio.sleep(0.02)  # 控制流式速度
             except Exception as e:

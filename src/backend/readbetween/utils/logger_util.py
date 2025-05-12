@@ -1,6 +1,6 @@
 import sys
 from loguru import logger
-from readbetween.settings import get_config
+from readbetween.config import settings
 
 class LoggerUtil:
     def __init__(self, log_file_path):
@@ -60,7 +60,7 @@ class LoggerUtil:
 
 
 # 获取日志文件路径配置
-base_log_path = get_config("logger.base_log_path")
+base_log_path = settings.logger.base_log_path
 # 创建 MyLogger 的实例并获取 logger
 logger_util = LoggerUtil(log_file_path=base_log_path).get_logger()
 

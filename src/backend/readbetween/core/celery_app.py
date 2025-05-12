@@ -16,7 +16,7 @@ def make_celery(app_name='ywjz-celery-tasks',
         timezone='Asia/Shanghai',  # 设置时区为上海
         enable_utc=False,  # 不使用 UTC 时间，因为已经设置了具体的时区
     )
-    celery.autodiscover_tasks(['awsome.services.tasks'])
+    celery.autodiscover_tasks(['readbetween.services.tasks'])
     return celery
 
 

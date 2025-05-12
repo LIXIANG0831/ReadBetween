@@ -3,14 +3,15 @@ from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
 from readbetween.utils.redis_util import RedisUtil
-from readbetween.utils.database_client import database_client
+from readbetween.utils.database_client import DatabaseClient
 from readbetween.settings import get_config
 from readbetween.utils.logger_util import logger_util
-
-redis_client = RedisUtil()
+from readbetween.config import settings
 
 
 def init_database():
+    database_client = DatabaseClient(settings.storage.mysql.uri)
+    redis_client = RedisUtil(settings.storage.redis.uri)
     """初始化数据库"""
     if redis_client.setNX('init_database', '1'):
         try:

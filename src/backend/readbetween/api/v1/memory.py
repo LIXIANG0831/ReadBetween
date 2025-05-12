@@ -1,6 +1,9 @@
 import json
 from typing import Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+
+from readbetween.config import Settings
+from readbetween.core.dependencies import get_settings
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.models.v1.memory import MemoryQuery
 from readbetween.utils.logger_util import logger_util
@@ -14,12 +17,12 @@ redis_util = RedisUtil()
 
 
 @router.post("/memory/query")
-async def query_memory(memory_query: MemoryQuery):
+async def query_memory(memory_query: MemoryQuery, settings: Settings = Depends(get_settings)):
     try:
         if _neo4j_driver is None:  # 未初始化Neo4j连接
-            neo4j_uri = get_config("memory_only.neo4j.url")
-            neo4j_user = get_config("memory_only.neo4j.username")
-            neo4j_password = get_config("memory_only.neo4j.password")
+            neo4j_uri = settings.memory.neo4j.url
+            neo4j_user = settings.memory.neo4j.username
+            neo4j_password = settings.memory.neo4j.password
             Neo4jClient.initialize(uri=neo4j_uri, user=neo4j_user, password=neo4j_password)
 
         query = f"MATCH (n)-[r]->(m) {memory_query.condition} " \

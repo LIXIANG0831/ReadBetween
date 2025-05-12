@@ -155,7 +155,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
             new_task_dict = new_task.dict()
             logger_util.info(f"调用Celery任务，参数: {new_task_dict}")
             celery_text_vectorize.delay(new_task_dict)
-            logger_util.info(f"Celery任务完成，参数: {new_task_dict}")
+            logger_util.info(f"任务已提交Celery，参数: {new_task_dict}")
 
             return resp_200(result)
     except Exception as e:

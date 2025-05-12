@@ -1,5 +1,6 @@
 import requests
 
+from readbetween.models.dao.model_available_cfg import ModelAvailableCfgDao
 from readbetween.models.v1.model_setting_cfg import ModelCfgCreate
 from readbetween.services.base import BaseService
 from readbetween.models.dao.model_setting_cfg import ModelSettingCfgDao
@@ -17,6 +18,8 @@ class ModelCfgService(BaseService):
 
     @classmethod
     def delete_model_cfg(cls, id):
+        # 级联删除可用模型配置
+        ModelAvailableCfgDao.delete_by_setting_id(id)
         return ModelSettingCfgDao.delete_by_id(id)
 
     @classmethod

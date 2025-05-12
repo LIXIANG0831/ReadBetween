@@ -1,7 +1,7 @@
 import redis
 from redis import ConnectionPool
 from typing import Optional, Any
-from readbetween.settings import get_config
+from readbetween.config import settings
 
 class RedisUtil:
     """封装 Redis 操作的工具类"""
@@ -13,7 +13,7 @@ class RedisUtil:
             url (str): Redis 服务器的连接 URL
             max_connections (int): 最大连接数
         """
-        url = url or get_config("storage.redis.uri")
+        url = url or settings.storage.redis.uri
         self.pool = ConnectionPool.from_url(url, max_connections=max_connections)
         self.client = redis.StrictRedis(connection_pool=self.pool)
 

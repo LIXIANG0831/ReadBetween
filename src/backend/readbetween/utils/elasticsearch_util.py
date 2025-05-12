@@ -1,8 +1,9 @@
 from elasticsearch_dsl import Document, Date, Integer, Text, Keyword, connections, Long, Index, Search, analyzer, \
     token_filter, tokenizer, Nested, Q
-from readbetween.settings import get_config
 from readbetween.utils.logger_util import logger_util
 from readbetween.models.schemas.es.base import BaseDocument
+from readbetween.config import settings
+
 
 
 class ElasticSearchUtil:
@@ -15,9 +16,9 @@ class ElasticSearchUtil:
         :param es_http_auth: HTTP 认证信息，默认从配置文件中获取。
         """
         # 如果未传入参数，则从配置文件中获取默认值
-        es_hosts = es_hosts or get_config("storage.es.hosts")
-        es_timeout = es_timeout or get_config("storage.es.timeout")
-        es_http_auth = es_http_auth or get_config("storage.es.http_auth")
+        es_hosts = es_hosts or settings.storage.es.hosts
+        es_timeout = es_timeout or settings.storage.es.timeout
+        es_http_auth = es_http_auth or settings.storage.es.http_auth
 
         # 连接到 Elasticsearch
         try:

@@ -2,9 +2,12 @@ from contextlib import contextmanager
 from contextlib import asynccontextmanager
 from sqlmodel import Session
 from sqlalchemy.ext.asyncio import AsyncSession
-from readbetween.utils.database_client import database_client
+from readbetween.utils.database_client import DatabaseClient
 from readbetween.utils.logger_util import logger_util
 import aiofiles
+from readbetween.config import settings
+
+database_client = DatabaseClient(settings.storage.mysql.uri)
 
 
 @asynccontextmanager
