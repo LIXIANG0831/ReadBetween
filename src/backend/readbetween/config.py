@@ -91,7 +91,7 @@ class SystemConfig(BaseModel):
         base_dir: str = "./static/models"
         embedding: EmbeddingConfig = EmbeddingConfig()
 
-    default_model_provider: List[str] = ""
+    default_model_provider: List[dict] = []
     models: ModelsConfig = ModelsConfig()
 
 

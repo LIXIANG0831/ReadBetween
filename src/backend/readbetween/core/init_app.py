@@ -4,7 +4,6 @@ from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
 from readbetween.utils.redis_util import RedisUtil
 from readbetween.utils.database_client import DatabaseClient
-from readbetween.settings import get_config
 from readbetween.utils.logger_util import logger_util
 from readbetween.config import settings
 
@@ -18,7 +17,7 @@ def init_database():
             database_client.create_db_and_tables()
 
             """获取配置文件模型供应商, 写入初始库"""
-            default_model_provider_cfg: List[dict] = get_config("system.default_model_provider")
+            default_model_provider_cfg: List[dict] = settings.system.default_model_provider
             default_model_provider = []
             for model_provider in default_model_provider_cfg:  # 获取系统设置的供应商
                 for provider, mark in model_provider.items():
@@ -38,8 +37,8 @@ def init_database():
 
 
 def init_embed_model():
-    embedding_model = get_config("system.models.embedding.name")
-    model_dir = get_config("system.models.base_dir")
+    embedding_model = settings.system.models.embedding.name
+    model_dir = settings.system.models.base_dir
 
     lem = LocalEmbedManager()
     lem.initialize(
