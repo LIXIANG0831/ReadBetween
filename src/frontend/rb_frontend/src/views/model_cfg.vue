@@ -8,11 +8,23 @@
         class="provider-card"
       >
         <h4>
-          <span v-if="provider.mark === 'openai'">🤖</span>
-          <span v-else-if="provider.mark === 'openai-compatible'">☁️</span>
-          <span v-else-if="provider.mark === 'qwen'">🌐</span>
-          <span v-else-if="provider.mark === 'hosted_vllm'">🦔</span>
-          {{ provider.provider }}
+          <span v-if="provider.mark === 'openai'">
+              <img src="@/assets/openai.svg" alt="OpenAI Icon" class="model-provider-icon" />
+          </span>
+          <span v-else-if="provider.mark === 'openai-compatible'">
+              <img src="@/assets/openai-compatible.svg" alt="OpenAI-Compatible Icon" class="model-provider-icon" />
+          </span>
+          <span v-else-if="provider.mark === 'qwen'">
+              <img src="@/assets/qwen.svg" alt="Qwen Icon" class="model-provider-icon" />
+          </span>
+          <span v-else-if="provider.mark === 'hosted_vllm'">
+              <img src="@/assets/vllm.svg" alt="vLLM Icon" class="model-provider-icon" />
+          </span>
+          
+          <span v-if="provider.provider === 'OpenAI-Compatible'">OpenAI兼容</span>
+          <span v-else-if="provider.provider === 'Qwen'">通义千问</span>
+          <span v-else>{{ provider.provider }}</span>
+
         </h4>
         <a-button type="primary" @click="handleAddModel(provider)" class="action-btn">
           🛠️ 添加配置
@@ -445,10 +457,10 @@ const addAvailableModel = async () => {
   border: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: center;   /* 这个属性负责子元素的水平居中 */
+  justify-content: space-between; /* 这个属性将 h4 推到顶部，按钮推到底部 */
   text-align: center;
-  padding: 24px;
+  padding: 24px; /* 这里的 padding-bottom: 24px 保证了按钮与卡片底部的间隙 */
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
@@ -457,13 +469,16 @@ const addAvailableModel = async () => {
   box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
 }
 
-.provider-card h3 {
-  font-size: 1.4rem;
-  margin-bottom: 16px;
-  color: #1f2937;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.provider-card h4 {
+  font-size: 1.4rem;     /* 保留你原来的字体大小 */
+  margin-bottom: 16px;   /* 保留你原来的下边距 */
+  color: #1f2937;        /* 保留你原来的颜色 */
+  
+  display: flex;         /* 启用 Flexbox 布局 */
+  flex-direction: column;/* 将子元素（图标span和文本span）垂直排列 */
+  align-items: center;   /* 在交叉轴上居中子元素（即水平居中） */
+  gap: 8px;              /* 在图标和文本之间添加 8px 的间距 (替换原有的水平间距) */
+  text-align: center;    /* 确保子元素内的文本内容也居中 (如果文本换行的话) */
 }
 
 .default-model-card {
@@ -557,4 +572,17 @@ strong {
   background: #f8fafc !important;
   font-weight: 600 !important;
 }
+
+.model-provider-icon {
+  width: 80px;  /* 设置宽度 */
+  height: 80px; /* 设置高度 */
+  display: block; /* 让图片表现得像一个块级元素，有助于布局稳定性 */
+}
+
+.provider-name-text {
+  /* 如果需要，可以在这里为文本添加特定样式，例如：*/
+  font-weight: 500;
+  line-height: 1.2;
+}
+
 </style>
