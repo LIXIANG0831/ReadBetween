@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING
-from readbetween.settings import get_config
 from readbetween.utils.logger_util import logger_util
 from sqlalchemy.exc import OperationalError
 from sqlmodel import Session, SQLModel, create_engine

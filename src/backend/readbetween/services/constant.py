@@ -1,5 +1,5 @@
 from pymilvus import FieldSchema, DataType
-from readbetween.settings import get_config
+from readbetween.config import settings
 
 # 盐
 SALT = "readbetween"
@@ -74,38 +74,38 @@ memory_config = {
     "llm": {  # LLM配置
         "provider": "openai",
         "config": {
-            "model": get_config("memory_only.llm.llm_name"),
+            "model": settings.memory.llm.llm_name,
             "temperature": 0.1,
             "max_tokens": 2000,
             "top_p": 0.3,
-            "api_key": get_config("memory_only.llm.api_key"),
-            "openai_base_url": get_config("memory_only.llm.base_url")
+            "api_key": settings.memory.llm.api_key,
+            "openai_base_url": settings.memory.llm.base_url
         }
     },
     "embedder": {
         "provider": "openai",
         "config": {
-            "model": get_config("memory_only.embedding.embedding_name"),
-            "embedding_dims": get_config("memory_only.embedding.dimension"),
-            "api_key": get_config("memory_only.embedding.api_key"),
-            "openai_base_url": get_config("memory_only.embedding.base_url")
+            "model": settings.memory.embedding.embedding_name,
+            "embedding_dims": settings.memory.embedding.dimension,
+            "api_key": settings.memory.embedding.api_key,
+            "openai_base_url": settings.memory.embedding.base_url
         }
     },
     "graph_store": {
         "provider": "neo4j",
         "config": {
             # "url": "neo4j+s://localhost:7687",
-            "url": get_config("memory_only.neo4j.url"),
-            "username": get_config("memory_only.neo4j.username"),
-            "password": get_config("memory_only.neo4j.password"),
+            "url": settings.memory.neo4j.url,
+            "username": settings.memory.neo4j.username,
+            "password": settings.memory.neo4j.password,
         }
     },
     "vector_store": {
         "provider": "milvus",
         "config": {
-            "collection_name": get_config("memory_only.milvus_memory_name"),
-            "embedding_model_dims": get_config("memory_only.embedding.dimension"),
-            "url": get_config("storage.milvus.uri")
+            "collection_name": settings.memory.milvus_memory_name,
+            "embedding_model_dims": settings.memory.embedding.dimension,
+            "url": settings.storage.milvus.uri
         }
     },
     "version": "v1.1"  # v1.1配置支持Graph

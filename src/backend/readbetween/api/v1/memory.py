@@ -8,7 +8,6 @@ from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.models.v1.memory import MemoryQuery
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.neo4j_client import Neo4jClient, _neo4j_driver
-from readbetween.settings import get_config
 from readbetween.utils.redis_util import RedisUtil
 
 router = APIRouter(tags=["记忆管理"])

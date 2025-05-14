@@ -1,8 +1,8 @@
 from celery import Celery
-from readbetween.settings import get_config
+from readbetween.config import settings
 
-celery_broker = get_config("storage.redis.uri") + "/11"
-celery_backend = get_config("storage.redis.uri") + "/12"
+celery_broker = f"{settings.storage.redis.uri}/11"
+celery_backend = f"{settings.storage.redis.uri}/12"
 
 
 def make_celery(app_name='ywjz-celery-tasks',
