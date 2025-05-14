@@ -602,6 +602,7 @@ const handleMessageSend = async (user_message: any) => {
 
     // ================= 事件处理器 =================
     const handleStreamEvent = (data: StreamMessage) => {
+      console.log(data.event)
       switch (data.event) {
         case 'START':
           // 初始化处理
@@ -620,6 +621,10 @@ const handleMessageSend = async (user_message: any) => {
 
         case 'END':
           handleStreamEnd();
+          break;
+        
+        case 'ERROR':
+          handleStreamError(data.text);
           break;
       }
     };
