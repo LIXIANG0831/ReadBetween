@@ -417,7 +417,7 @@ const chatBoxConfig = ref({
     // message.content为空时 MarkdownRender会报错
     if (message.status === "loading" || message.content === "") {
       return h("div", { class: className, style: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40px' } }, [ // Center align the spin and set minHeight
-        h(ASpin, { size: 'small' }) // Use ASpin for loading icon, size can be adjusted
+        h(ASpin, { size: 'default' }) // Use ASpin for loading icon, size can be adjusted
       ]);
     }
 
@@ -427,7 +427,8 @@ const chatBoxConfig = ref({
       ? message.source.map((item) => {
         let faviconUrl = '';
       if (item.source === 'kb') {
-        return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
+        // return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
+        return { ...item, avatar: 'src/assets/kb.svg' };
       } else if (item.source === 'web') {
         // 截取网站域名
         const urlObj = new URL(item.url);
