@@ -17,10 +17,10 @@ class BaseConfig(BaseSettings):
 # AppConfig
 class AppConfig(BaseModel):
     """应用配置"""
-    author: str = ""
-    version: str = ""
+    author: str = "LIXIANG"
+    version: str = "v1.0"
     port: int = 8080
-    env: str = "dev"
+    env: str = "prod"
 
 
 # StorageConfig

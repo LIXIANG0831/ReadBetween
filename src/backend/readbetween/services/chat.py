@@ -297,7 +297,7 @@ class ChatService:
             except Exception as delete_error:
                 logger_util.error(f"消息回滚失败: {delete_error}")
             # yield f"data: [ERROR] {e}\n\n"
-            cls._format_stream_response(event="ERROR", text=f"{e}")
+            yield cls._format_stream_response(event="ERROR", text=f"{e}")
 
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
