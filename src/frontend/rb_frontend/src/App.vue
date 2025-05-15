@@ -49,28 +49,28 @@ import VoiceInteraction from '@/components/VoiceInteraction.vue'
             <template #icon>
               <HomeOutlined />
             </template>
-            <span>🏠 渠道</span>
+            <span>渠道管理</span>
           </a-menu-item>
           
           <a-menu-item key="1">
             <template #icon>
               <BookOutlined />
             </template>
-            <span>📚 知识库管理</span>
+            <span>知识库管理</span>
           </a-menu-item>
 
           <a-menu-item key="2">
             <template #icon>
               <DeploymentUnitOutlined />
             </template>
-            <span>🧠 记忆管理</span>
+            <span>记忆管理</span>
           </a-menu-item>
 
           <a-menu-item key="3">
             <template #icon>
               <RocketOutlined />
             </template>
-            <span>🚀 模型管理</span>
+            <span>模型管理</span>
           </a-menu-item>
 
           <!-- <a-menu-item key="4">

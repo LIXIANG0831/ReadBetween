@@ -71,7 +71,7 @@
         </a-collapse-panel>
 
         <!-- 向量模型区域 -->
-        <a-collapse-panel header="🧬 向量模型【暂不生效使用系统内置向量模型】" key="2">
+        <a-collapse-panel header="🧬 嵌入模型【暂不生效使用系统内置嵌入模型】" key="2">
           <div v-if="groupedDefaultModelCfg.embedding.length > 0" class="model-type-section">
             <a-card
               v-for="model in groupedDefaultModelCfg.embedding"
@@ -83,7 +83,7 @@
                 <div class="model-card-title">
                   {{ model.name }}
                   <a-popconfirm
-                    title="删除该向量模型，会同步删除已创建的知识库，是否确认删除？"
+                    title="删除该嵌入模型，会同步删除已创建的知识库，是否确认删除？"
                     @confirm="handleDeleteAvailableModel(model)"
                   >
                     <a-button type="link" danger class="action-button">
@@ -99,7 +99,7 @@
             </a-card>
           </div>
           <div v-else class="model-type-section">
-            <p>暂无可用向量模型。</p>
+            <p>暂无可用嵌入模型。</p>
           </div>
         </a-collapse-panel>
       </a-collapse>
@@ -168,7 +168,7 @@
             v-model:value="setDefaultForm.modelType" 
             placeholder="请选择模型类型"
             :options="[  //  模型类型选项
-              { label: '🧬 向量模型', value: 'embedding' },
+              { label: '🧬 嵌入模型', value: 'embedding' },
               { label: '💬 大语言模型', value: 'llm' },
             ]"
           />

@@ -15,12 +15,12 @@
             </a-button>
             <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
               <template #icon>
-                <message-outlined />
+                <CommentOutlined />
               </template>
               <span>{{ item.title || `会话 ${item.id}` }}</span>
               <div class="action-icons">
-                <edit-outlined class="action-icon" @click.stop="handleEdit(item)" />
-                <delete-outlined class="action-icon" @click.stop="handleDelete(item.id)" />
+                <EditOutlined class="action-icon" @click.stop="handleEdit(item)" />
+                <DeleteOutlined class="action-icon" @click.stop="handleDelete(item.id)" />
               </div>
             </a-menu-item>
           </a-menu>
@@ -69,13 +69,13 @@
     <!-- 新建会话弹窗 -->
     <a-modal
       v-model:open="isCreateDialogVisible"
-      :title="isEditing ? '编辑会话' : '新建会话'"
+      :title="isEditing ? '编辑渠道' : '新建渠道'"
       width="500px"
       @cancel="handleModalClose"
     >
       <a-form :model="CreateConversationForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
-        <a-form-item label="会话标题" name="title">
-          <a-input v-model:value="CreateConversationForm.title" placeholder="请输入会话标题" />
+        <a-form-item label="渠道标题" name="title">
+          <a-input v-model:value="CreateConversationForm.title" placeholder="请输入渠道标题" />
         </a-form-item>
         <a-form-item label="模型" name="model" required>
           <a-select
@@ -141,7 +141,7 @@
 
 <script setup lang="ts">
 
-import { Chat, Button, MarkdownRender } from '@kousum/semi-ui-vue';
+import { Chat, Button, MarkdownRender, Tooltip } from '@kousum/semi-ui-vue';
 import { ref, onMounted, computed, watch, h } from 'vue';
 import {
   message,
@@ -152,14 +152,15 @@ import {
   Slider as ASlider,
   Menu as AMenu,
   Spin as ASpin,
-  Switch as ASwitch // 引入 Switch 组件
+  Switch as ASwitch, // 引入 Switch 组件
+  theme
 } from 'ant-design-vue';
 import {
   DeleteOutlined,
   EditOutlined,
-  MessageOutlined
+  CommentOutlined,
+  GlobalOutlined
 } from '@ant-design/icons-vue';
-import { theme } from 'ant-design-vue';
 import {
   createConversation,
   listConversations,
@@ -173,7 +174,6 @@ import { listKnowledge } from '@/api/knowledge';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 // import ChatInput from '@/components/ChatInput.vue';
-import { IconGlobeStroke } from '@kousum/semi-icons-vue';
 import escapeHtml from 'escape-html';
 
 
@@ -202,11 +202,11 @@ interface CreateConversationParams extends Api.BaseConversationParams {
 const roleConfig = ref({
   user: {
     name: 'User',
-    avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/docs-icon.png'
+    avatar: 'src/assets/human.svg'
   },
   assistant: {
     name: 'Assistant',
-    avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/other/logo.png'
+    avatar: 'src/assets/bot.svg'
   }
 });
 
@@ -469,36 +469,42 @@ const chatBoxConfig = ref({
 const isSearchEnabled = ref(false);
 const toggleSearch = () => isSearchEnabled.value = !isSearchEnabled.value;
 const renderCustomInput = (props) => {
-  return h('div', { style: { display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' } }, [
-    // 默认输入框（占据剩余空间）
-    h('div', { style: { flexGrow: 1 } }, [ // 使用 div 包裹 defaultNode 并设置 flexGrow
-        props.defaultNode
-    ]),
+  return h('div', 
+    { style: { display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' } }, 
+    [
+      // 默认输入框（占据剩余空间）
+      h('div', { style: { flexGrow: 1 } }, [ // 使用 div 包裹 defaultNode 并设置 flexGrow
+          props.defaultNode
+      ]),
+      // 网络搜索图标按钮
+      h(Button, {
+        type: isSearchEnabled.value ? 'primary' : 'tertiary',
+        onClick: toggleSearch,
+        icon: () => h(Tooltip, { content: '联网搜索' }, [
+          h(GlobalOutlined, {
+            style: {
+              fontSize: '24px', // 设置图标大小
+            },
+          })
+        ]),
+        theme: "borderless",
+        style: {
+          paddingRight: '8px',
+          flexShrink: 0,
+          padding: '6px',
+          borderRadius: '50%',
+          width: '48px',     // Fixed width and height for button size
+          height: '48px',
+          border: 'none',
+          display: 'flex',       // Ensure icon is centered
+          alignItems: 'center',  // Vertically center icon
+          justifyContent: 'center' // Horizontally center icon
+        } // 调整图标按钮样式，去除文字部分的padding
+      })
 
-    // 网络搜索图标按钮
-    h(Button, {
-      type: isSearchEnabled.value ? 'primary' : 'default',
-      onClick: toggleSearch,
-      icon: () => h(IconGlobeStroke, { size: '32' }), // 使用 IconSearch 组件作为 icon
-      style: {
-        paddingRight: '8px',
-        flexShrink: 0,
-        padding: '6px',
-        borderRadius: '50%',
-        minWidth: 'unset',
-        width: '48px',     // Fixed width and height for button size
-        height: '48px',
-        backgroundColor: 'var(--semi-color-fill-0)', // Default background
-        border: 'none',
-        display: 'flex',       // Ensure icon is centered
-        alignItems: 'center',  // Vertically center icon
-        justifyContent: 'center' // Horizontally center icon
-      } // 调整图标按钮样式，去除文字部分的padding
-    }),
-
-    // 如果还有其他图标按钮，可以放在这里，例如：
-    // h(Button, { ...otherButtonProps, icon: () => h(OtherIcon) }),
-  ]);
+      // 如果还有其他图标按钮，可以放在这里，例如：
+      // h(Button, { ...otherButtonProps, icon: () => h(OtherIcon) }),
+    ]);
 };
 
 // 发送消息处理
