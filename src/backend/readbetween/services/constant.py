@@ -17,6 +17,9 @@ Ex_PrefixRedisConversation = 30 * 60
 
 PrefixRedisKnowledge = "know_cfg_info:"
 
+RedisMCPServerKey = "mcp_server_info"
+RedisMCPServerDetailKey = "mcp_server_detail_info"
+
 """
 Milvus 默认配置项
 """

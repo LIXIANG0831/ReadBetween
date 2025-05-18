@@ -21,6 +21,7 @@ from readbetween.services.knowledge import KnowledgeService
 from readbetween.services.retriever import RetrieverService
 from readbetween.services.tasks import celery_add_memory
 from readbetween.utils.logger_util import logger_util
+from readbetween.utils.mcp_client import MCPClient
 from readbetween.utils.memory_util import MemoryUtil
 from readbetween.utils.minio_util import MinioUtil
 from readbetween.utils.model_factory import ModelFactory
@@ -201,6 +202,19 @@ class ChatService:
                 logger_util.debug(f"用户召回记忆:\n{final_query}")
             except Exception as e:
                 logger_util.error(f"记忆召回失败: {e}")
+
+        # 启用MCP
+        server_configs = [
+            # "server.py",  # stdio 服务器
+            ("https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc", "sse"),  # SSE 服务器
+            ("https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc", "sse"),  # SSE 服务器
+        ]
+        if len(server_configs) > 0:
+            logger_util.debug("用户开启MCP功能")
+            # 获取MCP工具列表
+            mcp_client = MCPClient(server_configs)
+            await mcp_client.initialize_sessions()
+            await mcp_client.get_all_tools()
 
         # 获取 历史记录
         # 构造 OpenAI 请求参数
