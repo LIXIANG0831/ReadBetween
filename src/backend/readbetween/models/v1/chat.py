@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from readbetween.models.dao import Conversation
 from readbetween.models.v1.model_available_cfg import ModelAvailableCfgInfo
 
@@ -21,11 +21,21 @@ class ChatRequest(BaseModel):
 class ChatCreate(BaseModel):
     # user_id: str = Field(..., description="用户 ID")
     title: Optional[str] = Field("新对话", description="对话标题")
-    available_model_id: str = Field("xxxx-xxxx-xxxx-xxxx", description="所使用的可用模型配置ID")  # 从默认系统配置模型进行获取
+    available_model_id: str = Field("xxxx-xxxx-xxxx-xxxx", description="所使用的可用模型配置ID")
     system_prompt: str = Field("你是一个有用的助手", description="系统提示")
     temperature: float = Field(0.3, ge=0, le=2, description="控制生成文本的随机性")
     knowledge_base_ids: Optional[List[str]] = Field(default=[], description="绑定的知识库ID列表")
     use_memory: int = Field(default=0, description="是否使用记忆")
+    mcp_server_configs: Optional[Dict] = Field({
+        "高德地图1": {
+            "type": "sse",
+            "url": "https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc"
+        },
+        "高德地图2": {
+            "type": "sse",
+            "url": "https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc"
+        }
+    }, description="绑定所使用的MCPServer")
 
 
 class ChatUpdate(BaseModel):
@@ -35,7 +45,8 @@ class ChatUpdate(BaseModel):
     temperature: Optional[float] = Field(None, ge=0, le=2, description="控制生成文本的随机性")
     knowledge_base_ids: Optional[List[str]] = Field([], description="绑定的知识库ID列表")
     use_memory: Optional[int] = Field(default=None, description="是否使用记忆")
-    available_model_id: Optional[str] = Field("xxxx-xxxx-xxxx-xxxx", description="所使用的可用模型配置ID")  # 从默认系统配置模型进行获取
+    available_model_id: Optional[str] = Field("xxxx-xxxx-xxxx-xxxx", description="所使用的可用模型配置ID")
+    mcp_server_configs: Optional[Dict] = Field(None, description="绑定所使用的MCPServer")
 
 
 class ChatMessageSend(BaseModel):
@@ -63,6 +74,7 @@ class MessageOut(BaseModel):
 class ConversationInfo(BaseModel):
     conversation: Conversation = Field(..., description="会话")
     model_cfg: ModelAvailableCfgInfo = Field(..., description="当前会话渠道模型配置")
+
 
 class ChatMessageSendPlus(ChatMessageSend):
     conversation_info: ConversationInfo = Field(..., description="当前会话渠道配置信息")

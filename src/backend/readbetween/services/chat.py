@@ -58,7 +58,8 @@ class ChatService:
             available_model_id=create_data.available_model_id,
             system_prompt=create_data.system_prompt,
             temperature=create_data.temperature,
-            use_memory=create_data.use_memory
+            use_memory=create_data.use_memory,
+            mcp_server_configs=create_data.mcp_server_configs
         )
 
         # 创建关联关系
@@ -100,7 +101,8 @@ class ChatService:
             temperature=update_data.temperature,
             knowledge_base_ids=update_data.knowledge_base_ids,
             use_memory=update_data.use_memory,
-            available_model_id=update_data.available_model_id
+            available_model_id=update_data.available_model_id,
+            mcp_server_configs=update_data.mcp_server_configs
         )
 
         # 更新模型 则删除配置缓存

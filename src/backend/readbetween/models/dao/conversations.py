@@ -12,7 +12,7 @@ import uuid
 from sqlalchemy.orm import Mapped, relationship, selectinload
 from sqlmodel import Field, Relationship
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, text, select, func, ForeignKey, join
+from sqlalchemy import Column, String, Text, DateTime, text, select, func, ForeignKey, join, JSON
 
 from readbetween.core.context import async_session_getter
 from readbetween.models.dao.base import AwsomeDBModel
@@ -52,6 +52,9 @@ class ConversationBase(AwsomeDBModel):
     available_model_id: Optional[str] = Field(
         sa_column=Column(String(255), ForeignKey('model_available_cfg.id', ondelete='CASCADE'),  # CASCADE级联删除
                          index=True, nullable=True), description="使用的可用模型配置ID")
+    mcp_server_configs: Optional[dict] = Field(
+        sa_column=Column(JSON, nullable=True), default=None, description="MCP服务器配置信息"
+    )
     # model_available_cfg: Optional["ModelAvailableCfg"] = Relationship(
     #     sa_relationship=relationship("ModelAvailableCfg", backref="conversations")
     #     # 添加 relationship，方便访问关联的 ModelAvailableCfg 对象
@@ -161,7 +164,8 @@ class ConversationDao:
     @staticmethod
     async def update(conv_id: str, title: Optional[str] = None, system_prompt: Optional[str] = None,
                      temperature: Optional[float] = None, knowledge_base_ids: Optional[List[str]] = None,
-                     use_memory: Optional[int] = None, available_model_id: Optional[str] = None,):
+                     use_memory: Optional[int] = None, available_model_id: Optional[str] = None,
+                     mcp_server_configs: Optional[dict] = None):
 
         async with async_session_getter() as session:
             stmt = select(Conversation).where(
@@ -182,6 +186,8 @@ class ConversationDao:
                     conv.use_memory = use_memory
                 if available_model_id is not None:
                     conv.available_model_id = available_model_id
+                if mcp_server_configs is not None:
+                    conv.mcp_server_configs = mcp_server_configs
 
                 conv.updated_at = datetime.utcnow()  # 更新更新时间
                 await session.commit()
