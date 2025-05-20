@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from contextlib import AsyncExitStack
 from typing import Dict, Any, List, Union, Tuple
 from mcp.client.sse import sse_client
@@ -47,13 +48,18 @@ class MCPClient:
                         args=config.get("args", []),
                         env=config.get("env", None)
                     )
-                    connection_ctx = stdio_client(params)
-                    connection = await self.exit_stack.enter_async_context(connection_ctx)
-                    session_ctx = ClientSession(*connection)
-                    session = await self.exit_stack.enter_async_context(session_ctx)
-                    await session.initialize()
-                    self.sessions[server_id] = (session, session_ctx, connection_ctx)
-                    logger_util.debug(f"[{server_id}] 已通过 stdio 连接")
+                    try:
+                        connection_ctx = stdio_client(params)
+                        connection = await self.exit_stack.enter_async_context(connection_ctx)
+                        session_ctx = ClientSession(*connection)
+                        session = await self.exit_stack.enter_async_context(session_ctx)
+                        await session.initialize()
+                        self.sessions[server_id] = (session, session_ctx, connection_ctx)
+                        logger_util.debug(f"[{server_id}] 已通过 stdio 连接")
+                    except Exception as e:
+                        logger_util.error(f"[{server_id}] stdio连接初始化失败: {e}")
+                        logger_util.error(traceback.format_exc())  # 打印完整堆栈
+                        continue
 
                 elif config["type"] == "sse":
                     # 处理 SSE 连接
@@ -74,6 +80,7 @@ class MCPClient:
                         logger_util.debug(f"[{server_id}] 已通过 SSE 连接到 {config['url']}")
                     except Exception as e:
                         logger_util.error(f"[{server_id}] SSE连接初始化失败: {e}")
+                        logger_util.error(traceback.format_exc())  # 打印完整堆栈
                         continue
 
                 # 获取工具列表并建立映射

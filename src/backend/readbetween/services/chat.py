@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 
+from mcp.types import CallToolResult, TextContent, ImageContent, EmbeddedResource
+
 from readbetween.models.dao.model_available_cfg import ModelAvailableCfgDao
 from readbetween.models.schemas.source import SourceMsg
 from readbetween.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
@@ -179,7 +181,8 @@ class ChatService:
         final_query, first_query = cls._init_user_query(content, is_multimodal_query)
         # 获取知识库召回内容
         kb_source_list = None
-        knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(conversation_info.conversation.id)  # 获取关联KB
+        knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(
+            conversation_info.conversation.id)  # 获取关联KB
         if len(knowledge_bases) > 0 and is_multimodal_query is False:
             logger_util.debug(f"用户开启并使用知识库检索")
             try:
@@ -206,17 +209,23 @@ class ChatService:
                 logger_util.error(f"记忆召回失败: {e}")
 
         # 启用MCP
-        server_configs = [
-            # "server.py",  # stdio 服务器
-            ("https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc", "sse"),  # SSE 服务器
-            ("https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc", "sse"),  # SSE 服务器
-        ]
-        if len(server_configs) > 0:
+        mcp_server_configs = conversation_info.conversation.mcp_server_configs
+        openai_tools = []
+        if mcp_server_configs is not None:
             logger_util.debug("用户开启MCP功能")
             # 获取MCP工具列表
-            mcp_client = MCPClient(server_configs)
+            mcp_client = MCPClient(mcp_server_configs)
             await mcp_client.initialize_sessions()
-            await mcp_client.get_all_tools()
+            tools = await mcp_client.get_all_tools()
+            for k, v in tools.items():
+                for inner_k, inner_v in v.items():
+                    inner_v["name"] = inner_v["prefixed_name"]  # 工具名使用 prefixed_name 方便获取 session
+                    openai_tools.append(
+                        {
+                            'type': 'function',
+                            'function': inner_v
+                        }
+                    )
 
         # 获取 历史记录
         # 构造 OpenAI 请求参数
@@ -233,7 +242,6 @@ class ChatService:
                 conv_id=message_data.conv_id,
                 role="user",
                 content=json.dumps(first_query, ensure_ascii=False),
-                source=None
             )
             user_msg_id = user_msg.id
             logger_util.debug(f"保存用户消息ID: {user_msg_id}")
@@ -254,11 +262,14 @@ class ChatService:
                     messages=messages,
                     temperature=message_data.temperature or conversation_info.conversation.temperature,
                     max_tokens=message_data.max_tokens,
-                    stream=True
+                    stream=True,
+                    tools=openai_tools,
+                    tool_choice="auto" if len(openai_tools) > 0 else "none",
                 )
 
                 # yield f"data: [START]\n\n"
                 yield cls._format_stream_response(event="START", text="")
+                func_call_list = []  # 模型实际需要调用的工具列表
                 for chunk in response:
                     if hasattr(chunk, 'choices') and chunk.choices:
                         if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
@@ -267,12 +278,50 @@ class ChatService:
                                 full_response.append(content)
                                 # yield f"data: {content}\n\n"
                                 yield cls._format_stream_response(event="MESSAGE", text=content)
-                        else:
-                            logger_util.debug("No delta or content in choices")
-                    else:
-                        logger_util.debug("No choices in chunk")
 
-                        # await asyncio.sleep(0.02)  # 控制流式速度
+                        if hasattr(chunk.choices[0], 'delta') and chunk.choices[0].delta.tool_calls:
+                            for tcchunk in chunk.choices[0].delta.tool_calls:
+                                if len(func_call_list) <= tcchunk.index:
+                                    func_call_list.append({
+                                        "id": "",
+                                        "type": "function",
+                                        "function": {"name": "", "arguments": ""}
+                                    })
+                                tc = func_call_list[tcchunk.index]
+                                if tcchunk.id:
+                                    tc["id"] += tcchunk.id
+                                if tcchunk.function.name:
+                                    tc["function"]["name"] += tcchunk.function.name
+                                if tcchunk.function.arguments:
+                                    tc["function"]["arguments"] += tcchunk.function.arguments
+
+                # 调用MCP工具获取结果
+                assistant_tool_calls_msg = None
+                tool_calls_msg = None
+                try:
+                    if len(func_call_list) > 0:  # 模型是否进行工具调用的判断条件
+                        # 进行MCP工具调用返回流式工具信息
+                        async for response in cls._handle_tool_calls(message_data.conv_id, func_call_list, mcp_client):
+                            # 已进行 _format_stream_response 格式化处理
+                            # Event -> TOOL_START(开始工具调用) | TOOL_END(完成工具调用)
+                            yield response
+
+                        # 拼接工具响应信息 触发二次模型调用
+                        full_response = []
+                        async for content in cls._stream_second_model_response(client, conversation_info, message_data):
+                            full_response.append(content)
+                            yield cls._format_stream_response(event="MESSAGE", text=content)
+
+                except Exception as e:
+                    error_msg = f"MCP调用失败: {str(e)}"
+                    if assistant_tool_calls_msg is not None:
+                        await MessageDao.delete_message(assistant_tool_calls_msg.id)
+                        logger_util.info(f"已回滚模型调用工具响应消息: {assistant_tool_calls_msg.id}")
+                    if tool_calls_msg is not None:
+                        await MessageDao.delete_message(tool_calls_msg.id)
+                        logger_util.info(f"已回滚工具调用响应消息: {tool_calls_msg.id}")
+                    raise Exception(error_msg)
+
             except Exception as e:
                 error_msg = f"模型响应失败: {str(e)}"
                 raise Exception(error_msg)
@@ -290,7 +339,8 @@ class ChatService:
                     conv_id=message_data.conv_id,
                     role="assistant",
                     content=json.dumps(assistant_content, ensure_ascii=False),
-                    source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False),
+                    source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False) if len(
+                        list(set(source_msg_list))) > 0 else None,
                 )
                 logger_util.debug(f"保存助手响应消息: {assistant_content}")
             except Exception as e:
@@ -315,11 +365,148 @@ class ChatService:
             # yield f"data: [ERROR] {e}\n\n"
             yield cls._format_stream_response(event="ERROR", text=f"{e}")
 
+        finally:
+            # 确保无论成功还是失败都会释放MCP连接
+            if mcp_client is not None:
+                await mcp_client.cleanup()
+
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
         """构建 OpenAI 需要的消息格式"""
         messages = await MessageDao.get_conversation_messages(conv_id)
-        return [{"role": msg.role, "content": json.loads(msg.content)} for msg in messages]
+        openai_messages = []
+        for msg in messages:
+            if msg.role == "user":
+                openai_messages.append({
+                    "role": msg.role,
+                    "content": json.loads(msg.content)
+                })
+            elif msg.role == "tool":
+                openai_messages.append({
+                    "role": msg.role,
+                    "tool_call_id": msg.tool_call_id,
+                    "content": json.loads(msg.content)
+                })
+            elif msg.role == "assistant":
+                assistant_msg = {
+                    "role": msg.role,
+                }
+                if msg.content is not None:
+                    assistant_msg["content"] = json.loads(msg.content)
+                if msg.tool_calls is not None:
+                    assistant_msg["tool_calls"] = json.loads(msg.tool_calls)
+                openai_messages.append(assistant_msg)
+            else:
+                pass
+        return openai_messages
+
+    @classmethod
+    async def _stream_second_model_response(
+            cls,
+            client,
+            conversation_info: ConversationInfo,
+            message_data: ChatMessageSendPlus
+    ) -> Generator:
+        """Stream the second model response after tool calls"""
+        system_prompt = [{'role': 'system', 'content': f'{conversation_info.conversation.system_prompt}'}]
+        history_messages = await cls._build_openai_messages(message_data.conv_id)
+        messages = system_prompt + history_messages
+
+        logger_util.debug("已获取工具响应信息进行二次模型调用")
+
+        second_response = await client.generate_text(
+            messages=messages,
+            temperature=message_data.temperature or conversation_info.conversation.temperature,
+            max_tokens=message_data.max_tokens,
+            stream=True,
+        )
+
+        for chunk in second_response:
+            if hasattr(chunk, 'choices') and chunk.choices:
+                if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+                    content = chunk.choices[0].delta.content or ""
+                    if content is not None:
+                        yield content  # 直接 yield 内容，不收集，不格式转换
+
+    @classmethod
+    async def _handle_tool_calls(
+            cls,
+            conv_id: str,
+            func_call_list: List[Dict],
+            mcp_client: MCPClient
+    ) -> Generator:
+        """Handle tool calls and yield responses"""
+        # 保存助手调用信息
+        assistant_tool_calls_msg = await MessageDao.create_message(
+            conv_id=conv_id,
+            role="assistant",
+            tool_calls=json.dumps(func_call_list, ensure_ascii=False)
+        )
+
+        tool_calls_msg = None
+        try:
+            for func_calling in func_call_list:
+                tool_call_id = func_calling["id"]
+                tool_name = func_calling["function"]["name"]
+                tool_args = func_calling["function"]["arguments"]
+
+                # Yield tool start information
+                tool_yield_msg = {
+                    "tool": tool_name,
+                    "input": json.loads(tool_args),
+                }
+                yield cls._format_stream_response(event="TOOL_START", text="", extra=tool_yield_msg)
+
+                logger_util.debug("开始执行MCP工具调用...")
+                mcp_tool_call_resp = await mcp_client.execute_tools([{
+                    "name": tool_name,
+                    "arguments": json.loads(tool_args)
+                }])
+                logger_util.debug("完成执行MCP工具调用...")
+
+                call_tool_result: CallToolResult = mcp_tool_call_resp[tool_name]['result']
+                call_tool_result_content_list: List[
+                    TextContent | ImageContent | EmbeddedResource] = call_tool_result.content
+
+                # 处理工具响应内容
+                call_tool_result_content_msg = {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": "工具调用结果异常"
+                }
+
+                for content in call_tool_result_content_list:
+                    if isinstance(content, TextContent):
+                        call_tool_result_content_msg["content"] = content.text
+                    elif isinstance(content, ImageContent):
+                        # TODO: Handle image content
+                        pass
+                    elif isinstance(content, EmbeddedResource):
+                        # TODO: Handle embedded resource
+                        pass
+
+                # Yield tool end information
+                tool_yield_msg["output"] = json.loads(call_tool_result_content_msg.get("content", "工具调用结果异常"))
+                yield cls._format_stream_response(event="TOOL_END", text="", extra=tool_yield_msg)
+
+                # 保存工具调用信息
+                tool_calls_msg = await MessageDao.create_message(
+                    conv_id=conv_id,
+                    role=call_tool_result_content_msg.get("role", "tool"),
+                    tool_call_id=call_tool_result_content_msg.get("tool_call_id", tool_call_id),
+                    content=json.dumps(call_tool_result_content_msg.get("content", "工具调用结果异常"),
+                                       ensure_ascii=False)
+                )
+
+        except Exception as e:
+            # Clean up messages if error occurs
+            if assistant_tool_calls_msg is not None:
+                await MessageDao.delete_message(assistant_tool_calls_msg.id)
+                logger_util.info(f"已回滚模型调用工具响应消息: {assistant_tool_calls_msg.id}")
+            if tool_calls_msg is not None:
+                await MessageDao.delete_message(tool_calls_msg.id)
+                logger_util.info(f"已回滚工具调用响应消息: {tool_calls_msg.id}")
+            raise Exception(f"MCP调用失败: {str(e)}")
 
     @classmethod
     async def _format_conversation_response(cls, conv: Conversation):
@@ -508,5 +695,3 @@ class ChatService:
         redis_client.set(conv_info_key, conversation_info.model_dump_json(), Ex_PrefixRedisConversation)
 
         return conversation_info
-
-

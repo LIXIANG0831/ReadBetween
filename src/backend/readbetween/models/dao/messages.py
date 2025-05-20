@@ -1,9 +1,13 @@
 from __future__ import annotations
+
+import time
 import uuid
+from typing import Optional
+
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, text, select, update
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, text, select, update, JSON, BigInteger
 
 from readbetween.core.context import async_session_getter
 from readbetween.models.dao.base import AwsomeDBModel
@@ -26,23 +30,27 @@ class MessageBase(AwsomeDBModel):
     )
     role: str = Field(
         sa_column=Column(String(20), nullable=False),
-        description="角色（system/user/assistant）"
+        description="角色（system/user/assistant/tool）"
     )
     content: str = Field(
-        sa_column=Column(Text, nullable=False),
+        sa_column=Column(Text, nullable=True),
         description="消息内容"
     )
     source: str = Field(
         sa_column=Column(Text, nullable=True),
         description="消息内容"
     )
-    timestamp: datetime = Field(
-        sa_column=Column(
-            DateTime,
-            nullable=False,
-            server_default=text('CURRENT_TIMESTAMP')
-        ),
-        description="消息时间"
+    tool_calls: Optional[str] = Field(
+        sa_column=Column(JSON, nullable=True), default=None, description="模型调用工具信息"
+    )
+    tool_call_id: str = Field(
+        sa_column=Column(String(50), nullable=True,  default=None,),
+        description="工具ID"
+    )
+    timestamp: int = Field(
+        default_factory=lambda: int(time.time() * 1000),  # 动态生成毫秒时间戳
+        sa_column=Column(BigInteger, nullable=False),
+        description="消息时间戳（毫秒）"
     )
     delete: int = Field(
         default=0,
@@ -63,9 +71,9 @@ class Message(MessageBase, table=True):
 
 class MessageDao:
     @staticmethod
-    async def create_message(conv_id: str, role: str, content: str, source: str):
+    async def create_message(conv_id: str, role: str, content: str = None, source: str = None, tool_calls: str = None, tool_call_id: str = None):
         async with async_session_getter() as session:
-            new_msg = Message(conv_id=conv_id, role=role, content=content, source=source)
+            new_msg = Message(conv_id=conv_id, role=role, content=content, source=source, tool_calls=tool_calls, tool_call_id=tool_call_id)
             session.add(new_msg)
             await session.commit()
             await session.refresh(new_msg)

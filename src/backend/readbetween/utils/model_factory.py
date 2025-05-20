@@ -174,7 +174,7 @@ class ModelFactory:
         # 匹配模型供应商
         if config.mark == "openai":  # 模型供应商标识
             client = OpenAIModelProvider(config)
-        elif config.mark == "openai-compatible":
+        elif config.mark in ["openai-compatible", "qwen"]:
             client = CompatibleOpenAIModelProvider(config)
         elif config.mark == "system":  # 系统内置模型专用标识
             client = SystemModelProvider(config)
