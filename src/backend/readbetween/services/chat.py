@@ -138,6 +138,7 @@ class ChatService:
                 }
                 for kb in conv.knowledge_bases
             ],
+            "selected_mcp_servers": conv.mcp_server_configs,
             "updated_at": conv.updated_at.isoformat()
         }
             for conv in conversations
@@ -445,6 +446,7 @@ class ChatService:
 
         tool_calls_msg = None
         try:
+            yield cls._format_stream_response(event="TOOL_START", text="", extra=func_call_list)
             for func_calling in func_call_list:
                 tool_call_id = func_calling["id"]
                 tool_name = func_calling["function"]["name"]
@@ -455,7 +457,6 @@ class ChatService:
                     "tool": tool_name,
                     "input": json.loads(tool_args),
                 }
-                yield cls._format_stream_response(event="TOOL_START", text="", extra=tool_yield_msg)
 
                 logger_util.debug("开始执行MCP工具调用...")
                 mcp_tool_call_resp = await mcp_client.execute_tools([{
@@ -487,7 +488,8 @@ class ChatService:
 
                 # Yield tool end information
                 tool_yield_msg["output"] = json.loads(call_tool_result_content_msg.get("content", "工具调用结果异常"))
-                yield cls._format_stream_response(event="TOOL_END", text="", extra=tool_yield_msg)
+                yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
+                yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
 
                 # 保存工具调用信息
                 tool_calls_msg = await MessageDao.create_message(

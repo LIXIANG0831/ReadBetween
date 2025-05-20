@@ -26,16 +26,7 @@ class ChatCreate(BaseModel):
     temperature: float = Field(0.3, ge=0, le=2, description="控制生成文本的随机性")
     knowledge_base_ids: Optional[List[str]] = Field(default=[], description="绑定的知识库ID列表")
     use_memory: int = Field(default=0, description="是否使用记忆")
-    mcp_server_configs: Optional[Dict] = Field({
-        "高德地图1": {
-            "type": "sse",
-            "url": "https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc"
-        },
-        "高德地图2": {
-            "type": "sse",
-            "url": "https://mcp.amap.com/sse?key=2f5e7338488ceb95f2252c61e60042fc"
-        }
-    }, description="绑定所使用的MCPServer")
+    mcp_server_configs: Optional[Dict] = Field(None, description="绑定所使用的MCPServer")
 
 
 class ChatUpdate(BaseModel):

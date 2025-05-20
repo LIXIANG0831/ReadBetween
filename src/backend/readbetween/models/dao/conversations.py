@@ -186,8 +186,7 @@ class ConversationDao:
                     conv.use_memory = use_memory
                 if available_model_id is not None:
                     conv.available_model_id = available_model_id
-                if mcp_server_configs is not None:
-                    conv.mcp_server_configs = mcp_server_configs
+                conv.mcp_server_configs = mcp_server_configs
 
                 conv.updated_at = datetime.utcnow()  # 更新更新时间
                 await session.commit()
