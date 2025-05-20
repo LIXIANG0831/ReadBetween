@@ -2,7 +2,7 @@
     <div>
       <VoiceInteraction />
     </div>
-  </template>
+</template>
   
   <script>
   import VoiceInteraction from '@/components/VoiceInteraction.vue'

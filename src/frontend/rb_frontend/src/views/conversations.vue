@@ -124,6 +124,23 @@
             </a-select-option>
           </a-select>
         </a-form-item>
+        <!-- 新增 MCP 集成 -->
+        <a-form-item label="MCP服务">
+          <a-select
+            v-model:value="CreateConversationForm.selectedMcpServices"
+            mode="multiple"
+            placeholder="请选择MCP服务"
+            option-label-prop="label"
+          >
+            <a-select-option
+              v-for="option in mcpServerOptions"
+              :key="option.key"
+              :value="option.key"
+            >
+              {{ option.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <!-- 新增 use_memory 开关 -->
         <a-form-item label="启用记忆" name="use_memory">
           <a-switch v-model:checked="CreateConversationForm.use_memory" />
@@ -143,6 +160,8 @@
 
 import { Chat, Button, MarkdownRender, Tooltip } from '@kousum/semi-ui-vue';
 import { ref, onMounted, computed, watch, h } from 'vue';
+import { useMcpStore } from '@/store/mcpStore'
+
 import {
   message,
   Modal as AModal,
@@ -174,19 +193,23 @@ import { listKnowledge } from '@/api/knowledge';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 // import ChatInput from '@/components/ChatInput.vue';
-import escapeHtml from 'escape-html';
+// import escapeHtml from 'escape-html';
+import type { Key } from 'ant-design-vue/es/_util/type';
+
 
 
 interface ExtendedChatMessage {
   content: any;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool';
   source: any;
   status?: 'loading' | 'error';
   timestamp: number;
+  tool_calls?: any
+  tool_call_id?: any
 }
 
 interface StreamMessage {
-  event: 'START' | 'MESSAGE' | 'SOURCE' | 'END';
+  event: 'START' | 'MESSAGE' | 'SOURCE' | 'END' | 'ERROR' | 'TOOL_START' | 'TOOL_END';
   text?: string;
   [key: string]: any;
 }
@@ -196,6 +219,8 @@ interface CreateConversationParams extends Api.BaseConversationParams {
   use_memory: boolean;
   conv_id: string;
   model: any;
+  selectedMcpServices: []; // 用于表单绑定的选中项
+  mcp_server_configs: null; // 用于API提交的配置
 }
 
 
@@ -213,7 +238,17 @@ const roleConfig = ref({
 
 
 const availableModelStore = useAvailableModelStore();
+const mcpStore = useMcpStore()
 const { token } = theme.useToken();
+// MCP
+// 新增计算属性 - MCP服务选项
+const mcpServerOptions = computed(() => {
+  return Object.entries(mcpStore.parsedMcpServers).map(([key, config]) => ({
+    key,
+    name: key,
+    value: config
+  }))
+})
 
 // 状态管理
 const activeKey = ref<string[]>([]);
@@ -242,7 +277,9 @@ const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展�
   temperature: 0.3,
   knowledge_base_ids: [],
   use_memory: true, // 默认启用记忆
-  conv_id: ""
+  conv_id: "",
+  selectedMcpServices: [], // 用于MCP表单绑定的选中项
+  mcp_server_configs: null, // 用于MCP-API提交的配置
 });
 
 // 样式计算
@@ -272,11 +309,13 @@ const fetchMessageHistory = async (convId: string) => {
     if (res.data.status_code === 200) {
       chats.value = res.data.data.map(msg => ({
         content: JSON.parse(msg.content),
-        role: msg.role === 'user' ? 'user' : 'assistant',
+        role: msg.role || null,
         source: JSON.parse(msg.source),
+        tool_call_id: msg.tool_call_id,
+        tool_calls: JSON.parse(msg.tool_calls),
         timestamp: new Date(msg.timestamp).getTime()
       }));
-      // console.log(chats.value)
+      console.log(chats.value)
     }
     else {
       console.error('获取消息历史失败:', res.data); // 打印错误信息
@@ -409,42 +448,247 @@ const customUploadProps = ref({
 } as any);
 
 // 自定义对话框
+const isToolExpanded = ref(false); // 控制工具调用结果折叠状态的响应式变量
+const currentMessageTool = ref([]); // 当前会话使用到的工具
 const chatBoxConfig = ref({
   renderChatBoxContent: (props) => {
     const { role, message, defaultNode, className } = props;
 
-    // 如果 message.status 是 "loading"，不返回任何内容 返回加载状态
-    // message.content为空时 MarkdownRender会报错
-    if (message.status === "loading" || message.content === "") {
-      return h("div", { class: className, style: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40px' } }, [ // Center align the spin and set minHeight
-        h(ASpin, { size: 'default' }) // Use ASpin for loading icon, size can be adjusted
+    // 如果 message.status 是 "loading"，返回加载状态
+    if (message.status === "loading" || (message.content === "" && Array.isArray(message.tool_calls) && message.tool_calls.length > 0)) {
+      return h("div", { class: className, style: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40px' } }, [
+        h(ASpin, { size: 'default' })
       ]);
     }
 
-    // 替换头像图标
-    // 遍历 message.source，根据 source 字段添加 avatar 属性
+    // 处理 tool_calls 如果存在
+    if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+      currentMessageTool.value = message.tool_calls;
+      message.content = "调用工具ING";
+      // 历史记录中直接不处理这条消息
+    }
+
+    // 处理 tool 消息
+    if (message.role === 'tool' && message.tool_call_id) {
+      // 查找对应的 tool call
+      const toolCall = currentMessageTool.value.find(
+        tc => tc.id === message.tool_call_id
+      );
+      
+      if (toolCall) {
+        // 解析 arguments
+        let args = '';
+        try {
+          args = JSON.stringify(JSON.parse(toolCall.function.arguments), null, 2);
+        } catch {
+          args = toolCall.function.arguments;
+        }
+
+        // 解析 content
+        let content = '';
+        try {
+          content = JSON.stringify(JSON.parse(message.content), null, 2);
+        } catch {
+          content = message.content;
+        }
+
+        // 创建工具调用卡片
+        return h('div', { 
+          class: 'tool-call-card',
+          style: {
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            margin: '12px 0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          }
+        }, [
+          h('div', { 
+            class: 'tool-call-header',
+            style: {
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px 16px',
+              backgroundColor: '#f9fafb',
+              borderBottom: '1px solid #e5e7eb',
+              cursor: 'pointer'
+            },
+            onClick: () => isToolExpanded.value = !isToolExpanded.value
+          }, [
+            h('div', { 
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }
+            }, [
+              h('div', {
+                style: {
+                  width: '24px',
+                  height: '24px',
+                  // backgroundColor: '#3b82f6',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '12px'
+                }
+              }, '🔧'),
+              h('span', { 
+                class: 'tool-call-name',
+                style: {
+                  fontWeight: '500',
+                  color: '#111827'
+                }
+              }, `${toolCall.function.name}`)
+            ]),
+            h('button', { 
+              class: 'tool-call-toggle',
+              style: {
+                background: 'none',
+                border: 'none',
+                color: '#3b82f6',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '14px'
+              }
+            }, [
+              isToolExpanded.value ? '收起' : '展开',
+              h('span', {
+                style: {
+                  transition: 'transform 0.2s',
+                  transform: isToolExpanded.value ? 'rotate(180deg)' : 'rotate(0deg)'
+                }
+              }, '▼')
+            ])
+          ]),
+          isToolExpanded.value && h('div', { 
+            class: 'tool-call-details',
+            style: {
+              padding: '16px',
+              backgroundColor: 'white'
+            }
+          }, [
+            h('div', { 
+              class: 'tool-call-section',
+              style: {
+                marginBottom: '16px'
+              }
+            }, [
+              h('div', { 
+                class: 'tool-call-title',
+                style: {
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#6b7280',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }
+              }, [
+                h('span', {
+                  style: {
+                    display: 'inline-block',
+                    width: '4px',
+                    height: '16px',
+                    backgroundColor: '#3b82f6',
+                    marginRight: '8px',
+                    borderRadius: '2px'
+                  }
+                }),
+                '参数'
+              ]),
+              h('pre', { 
+                class: 'tool-call-content',
+                style: {
+                  margin: 0,
+                  padding: '12px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '6px',
+                  overflowX: 'auto',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  color: '#111827',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap'
+                }
+              }, args)
+            ]),
+            h('div', { 
+              class: 'tool-call-section'
+            }, [
+              h('div', { 
+                class: 'tool-call-title',
+                style: {
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#6b7280',
+                  marginBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }
+              }, [
+                h('span', {
+                  style: {
+                    display: 'inline-block',
+                    width: '4px',
+                    height: '16px',
+                    backgroundColor: '#10b981',
+                    marginRight: '8px',
+                    borderRadius: '2px'
+                  }
+                }),
+                '结果'
+              ]),
+              h('pre', { 
+                class: 'tool-call-content',
+                style: {
+                  margin: 0,
+                  padding: '12px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '6px',
+                  overflowX: 'auto',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  color: '#111827',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap'
+                }
+              }, content)
+            ])
+          ])
+        ]);
+      }
+    }
+
+    // 处理来源数据
     const processedHistorySourceCard = message.source && message.source.length > 0
       ? message.source.map((item) => {
-        let faviconUrl = '';
-      if (item.source === 'kb') {
-        // return { ...item, avatar: 'https://lf3-static.bytednsdoc.com/obj/eden-cn/ptlz_zlp/ljhwZthlaukjlkulzlp/root-web-sites/dy.png' };
-        return { ...item, avatar: 'src/assets/kb.svg' };
-      } else if (item.source === 'web') {
-        // 截取网站域名
-        const urlObj = new URL(item.url);
-        faviconUrl = `${urlObj.origin}/favicon.ico`;
-        return { ...item, avatar: faviconUrl };
-      }
-      return item; // 其他情况保持原样
-    }) : [];
+          let faviconUrl = '';
+          if (item.source === 'kb') {
+            return { ...item, avatar: 'src/assets/kb.svg' };
+          } else if (item.source === 'web') {
+            const urlObj = new URL(item.url);
+            faviconUrl = `${urlObj.origin}/favicon.ico`;
+            return { ...item, avatar: faviconUrl };
+          }
+          return item;
+        }) : [];
 
-    // 处理多模态message响应
-    let processedContent = '';
+    let processedContent = '';  // 模型回复文本
     if (Array.isArray(message.content)) {
       message.content.forEach(item => {
-        if (item.type === 'text') {
+        if (item.type === 'text') {  // 处理问答message响应
           processedContent += item.text + '\n';
-        } else if (item.type === 'image_url') {
+        } else if (item.type === 'image_url') {  // 处理多模态message响应
           const imageUrl = item.image_url.url;
           processedContent += `![](${imageUrl})\n`;
         }
@@ -453,14 +697,18 @@ const chatBoxConfig = ref({
       processedContent = message.content;
     }
 
-    // 使用 h 函数构建渲染内容
-    const escapedContent = escapeHtml(processedContent);
+    // 构建最终渲染内容
     return h(
       'div',
       { class: className },
-      message.source && message.source.length > 0
-        ? [h(SourceCard, { source: processedHistorySourceCard }), h(MarkdownRender, { raw: escapedContent, components: {} })]
-        : h(MarkdownRender, { raw: escapedContent, components: {} })
+      [
+        // 来源卡片（如果有）
+        message.source && message.source.length > 0 
+          ? h(SourceCard, { source: processedHistorySourceCard }) 
+          : null,
+        // 消息内容
+        h(MarkdownRender, { raw: processedContent, components: {} })
+      ].filter(Boolean) // 过滤掉null/undefined的节点
     );
   }
 });
@@ -551,7 +799,7 @@ const handleMessageSend = async (user_message: any) => {
       role: 'assistant',
       status: 'loading',
       source: [],
-      timestamp: userMessage.timestamp + 1  // 确保唯一性
+      timestamp: userMessage.timestamp + 3  // 确保唯一性
     };
 
     // 不可变更新消息列表
@@ -633,6 +881,16 @@ const handleMessageSend = async (user_message: any) => {
         case 'ERROR':
           handleStreamError(data.text);
           break;
+        
+        case 'TOOL_START':
+          const toolStartData = data.extra;
+          handleToolStart(toolStartData);
+          break;
+        
+        case 'TOOL_END':
+          const toolEndData = data.extra;
+          handleToolEnd(toolEndData);
+          break;
       }
     };
 
@@ -650,7 +908,45 @@ const handleMessageSend = async (user_message: any) => {
         return msg;  // 保持用户和其他消息不变
       });
     };
+  // ================= 处理工具开始调用事件 =================
+  const handleToolStart = (toolStartData: any) =>  {
+    // 向 chats 列表中插入一条新消息
+    // 获取所有的工具名称
+    const toolNames = toolStartData.map(tool => tool.function.name).join('，') || '未知工具';
 
+    const newAssistantCallToolMessage: ExtendedChatMessage = {
+      role: "assistant",
+      content: `正在调用工具：${toolNames}`,
+      timestamp: userMessage.timestamp + 1,
+      tool_calls: toolStartData,
+      source: null
+    };
+
+    // 将新消息 push 到 chats.value 中
+    chats.value = [
+      ...chats.value,
+      newAssistantCallToolMessage
+    ];
+    
+
+  }
+  // ================= 处理工具调用结束时间 =================   
+  const handleToolEnd = (toolEndData: any) =>  {
+    // 向 chats 列表中插入一条新消息
+    const newToolMessage: ExtendedChatMessage = {
+      role: "tool",
+      tool_call_id: toolEndData.tool_call_id,
+      content: toolEndData.content,
+      timestamp: userMessage.timestamp + 2,
+      source: null
+    };
+
+    // 将新消息 push 到 chats.value 中
+    chats.value = [
+      ...chats.value,
+      newToolMessage
+    ];
+  }
   // ================= 处理来源数据的方法 =================
   const handleSourceData = (sourceData: any) => {
     chats.value = chats.value.map(msg => {
@@ -760,6 +1056,13 @@ const handleEdit = (item) => {
   // 查找匹配的模型对象，使用 available_model_id 进行匹配
   const selectedModel = availableModelStore.llmAvailableModelCfg.find(model => model.id === item.available_model_id);
   
+  // 处理MCP服务回显
+  const selectedMcpKeys = item.selected_mcp_servers 
+    ? Object.keys(item.selected_mcp_servers)
+    : [];
+  // 处理MCP服务配置 - 保留原始配置
+  const mcpServerConfigs = item.selected_mcp_servers || null;
+
   CreateConversationForm.value = {
     title: item.title,
     model: selectedModel?.id || null,  // 使用 id 而不是 name
@@ -767,7 +1070,9 @@ const handleEdit = (item) => {
     temperature: item.temperature,
     knowledge_base_ids: knowledgeBaseIds,
     conv_id: item.id,
-    use_memory: !!item.use_memory // 同步 use_memory 字段
+    use_memory: !!item.use_memory, // 同步 use_memory 字段
+    selectedMcpServices: selectedMcpKeys, // 用于回显选中的key
+    mcp_server_configs: mcpServerConfigs // 保留原始配置
   } as CreateConversationParams; // 强制类型转换
 };
 
@@ -779,12 +1084,24 @@ const handleConversationSubmit = async () => {
       return;
     }
 
+    // 准备MCP服务配置
+    const selectedMcpConfigs = {};
+    CreateConversationForm.value.selectedMcpServices.forEach(key => {
+      const option = mcpServerOptions.value.find(opt => opt.key === key);
+      if (option) {
+        selectedMcpConfigs[option.name] = option.value;
+      }
+    });
+
     // 使用对象解构排除 model 字段
     const { model, ...rest } = CreateConversationForm.value;
     const submitForm = {
       ...rest,
       available_model_id: model,  // 直接使用 model 值，因为它已经是 id
-      use_memory: CreateConversationForm.value.use_memory ? 1 : 0 // Convert boolean to 1 or 0
+      use_memory: CreateConversationForm.value.use_memory ? 1 : 0, // Convert boolean to 1 or 0
+      mcp_server_configs: Object.keys(selectedMcpConfigs).length > 0 
+        ? selectedMcpConfigs 
+        : null
     };
 
     if (isEditing.value) {
@@ -812,21 +1129,25 @@ const handleModalClose = () => {
     temperature: 0.3,
     knowledge_base_ids: [],
     use_memory: true, // 初始化 use_memory 为 true
-    conv_id: ""
+    conv_id: "",
+    mcp_server_configs: null, // 重置MCP服务配置
+    selectedMcpServices: [] // 重置选中项
   };
 };
 
+
 // 会话点击处理
-const handleConversationClick = ({ key }: { key: string }) => {
-  activeKey.value = [key];
-  console.log('Selected:', key); // 添加调试日志
-  fetchMessageHistory(key);
+const handleConversationClick = async (info: { key: Key }) => {
+  activeKey.value = [info.key.toString()]; // 确保转换为字符串
+  console.log('Selected:', info.key);
+  await fetchMessageHistory(info.key.toString());
 };
 
 // 初始化
 onMounted(async () => {
   await fetchConversations();
   await fetchKnowledgeList();
+  await mcpStore.fetchData()
   await availableModelStore.loadAvailableModelCfg();
 });
 

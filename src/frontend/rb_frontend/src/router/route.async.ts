@@ -48,6 +48,15 @@ const asyncRoutes: Array<RouteRecordRaw> = [
     component: () => import('../views/memory.vue'),
   },
   {
+    path: '/mcp',
+    name: 'mcp',
+    meta: {
+      title: 'MCP管理',
+      icon: '',
+    },
+    component: () => import('../views/mcp.vue'),
+  },
+  {
     path: '/voice',
     name: 'voice',
     meta: {

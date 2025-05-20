@@ -2,7 +2,7 @@
 import zhCN from 'ant-design-vue/es/locale/zh_CN';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { FolderOpenOutlined, HomeOutlined, BookOutlined, RocketOutlined, DeploymentUnitOutlined } from '@ant-design/icons-vue';
+import { ToolOutlined, FolderOpenOutlined, HomeOutlined, BookOutlined, RocketOutlined, DeploymentUnitOutlined } from '@ant-design/icons-vue';
 import { XProvider } from 'ant-design-x-vue';
 
 const locale = zhCN;
@@ -22,9 +22,9 @@ const handleSelect = (event: { key: string }) => {
   else if (key === '3') {
     router.push('/model_cfg');
   }
-  // else if (key === '4') {
-    // router.push('/voice');
-  // }
+  else if (key === '4') {
+    router.push('/mcp');
+  }
 };
 
 import VoiceInteraction from '@/components/VoiceInteraction.vue'
@@ -64,6 +64,13 @@ import VoiceInteraction from '@/components/VoiceInteraction.vue'
               <DeploymentUnitOutlined />
             </template>
             <span>记忆管理</span>
+          </a-menu-item>
+
+          <a-menu-item key="4">
+            <template #icon>
+              <ToolOutlined />
+            </template>
+            <span>MCP管理</span>
           </a-menu-item>
 
           <a-menu-item key="3">

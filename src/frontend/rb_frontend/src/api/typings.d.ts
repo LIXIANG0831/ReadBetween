@@ -1,9 +1,32 @@
 declare namespace Api {
-  type queryMemoryParams = {
-    condition: string;
-    condition_parameters: {
-      [key: string]: any;
-    };
+  /**
+   * MCP 服务器配置
+   */
+  type McpServerConfig = {
+    /** 服务器类型 */
+    type: string;
+    /** 启动命令 */
+    command?: string | null;
+    /** 命令参数 */
+    args?: string[] | null;
+    /** 环境变量 */
+    env?: Record<string, string> | null;
+    /** 服务器URL */
+    url?: string | null;
+    /** 请求头配置 */
+    headers?: Record<string, string> | null;
+  }
+
+  /**
+   * MCP 服务器数据
+   */
+  type McpServersData = {
+    /** 
+     * MCP 服务器配置映射
+     * @key 服务器名称或ID
+     * @value 服务器配置
+     */
+    mcpServers: Record<string, McpServerConfig>;
   }
   /**
    * 创建模型配置的参数。
@@ -91,21 +114,46 @@ declare namespace Api {
   };
   
     /**
-   * 创建会话的参数。
-   * @param {string | null} [title] - 会话的标题，可选。
-   * @param {string} model - 使用的模型名称。
-   * @param {string} system_prompt - 系统提示。
-   * @param {number} temperature - 控制生成文本的随机性。
-   * @param {string[] | null} [knowledge_base_ids] - 绑定的知识库ID列表，可选。
-   */
-  type CreateConversationParams = {
-    title?: string | null;
-    available_model_id: string;
-    system_prompt: string;
-    temperature: number;
-    knowledge_base_ids?: string[] | null;
-    use_memory?: number | null;
-  };
+ * 创建会话的参数。
+ * @param {string | null} [title] - 会话的标题，可选。
+ * @param {string} available_model_id - 使用的模型ID。
+ * @param {string} system_prompt - 系统提示。
+ * @param {number} temperature - 控制生成文本的随机性。
+ * @param {string[] | null} [knowledge_base_ids] - 绑定的知识库ID列表，可选。
+ * @param {number | null} [use_memory] - 是否使用记忆功能，可选。
+ * @param {Record<string, unknown> | null} [mcp_server_configs] - MCP服务器配置，可选。
+ */
+type CreateConversationParams = {
+  title?: string | null;
+  available_model_id: string;
+  system_prompt: string;
+  temperature: number;
+  knowledge_base_ids?: string[] | null;
+  use_memory?: number | null;
+  mcp_server_configs?: Record<string, unknown> | null;
+};
+
+/**
+ * 更新会话的参数。
+ * @param {string} conv_id - 要更新的会话ID。
+ * @param {string | null} [title] - 新的会话标题，可选。
+ * @param {string | null} [available_model_id] - 新的模型ID，可选。
+ * @param {string | null} [system_prompt] - 新的系统提示，可选。
+ * @param {number | null} [temperature] - 新的温度值，可选。
+ * @param {string[] | null} [knowledge_base_ids] - 新的知识库ID列表，可选。
+ * @param {number | null} [use_memory] - 是否使用记忆功能，可选。
+ * @param {Record<string, unknown> | null} [mcp_server_configs] - MCP服务器配置，可选。
+ */
+type UpdateConversationParams = {
+  conv_id: string;
+  title?: string | null;
+  available_model_id?: string | null;
+  system_prompt?: string | null;
+  temperature?: number | null;
+  knowledge_base_ids?: string[] | null;
+  use_memory?: number | null;
+  mcp_server_configs?: Record<string, unknown> | null;
+};
 
   /**
    * 删除会话的参数。
@@ -113,24 +161,6 @@ declare namespace Api {
    */
   type DeleteConversationParams = {
     conv_id: string;
-  };
-
-  /**
-   * 更新会话的参数。
-   * @param {string} conv_id - 要更新的会话ID。
-   * @param {string | null} [title] - 新的会话标题，可选。
-   * @param {string | null} [system_prompt] - 新的系统提示，可选。
-   * @param {number | null} [temperature] - 新的温度值，可选。
-   * @param {string[] | null} [knowledge_base_ids] - 新的知识库ID列表，可选。
-   */
-  type UpdateConversationParams = {
-    conv_id: string;
-    title?: string | null;
-    system_prompt?: string | null;
-    temperature?: number | null;
-    knowledge_base_ids?: string[] | null;
-    use_memory?: number | null;
-    available_model_id?: string | null;
   };
 
   /**

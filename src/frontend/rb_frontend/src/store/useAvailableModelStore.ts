@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia';
+import { defineStore } from 'pinia'
 import { getAvailableModelCfgList } from '@/api/model_cfg';
 
 interface ModelConfig {
@@ -15,7 +15,7 @@ interface AvailableModelState {
   isLoading: boolean;
 }
 
-export const useAvailableModelStore = defineStore('availableModelStore', {
+export const useAvailableModelStore = defineStore('available_model', {
   state: (): AvailableModelState => ({
     allAvailableModelCfg: null, // 所有模型配置
     llmAvailableModelCfg: [], // LLM 类型的模型配置
