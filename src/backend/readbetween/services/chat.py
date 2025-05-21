@@ -484,7 +484,7 @@ class ChatService:
                         pass
 
                 # Yield tool end information
-                tool_yield_msg["output"] = json.loads(call_tool_result_content_msg.get("content", "工具调用结果异常"))
+                tool_yield_msg["output"] = call_tool_result_content_msg.get("content", "工具调用结果异常")
                 yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
                 yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
 
