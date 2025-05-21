@@ -160,6 +160,8 @@ class ChatService:
         """流式聊天处理"""
         # 来源信息
         source_msg_list: List[SourceMsg] = []
+        # 初始化 mcp_client as None
+        mcp_client = None
         # 获取对话配置
         conversation_info: ConversationInfo = message_data.conversation_info
         if not conversation_info:
@@ -297,8 +299,6 @@ class ChatService:
                                     tc["function"]["arguments"] += tcchunk.function.arguments
 
                 # 调用MCP工具获取结果
-                assistant_tool_calls_msg = None
-                tool_calls_msg = None
                 try:
                     if len(func_call_list) > 0:  # 模型是否进行工具调用的判断条件
                         # 进行MCP工具调用返回流式工具信息
@@ -315,13 +315,15 @@ class ChatService:
 
                 except Exception as e:
                     error_msg = f"MCP调用失败: {str(e)}"
-                    if assistant_tool_calls_msg is not None:
-                        await MessageDao.delete_message(assistant_tool_calls_msg.id)
-                        logger_util.info(f"已回滚模型调用工具响应消息: {assistant_tool_calls_msg.id}")
-                    if tool_calls_msg is not None:
-                        await MessageDao.delete_message(tool_calls_msg.id)
-                        logger_util.info(f"已回滚工具调用响应消息: {tool_calls_msg.id}")
                     raise Exception(error_msg)
+
+                finally:
+                    # 确保无论成功还是失败都会释放MCP连接
+                    if mcp_client is not None:  # Only cleanup if mcp_client was actually initialized
+                        try:
+                            await mcp_client.cleanup()
+                        except Exception as cleanup_error:
+                            logger_util.error(f"清理MCP客户端时出错: {cleanup_error}")
 
             except Exception as e:
                 error_msg = f"模型响应失败: {str(e)}"
@@ -504,11 +506,6 @@ class ChatService:
                 await MessageDao.delete_message(tool_calls_msg.id)
                 logger_util.info(f"已回滚工具调用响应消息: {tool_calls_msg.id}")
             raise Exception(f"MCP调用失败: {str(e)}")
-
-        finally:
-            # 确保无论成功还是失败都会释放MCP连接
-            if mcp_client is not None:
-                await mcp_client.cleanup()
 
     @classmethod
     async def _format_conversation_response(cls, conv: Conversation):
