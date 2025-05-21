@@ -232,6 +232,10 @@ const roleConfig = ref({
   assistant: {
     name: 'Assistant',
     avatar: 'src/assets/bot.svg'
+  },
+  tool: {
+    name: 'Tool',
+    avatar: 'src/assets/tool.svg'
   }
 });
 
