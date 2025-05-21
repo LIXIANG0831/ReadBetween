@@ -204,7 +204,7 @@ class ChatService:
         if conversation_info.conversation.use_memory == 1 and is_multimodal_query is False:
             logger_util.debug(f"用户开启并使用记忆")
             try:
-                final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 1)
+                final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
                 logger_util.debug(f"用户召回记忆:\n{final_query}")
             except Exception as e:
                 logger_util.error(f"记忆召回失败: {e}")
@@ -366,11 +366,6 @@ class ChatService:
             # yield f"data: [ERROR] {e}\n\n"
             yield cls._format_stream_response(event="ERROR", text=f"{e}")
 
-        finally:
-            # 确保无论成功还是失败都会释放MCP连接
-            if mcp_client is not None:
-                await mcp_client.cleanup()
-
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
         """构建 OpenAI 需要的消息格式"""
@@ -510,6 +505,11 @@ class ChatService:
                 logger_util.info(f"已回滚工具调用响应消息: {tool_calls_msg.id}")
             raise Exception(f"MCP调用失败: {str(e)}")
 
+        finally:
+            # 确保无论成功还是失败都会释放MCP连接
+            if mcp_client is not None:
+                await mcp_client.cleanup()
+
     @classmethod
     async def _format_conversation_response(cls, conv: Conversation):
         return {
@@ -570,10 +570,15 @@ class ChatService:
                 # 保存来源信息
                 source_list.append(SourceMsg(source="kb", title=retrieve_result.metadata['title'], url=minio_file_url))
                 # TODO 考虑是否抽象为配置项
-                if retrieve_result.source == 'milvus' and float(retrieve_result.score) > 0.75:
+                # if retrieve_result.source == 'milvus' and float(retrieve_result.score) < 1:  # 较为宽松的召回
+                if retrieve_result.source == 'milvus' and float(retrieve_result.score) < 0.9:  # 较为严格的召回
                     recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
-                if retrieve_result.source == 'es' and float(retrieve_result.score) < 5:
+                    logger_util.debug(f"Milvus Score: {float(retrieve_result.score)}")
+                # if retrieve_result.source == 'es' and float(retrieve_result.score) > 2.5:  # 较为宽松的召回
+                if retrieve_result.source == 'es' and float(retrieve_result.score) > 4.5:  # 较为严格的召回
                     recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
+                    logger_util.debug(f"ES Score: {float(retrieve_result.score)}")
+
 
         if recall_chunk:
             return f"""
@@ -617,6 +622,8 @@ class ChatService:
         memory_tool = MemoryUtil(memory_config)
         # 检索记忆
         related_memories, memory_str = memory_tool.search_memories(query=query, user_id=user_id, limit=limit)
+        logger_util.debug(f"记忆召回[results(向量)/relations(图)]: {related_memories}")
+        logger_util.debug(f"记忆召回文本内容\n: {memory_str}")
         # 添加记忆
         # memory_tool.add_memory(text=query, user_id=user_id)
         # 使用Celery后台添加记忆
@@ -625,7 +632,7 @@ class ChatService:
         original_memories = related_memories.get("results", [])
         # 图记忆
         graph_entities = related_memories.get("relations", [])
-        if len(graph_entities) == 0:
+        if len(graph_entities) == 0 and len(original_memories) == 0:
             return message
         else:
             return f"""
