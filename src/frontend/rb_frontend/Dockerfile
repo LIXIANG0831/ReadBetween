@@ -1,14 +1,17 @@
 # 使用官方 Node.js 镜像作为构建环境
-FROM docker.m.daocloud.io/library/nginx:alpine as builder
+FROM docker.m.daocloud.io/library/node:alpine as builder
 
 # 设置工作目录
 WORKDIR /app
+
+# 首先全局安装 pnpm
+RUN npm install -g pnpm
 
 # 复制 package.json 和 package-lock.json (或 yarn.lock)
 COPY package*.json ./
 
 # 安装依赖
-RUN npm install
+RUN pnpm install
 
 # 复制环境变量
 COPY .env ./
@@ -17,7 +20,7 @@ COPY .env ./
 COPY . .
 
 # 构建生产环境的应用
-RUN npm run build
+RUN pnpm run build
 
 # 使用 Nginx 作为生产服务器
 FROM docker.m.daocloud.io/library/nginx:alpine

@@ -15,7 +15,12 @@ services:
   frontend:
     <<: *defaults
     container_name: readbetween-app-frontend
-    image: readbetween/frontend:v0.0.1
+    image: readbetween/frontend:${TAG}
+    build:
+      context: ../src/frontend/rb_frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
     ports:
       - "18080:80"
     environment:
@@ -33,7 +38,10 @@ services:
   backend:
     <<: *defaults
     container_name: readbetween-app-backend
-    image: readbetween/backend:v0.0.1
+    image: readbetween/backend:${TAG}
+    build:
+      context: ../src/backend/readbetween
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     healthcheck:
