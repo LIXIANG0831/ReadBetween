@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm install
 
 # 复制环境变量
-COPY .env .env.production ./
+COPY .env ./
 
 # 复制项目文件
 COPY . .
