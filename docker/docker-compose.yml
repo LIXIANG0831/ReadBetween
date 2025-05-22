@@ -164,7 +164,7 @@ services:
       NEO4J_apoc_export_file_enabled: "true"
       NEO4J_apoc_import_file_enabled: "true"
       NEO4J_apoc_import_file_use__neo4j__config: "true"
-      NEO4JLABS_PLUGINS: '["apoc"]'
+      NEO4J_PLUGINS: '["apoc"]'
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY}/neo4j/data:/data
       - ${DOCKER_VOLUME_DIRECTORY}/neo4j/logs:/logs
@@ -306,20 +306,3 @@ networks:
   readbetween-network:
     driver: bridge
     attachable: true
-
-# 卷定义
-volumes:
-  mysql-data:
-    driver: local
-    driver_opts:
-      o: bind
-      type: none
-      device: ${DOCKER_VOLUME_DIRECTORY}/mysql/data
-  redis-data:
-    driver: local
-  neo4j-data:
-    driver: local
-  es-data:
-    driver: local
-  milvus-data:
-    driver: loca
