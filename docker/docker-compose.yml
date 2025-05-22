@@ -43,6 +43,8 @@ services:
       retries: 3
       start_period: 10s
     environment:
+
+      PYTHONPATH: /app/readbetween
       # 应用配置
       APP__ENV: ${APP_ENV}
 
@@ -170,11 +172,6 @@ services:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/logs:/logs
       - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/import:/var/lib/neo4j/import
       - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/plugins:/plugins
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7474"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     deploy:
       resources:
         limits:
