@@ -1,25 +1,44 @@
 version: '3.8'
 
+x-defaults: &defaults
+  restart: unless-stopped
+  networks:
+    - readbetween-network
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: 3
+
 services:
+  # 前端服务
   frontend:
+    <<: *defaults
     container_name: readbetween-app-frontend
+    image: readbetween/frontend:${TAG}
     build:
       context: ../src/frontend/rb_frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
     ports:
       - "18080:80"
     environment:
       - VITE_BACKEND_URL=http://backend:8080
-      - VITE_IMAGE_BED_TOKEN="YOUR IMAGES BED TOKEN"
+      - VITE_IMAGE_BED_TOKEN=${VITE_IMAGE_BED_TOKEN}
     depends_on:
       backend:
         condition: service_healthy
-    restart: always
-    networks:
-      - readbetween-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
+  # 后端服务
   backend:
+    <<: *defaults
     container_name: readbetween-app-backend
+    image: readbetween/backend:${TAG}
     build:
       context: ../src/backend/readbetween
       dockerfile: Dockerfile
@@ -33,58 +52,47 @@ services:
       start_period: 10s
     environment:
       # 应用配置
-      APP__ENV: "prod"
-      APP__AUTHOR: "LIXIANG"
-      APP__VERSION: "v1.0"
-      APP__PORT: "8080"
-
-      # 存储配置
-      STORAGE__MYSQL__URI: "mysql+pymysql://root:readbetween0322@mysql:3306/readbetween?charset=utf8mb4"
-      STORAGE__REDIS__URI: "redis://redis:6379"
-      STORAGE__MINIO__SECURE: "false"
-      STORAGE__MINIO__CERT_CHECK: "false"
-      STORAGE__MINIO__ENDPOINT: "minio:9000"
-      STORAGE__MINIO__ACCESS_KEY: "minioadmin"
-      STORAGE__MINIO__SECRET_KEY: "minioadmin"
-      STORAGE__MINIO__DEFAULT_BUCKET: "readbetween"
-      STORAGE__MILVUS__URI: "http://standalone:19530"
-      STORAGE__ES__HOSTS: '["http://es:9200"]'
-      STORAGE__ES__TIMEOUT: "200"
-
-      # 记忆存储配置 - Neo4j
-      MEMORY__NEO4J__URL: "bolt://neo4j:7687"
-      MEMORY__NEO4J__USERNAME: "neo4j"
-      MEMORY__NEO4J__PASSWORD: "readbetween0322"
-
-      # 记忆存储配置 - LLM
-      MEMORY__LLM__BASE_URL: "YOURS OPENAI COMPATIBLE BASE URL"
-      MEMORY__LLM__API_KEY: "YOURS API KEY"
-      MEMORY__LLM__LLM_NAME: "YOURS LLM NAME, e.g. gpt-4o"
-
-      # 记忆存储配置 - Embedding
-      MEMORY__EMBEDDING__BASE_URL: "YOURS OPENAI COMPATIBLE BASE URL"
-      MEMORY__EMBEDDING__API_KEY: "YOURS API KEY"
-      MEMORY__EMBEDDING__EMBEDDING_NAME: "YOURS EMBEDDING NAME, e.g. text-embedding-ada-002"
-      MEMORY__EMBEDDING__DIMENSION: "YOURS EMBEDDING DIMENSION, e.g. 768"
-      MEMORY__MILVUS_MEMORY_NAME: "readbetween_memory"
+      APP__ENV: ${APP_ENV}
 
       # 日志配置
       LOGGER__BASE_LOG_PATH: "/app/logs"
 
-      # 系统配置
-      SYSTEM__MODELS__BASE_DIR: "./static/models"
-      SYSTEM__MODELS__EMBEDDING_NAME: "iic/nlp_gte_sentence-embedding_chinese-large"
-      SYSTEM__DEFAULT_MODEL_PROVIDER: "[{\"Qwen\": \"qwen\"},{\"OpenAI\": \"openai\"},{\"OpenAI-Compatible\": \"openai-compatible\"},{\"vLLM\": \"hosted_vllm\"}]"
+      # 存储配置
+      STORAGE__MYSQL__URI: "mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?charset=utf8mb4"
+      STORAGE__REDIS__URI: "redis://:${REDIS_PASSWORD}@redis:6379"
+      STORAGE__MINIO__ENDPOINT: "minio:9000"
+      STORAGE__MINIO__ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      STORAGE__MINIO__SECRET_KEY: ${MINIO_SECRET_KEY}
+      STORAGE__MINIO__DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKET}
+      STORAGE__MILVUS__URI: "http://standalone:19530"
+      STORAGE__ES__HOSTS: '["http://es:9200"]'
+      STORAGE__ES__TIMEOUT: "200"
 
-      # API配置
-      API__LIVEKIT__API_KEY: "YOURS LIVEKIT API KEY"
-      API__LIVEKIT__API_SECRET: "YOURS LIVEKIT API SECRET"
-      API__LIVEKIT__URL: "YOURS LIVEKIT URL, e.g. ws://127.0.0.1:7880"
-      API__DEEPGRAM__API_KEY: "YOURS DEEPGRAM API KEY"
-      API__CARTESIA__API_KEY: "YOURS CARTESIA API KEY"
+      # Neo4j 配置
+      MEMORY__NEO4J__URL: "bolt://neo4j:7687"
+      MEMORY__NEO4J__USERNAME: "neo4j"
+      MEMORY__NEO4J__PASSWORD: ${NEO4J_PASSWORD}
 
+      # LLM 配置
+      MEMORY__LLM__BASE_URL: ${LLM_BASE_URL}
+      MEMORY__LLM__API_KEY: ${LLM_API_KEY}
+      MEMORY__LLM__LLM_NAME: ${LLM_MODEL_NAME}
+
+      # 嵌入配置
+      MEMORY__EMBEDDING__BASE_URL: ${EMBEDDING_BASE_URL}
+      MEMORY__EMBEDDING__API_KEY: ${EMBEDDING_API_KEY}
+      MEMORY__EMBEDDING__EMBEDDING_NAME: ${EMBEDDING_MODEL_NAME}
+      MEMORY__EMBEDDING__DIMENSION: ${EMBEDDING_DIMENSION}
+      MEMORY__MILVUS_MEMORY_NAME: ${MILVUS_MEMORY_NAME}
+
+      # API 配置
+      API__LIVEKIT__API_KEY: ${LIVEKIT_API_KEY}
+      API__LIVEKIT__API_SECRET: ${LIVEKIT_API_SECRET}
+      API__LIVEKIT__URL: ${LIVEKIT_URL}
+      API__DEEPGRAM__API_KEY: ${DEEPGRAM_API_KEY}
+      API__CARTESIA__API_KEY: ${CARTESIA_API_KEY}
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/readbetween/logs:/app/logs
+      - ${DOCKER_VOLUME_DIRECTORY}/readbetween/logs:/app/logs
     depends_on:
       mysql:
         condition: service_healthy
@@ -94,85 +102,106 @@ services:
         condition: service_healthy
       standalone:
         condition: service_healthy
-    networks:
-      - readbetween-network
-    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 1G
 
-  neo4j:
-    container_name: readbetween-neo4j
-    image: neo4j:latest
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    environment:
-      NEO4J_AUTH: neo4j/readbetween0322
-      NEO4J_apoc_export_file_enabled: "true"
-      NEO4J_apoc_import_file_enabled: "true"
-      NEO4J_apoc_import_file_use__neo4j__config: "true"
-      NEO4JLABS_PLUGINS: '["apoc"]'
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/data:/data
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/logs:/logs
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/import:/var/lib/neo4j/import
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/plugins:/plugins
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7474"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: on-failure
-
-  redis:
-    container_name: readbetween-redis
-    image: redis:7.0.4
-    ports:
-      - "6379:6379"
-    environment:
-      TZ: Asia/Shanghai
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/redis/data:/data
-      #- ${DOCKER_VOLUME_DIRECTORY:-.}/redis/redis.conf:/etc/redis.conf
-    command: redis-server /etc/redis.conf
-    healthcheck:
-      test: ["CMD-SHELL", 'redis-cli ping | grep -e "PONG\|NOAUTH"']
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    restart: on-failure
-
+  # MySQL 服务
   mysql:
+    <<: *defaults
     container_name: readbetween-mysql
     image: mysql:8.3.0
     ports:
       - "3306:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: "readbetween0322"
-      MYSQL_DATABASE: "readbetween"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
       TZ: Asia/Shanghai
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/data:/var/lib/mysql
-      #- ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/conf/my.cnf:/etc/mysql/my.cnf
+      - ${DOCKER_VOLUME_DIRECTORY}/mysql/data:/var/lib/mysql
+      - ${DOCKER_VOLUME_DIRECTORY}/mysql/conf:/etc/mysql/conf.d
     healthcheck:
-      test: ["CMD-SHELL", "exit | mysql -u root -p$MYSQL_ROOT_PASSWORD"]
-      start_period: 30s
-      interval: 20s
-      timeout: 10s
-      retries: 4
-    restart: on-failure
+      test: ["CMD-SHELL", "mysqladmin ping -u root -p$$MYSQL_ROOT_PASSWORD | grep 'mysqld is alive' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1G
 
+  # Redis 服务
+  redis:
+    <<: *defaults
+    container_name: readbetween-redis
+    image: redis:7.0.4-alpine
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/redis/data:/data
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Neo4j 服务
+  neo4j:
+    <<: *defaults
+    container_name: readbetween-neo4j
+    image: neo4j:5.13.0
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+      NEO4JLABS_PLUGINS: '["apoc"]'
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/data:/data
+      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/logs:/logs
+      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/import:/var/lib/neo4j/import
+      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/plugins:/plugins
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7474"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # Milvus 相关服务
   etcd:
+    <<: *defaults
     container_name: readbetween-milvus-etcd
     image: quay.io/coreos/etcd:v3.5.5
     environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: 1000
+      ETCD_QUOTA_BACKEND_BYTES: 4294967296
+      ETCD_SNAPSHOT_COUNT: 50000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus-server-volumes/etcd:/etcd
-    command: etcd -advertise-client-urls=http://etcd:2379 \
-      -listen-client-urls http://0.0.0.0:2379 \
-      --data-dir /etcd
+      - ${DOCKER_VOLUME_DIRECTORY}/milvus/etcd:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ["CMD", "etcdctl", "endpoint", "health"]
       interval: 30s
@@ -180,16 +209,17 @@ services:
       retries: 3
 
   minio:
+    <<: *defaults
     container_name: readbetween-milvus-minio
     image: minio/minio:RELEASE.2023-03-20T20-16-18Z
     environment:
-      MINIO_ACCESS_KEY: "minioadmin"
-      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
     ports:
       - "9001:9001"
       - "9000:9000"
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus-server-volumes/minio:/minio_data
+      - ${DOCKER_VOLUME_DIRECTORY}/milvus/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -198,6 +228,7 @@ services:
       retries: 3
 
   standalone:
+    <<: *defaults
     container_name: readbetween-milvus-standalone
     image: milvusdb/milvus:v2.4.9
     command: ["milvus", "run", "standalone"]
@@ -207,7 +238,7 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus-server-volumes/milvus:/var/lib/milvus
+      - ${DOCKER_VOLUME_DIRECTORY}/milvus/milvus:/var/lib/milvus
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
@@ -224,6 +255,7 @@ services:
         condition: service_healthy
 
   attu:
+    <<: *defaults
     container_name: readbetween-milvus-attu
     image: zilliz/attu:v2.4
     environment:
@@ -233,44 +265,69 @@ services:
     depends_on:
       standalone:
         condition: service_healthy
+
+  # Elasticsearch 服务
   es:
+    <<: *defaults
     container_name: readbetween-es
     image: elasticsearch:8.12.0
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/es/data:/usr/share/elasticsearch/data
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/es/plugins:/usr/share/elasticsearch/plugins
-      #- ${DOCKER_VOLUME_DIRECTORY:-.}/es/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - ${DOCKER_VOLUME_DIRECTORY}/es/data:/usr/share/elasticsearch/data
+      - ${DOCKER_VOLUME_DIRECTORY}/es/plugins:/usr/share/elasticsearch/plugins
     ports:
       - "9200:9200"
-      - "9300:9300"
-    networks:
-      - readbetween-network
-    restart: on-failure
-    privileged: true
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:9200 || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
 
+  # Kibana 服务
   kibana:
+    <<: *defaults
     container_name: readbetween-kibana
     image: kibana:8.12.0
     environment:
       - ELASTICSEARCH_HOSTS=http://es:9200
     ports:
       - "5601:5601"
-    networks:
-      - readbetween-network
     depends_on:
       es:
         condition: service_healthy
-    restart: on-failure
 
+# 网络定义
 networks:
   readbetween-network:
-    name: readbetween-network
+    driver: bridge
+    attachable: true
+
+# 卷定义
+volumes:
+  mysql-data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${DOCKER_VOLUME_DIRECTORY}/mysql/data
+  redis-data:
+    driver: local
+  neo4j-data:
+    driver: local
+  es-data:
+    driver: local
+  milvus-data:
+    driver: loca
