@@ -1,8 +1,22 @@
 version: '3.8'
 
 services:
-  readbetween:
-    container_name: readbetween-app
+  frontend:
+    container_name: readbetween-app-frontend
+    build:
+      context: ../src/frontend/rb_frontend
+      dockerfile: Dockerfile
+    ports:
+      - "18080:80"
+    environment:
+      - VITE_BACKEND_URL=http://backend:8080
+      - VITE_IMAGE_BED_TOKEN="YOUR IMAGES BED TOKEN"
+    restart: always
+    networks:
+      - readbetween-network
+
+  backend:
+    container_name: readbetween-app-backend
     build:
       context: ../src/backend/readbetween
       dockerfile: Dockerfile
@@ -25,7 +39,7 @@ services:
       STORAGE__MINIO__SECRET_KEY: "minioadmin"
       STORAGE__MINIO__DEFAULT_BUCKET: "readbetween"
       STORAGE__MILVUS__URI: "http://standalone:19530"
-      STORAGE__ES__HOSTS: '["http://localhost:9200"]'
+      STORAGE__ES__HOSTS: '["http://es:9200"]'
       STORAGE__ES__TIMEOUT: "200"
 
       # 记忆存储配置 - Neo4j
@@ -108,7 +122,7 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/redis/data:/data
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/redis/redis.conf:/etc/redis.conf
+      #- ${DOCKER_VOLUME_DIRECTORY:-.}/redis/redis.conf:/etc/redis.conf
     command: redis-server /etc/redis.conf
     healthcheck:
       test: ["CMD-SHELL", 'redis-cli ping | grep -e "PONG\|NOAUTH"']
@@ -127,8 +141,8 @@ services:
       MYSQL_DATABASE: "readbetween"
       TZ: Asia/Shanghai
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/conf/my.cnf:/etc/mysql/my.cnf
       - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/data:/var/lib/mysql
+      #- ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/conf/my.cnf:/etc/mysql/my.cnf
     healthcheck:
       test: ["CMD-SHELL", "exit | mysql -u root -p$MYSQL_ROOT_PASSWORD"]
       start_period: 30s
@@ -210,6 +224,43 @@ services:
     depends_on:
       standalone:
         condition: service_healthy
+  es:
+    container_name: readbetween-es
+    image: elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/es/data:/usr/share/elasticsearch/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/es/plugins:/usr/share/elasticsearch/plugins
+      #- ${DOCKER_VOLUME_DIRECTORY:-.}/es/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - readbetween-network
+    restart: on-failure
+    privileged: true
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9200 || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    container_name: readbetween-kibana
+    image: kibana:8.12.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://es:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - readbetween-network
+    depends_on:
+      es:
+        condition: service_healthy
+    restart: on-failure
 
 networks:
   readbetween-network:
