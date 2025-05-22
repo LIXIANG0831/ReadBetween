@@ -1,10 +1,10 @@
 services:
-  memoji_frontend:
-    image: memoji_frontend
+  frontend:
+    image: readbetween_frontend
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: memoji_frontend
+    container_name: readbetween-app-frontend
     restart: always
     ports:
       - "29014:80"

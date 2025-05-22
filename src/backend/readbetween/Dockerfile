@@ -6,6 +6,15 @@ WORKDIR /app
 # 复制项目文件到工作目录
 COPY . /app
 
+# 安装系统依赖
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    patch \
+    build-essential \
+    libpq-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # 使用清华源安装依赖
 RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 

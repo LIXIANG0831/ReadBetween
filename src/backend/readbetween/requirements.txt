@@ -179,7 +179,7 @@ marshmallow==3.23.0
 matplotlib==3.9.2
 matplotlib-inline==0.1.7
 mdurl==0.1.2
-megatron-util==1.3.2
+megatron-util
 mem0ai==0.1.21
 milvus-lite==2.4.10
 minio==7.2.10
@@ -204,7 +204,7 @@ nibabel==5.3.1
 nipype==1.8.6
 nltk==3.9.1
 numba==0.61.0
-numpy==1.26.4
+numpy>=1.26.4
 olefile==0.47
 omegaconf==2.3.0
 onnx==1.17.0
