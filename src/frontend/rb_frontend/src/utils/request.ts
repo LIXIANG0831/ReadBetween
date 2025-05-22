@@ -8,7 +8,7 @@ function createService() {
   // 创建一个 axios 实例命名为 service
   const service = axios.create({
     // baseURL: 'https://emoji.just4dream.club',
-    baseURL: 'http://localhost:8080',
+    baseURL: import.meta.env.VITE_BACKEND_URL,
     timeout: 50000,
     headers: { 'Content-Type': 'application/json' },
   });

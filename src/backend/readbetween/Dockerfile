@@ -1,4 +1,4 @@
-FROM docker.qdai.tech/python:3.10-slim
+FROM m.daocloud.io/docker.io/library/python:3.10-slim
 
 # 设置工作目录
 WORKDIR /app
