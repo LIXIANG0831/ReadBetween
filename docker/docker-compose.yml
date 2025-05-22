@@ -119,11 +119,11 @@ services:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/data:/var/lib/mysql
       - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/conf:/etc/mysql/conf.d
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -u root -p$$MYSQL_ROOT_PASSWORD | grep 'mysqld is alive' || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 6
-      start_period: 40s
+      test: [ "CMD", "mysql", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}", "-e", "SELECT 1;" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     deploy:
       resources:
         limits:
@@ -167,6 +167,12 @@ services:
       NEO4J_apoc_import_file_enabled: "true"
       NEO4J_apoc_import_file_use__neo4j__config: "true"
       NEO4J_PLUGINS: '["apoc"]'
+    healthcheck:
+      test: [ "CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD} 'MATCH (n) RETURN count(n)' || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/data:/data
       - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/logs:/logs
