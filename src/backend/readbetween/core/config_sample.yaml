@@ -1,3 +1,5 @@
+# 该配置文件仅用于 test 包的调试
+# 生产中使用环境变量的方式
 app:
   author: LIXIANG
   version: v1.0

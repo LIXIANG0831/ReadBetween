@@ -83,6 +83,7 @@ class LoggerConfig(BaseModel):
     base_log_path: str = "./readbetween_log"
 
 
+# Deprecated
 class SystemConfig(BaseModel):
     class ModelsConfig(BaseModel):
         class EmbeddingConfig(BaseModel):
@@ -102,7 +103,7 @@ class Settings(BaseConfig):
     storage: StorageConfig = StorageConfig()
     memory: MemoryConfig = MemoryConfig()
     logger: LoggerConfig = LoggerConfig()
-    system: SystemConfig = SystemConfig()
+    # system: SystemConfig = SystemConfig()
 
     model_config = SettingsConfigDict(
         env_file='.env',  # 从 BaseConfig 继承（或重新声明）
