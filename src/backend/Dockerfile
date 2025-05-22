@@ -26,7 +26,7 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
     && echo "Asia/Shanghai" > /etc/timezone
 
 # 设置Python路径
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/readbetween
 
 # 启动应用
 CMD ["sh", "-c", "celery -A readbetween.core.celery_app worker --loglevel=info & uvicorn readbetween.main:app --workers 2 --port 8080 --host 0.0.0.0"]
