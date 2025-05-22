@@ -16,7 +16,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # 使用清华源安装依赖
-RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN cd /app/readbetween && pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 暴露端口
 EXPOSE 8080

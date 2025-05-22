@@ -40,7 +40,7 @@ services:
     container_name: readbetween-app-backend
     image: readbetween/backend:${TAG}
     build:
-      context: ../src/backend/readbetween
+      context: ../src/backend
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
