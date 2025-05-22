@@ -84,7 +84,7 @@ services:
       API__DEEPGRAM__API_KEY: ${DEEPGRAM_API_KEY}
       API__CARTESIA__API_KEY: ${CARTESIA_API_KEY}
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/readbetween/logs:/app/logs
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/readbetween/logs:/app/logs
     depends_on:
       mysql:
         condition: service_healthy
@@ -114,8 +114,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       TZ: Asia/Shanghai
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/mysql/data:/var/lib/mysql
-      - ${DOCKER_VOLUME_DIRECTORY}/mysql/conf:/etc/mysql/conf.d
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/data:/var/lib/mysql
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/conf:/etc/mysql/conf.d
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -u root -p$$MYSQL_ROOT_PASSWORD | grep 'mysqld is alive' || exit 1"]
       interval: 15s
@@ -139,7 +139,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       TZ: Asia/Shanghai
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/redis/data:/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/redis/data:/data
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping | grep PONG"]
@@ -166,10 +166,10 @@ services:
       NEO4J_apoc_import_file_use__neo4j__config: "true"
       NEO4J_PLUGINS: '["apoc"]'
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/data:/data
-      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/logs:/logs
-      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/import:/var/lib/neo4j/import
-      - ${DOCKER_VOLUME_DIRECTORY}/neo4j/plugins:/plugins
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/data:/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/logs:/logs
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/import:/var/lib/neo4j/import
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/neo4j/plugins:/plugins
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7474"]
       interval: 30s
@@ -192,7 +192,7 @@ services:
       ETCD_QUOTA_BACKEND_BYTES: 4294967296
       ETCD_SNAPSHOT_COUNT: 50000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/milvus/etcd:/etcd
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus/etcd:/etcd
     command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ["CMD", "etcdctl", "endpoint", "health"]
@@ -211,7 +211,7 @@ services:
       - "9001:9001"
       - "9000:9000"
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/milvus/minio:/minio_data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -230,7 +230,7 @@ services:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/milvus/milvus:/var/lib/milvus
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus/milvus:/var/lib/milvus
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
@@ -273,8 +273,8 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY}/es/data:/usr/share/elasticsearch/data
-      - ${DOCKER_VOLUME_DIRECTORY}/es/plugins:/usr/share/elasticsearch/plugins
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/es/data:/usr/share/elasticsearch/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/es/plugins:/usr/share/elasticsearch/plugins
     ports:
       - "9200:9200"
     healthcheck:
