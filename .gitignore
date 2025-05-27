@@ -4,6 +4,8 @@
 /src/backend/readbetween/core/config_test.yaml
 /src/backend/readbetween/static
 /src/backend/test/mineru/*/
+/src/backend/test/chromadb/
+docker/*/
 node_modules
 
 __pycache__/
