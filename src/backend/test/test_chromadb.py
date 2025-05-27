@@ -1,10 +1,22 @@
 # pip install chromadb
 import chromadb
+import chromadb.utils.embedding_functions as embedding_functions
+openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+                api_base="https://gpt.cosmoplat.com/v1",
+                api_key="sk-j6rj6sglXDAWPJHr6fC4D63fDbEd42E99b1cC7479384E2B6",
+                model_name="text-embedding-ada-002"
+            )
+
+print(openai_ef(["你好"]))
+
 
 client = chromadb.PersistentClient(path="chromadb")
 
 # switch `create_collection` to `get_or_create_collection` to avoid creating a new collection every time
-collection = client.get_or_create_collection(name="my_collection")
+collection = client.get_or_create_collection(
+    name="my_collection",
+    embedding_function=openai_ef,
+)
 
 # switch `add` to `upsert` to avoid adding the same documents every time
 collection.upsert(
@@ -18,9 +30,14 @@ collection.upsert(
     ids=["id1", "id2", "id3", "id4", "id5"]
 )
 
+# results = collection.query(
+#     query_texts=["春天的湖边"],  # Chroma 会自动向量化文本进行查询
+#     # query_texts=["冬天好冷"],
+#     n_results=2  # how many results to return
+# )
+
 results = collection.query(
-    query_texts=["春天的湖边"],  # Chroma will embed this for you
-    # query_texts=["冬天好冷"],  # Chroma will embed this for you
+    query_embeddings=openai_ef(["春天的湖边"]),  # 直接通过向量查询
     n_results=2  # how many results to return
 )
 
