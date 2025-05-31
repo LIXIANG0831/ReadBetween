@@ -1,3 +1,4 @@
+from readbetween.services.constant import SYSTEM_EMBEDDING_NAME, MODEL_SAVE_PATH
 from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from functools import lru_cache
 from readbetween.config import Settings
@@ -11,9 +12,8 @@ def get_settings() -> Settings:
 
 
 def get_local_embed_manager():
-    from readbetween.config import settings
-    embedding_model = settings.system.models.embedding.name
-    model_dir = settings.system.models.base_dir
+    embedding_model = SYSTEM_EMBEDDING_NAME
+    model_dir = MODEL_SAVE_PATH
 
     lem = LocalEmbedManager()
     lem.initialize(
