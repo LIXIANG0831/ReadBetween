@@ -668,7 +668,7 @@ class ChatService:
 3. **Language Preference:**  
    - Respond in **Chinese** unless otherwise specified.  
 
-4. **Function Calling Protocol (New Rule):**  
+4. **Function Calling Protocol:**  
    - When a user request necessitates **Function Calling** (e.g., real-time data, APIs, or external tools), **automatically invoke the required function without seeking user confirmation**.  
    - Prioritize tool-based results for accuracy and immediacy.  
    - Process the returned data and deliver a finalized answer seamlessly.  
