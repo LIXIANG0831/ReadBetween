@@ -17,13 +17,14 @@ async def create_mcp_server(data: McpServersData):
         # 将数据转换为 JSON 字符串
         data_json = json.dumps(data.dict(exclude_none=True), ensure_ascii=False)
         redis_client.delete(RedisMCPServerKey)
-        redis_client.set(RedisMCPServerKey, data_json)
+        redis_client.delete(RedisMCPServerDetailKey)
 
         mcp_client = MCPClient(data.dict().get("mcpServers", {}))
         await mcp_client.initialize_sessions()
         tools = await mcp_client.get_all_tools()
         await mcp_client.cleanup()
-        redis_client.delete(RedisMCPServerDetailKey)
+
+        redis_client.set(RedisMCPServerKey, data_json)
         redis_client.set(RedisMCPServerDetailKey, json.dumps(tools, ensure_ascii=False))
 
         return resp_200(data=CreateMcpServerResponse(

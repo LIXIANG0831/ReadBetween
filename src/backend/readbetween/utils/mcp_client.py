@@ -37,12 +37,12 @@ class MCPClient:
         for server_name, config in self.server_configs.items():
             server_id = server_name  # 直接使用配置中的名称作为 server_id
             try:
-                if config["type"] == "stdio":
-                    # 处理 stdio 连接
-                    if not config.get("command"):
-                        logger_util.error(f"[{server_id}] 缺少 stdio 必需的 command 参数")
-                        continue
+                if not config.get("url") and  not config.get("command"):
+                    logger_util.error(f"[{server_id}] 无法判断MCP服务器类型")
+                    raise Exception(f"[{server_id}] 无法判断MCP服务器类型")
 
+                if config.get("command") and not config.get("url"):
+                    # 处理 stdio 连接
                     params = StdioServerParameters(
                         command=config["command"],
                         args=config.get("args", []),
@@ -61,12 +61,7 @@ class MCPClient:
                         logger_util.error(traceback.format_exc())  # 打印完整堆栈
                         continue
 
-                elif config["type"] == "sse":
-                    # 处理 SSE 连接
-                    if not config.get("url"):
-                        logger_util.error(f"[{server_id}] 缺少 SSE 必需的 url 参数")
-                        continue
-
+                elif not config.get("command") and config.get("url"):
                     try:
                         connection_ctx = sse_client(
                             url=config["url"],
@@ -88,6 +83,7 @@ class MCPClient:
 
             except Exception as e:
                 logger_util.error(f"[{server_id}] 连接失败：{e}")
+                raise e
 
     async def _update_tool_mapping(self, server_id: str, session: ClientSession):
         """更新工具映射（保持不变）"""
