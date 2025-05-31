@@ -34,11 +34,12 @@
                   清除历史记录
                 </a-button>
               </div> -->
+              <!-- :loading="isLoading" -->
               <Chat
               :chats="chats"
               @message-send="handleMessageSend"
               :message-key="msg => msg.timestamp.toString()"
-              :loading="isLoading"
+              
               :roleConfig="roleConfig"
               showClearContext
               :style="commonChatOuterStyle"
@@ -202,7 +203,7 @@ interface ExtendedChatMessage {
   content: any;
   role: 'user' | 'assistant' | 'tool';
   source: any;
-  status?: 'loading' | 'error';
+  status?: 'loading' | 'error' | 'success';
   timestamp: number;
   tool_calls?: any
   tool_call_id?: any
@@ -825,8 +826,13 @@ const handleMessageSend = async (user_message: any) => {
     uploadedFiles.value = [];
 
     if (!response.ok) throw new Error('Failed to get stream');
+    // 检查响应头
+    // console.log('Content-Type:', response.headers.get('Content-Type'));
+    // console.log('Transfer-Encoding:', response.headers.get('Transfer-Encoding'));
 
     const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
     let currentContent = '';
     let isStreamEnded = false;
 
@@ -840,7 +846,7 @@ const handleMessageSend = async (user_message: any) => {
             return;
           }
 
-          const chunkText = new TextDecoder().decode(value);
+          const chunkText = decoder.decode(value);
           const lines = chunkText.split('\n\n');
 
           for (const line of lines) {
@@ -861,7 +867,6 @@ const handleMessageSend = async (user_message: any) => {
 
     // ================= 事件处理器 =================
     const handleStreamEvent = (data: StreamMessage) => {
-      console.log(data.event)
       switch (data.event) {
         case 'START':
           // 初始化处理
@@ -869,6 +874,7 @@ const handleMessageSend = async (user_message: any) => {
 
         case 'MESSAGE':
           currentContent += data.text || '';
+          // console.log(currentContent)
           updateAssistantContent(currentContent);
           break;
 
@@ -906,7 +912,7 @@ const handleMessageSend = async (user_message: any) => {
           return {
             ...msg,
             content,
-            status: content ? undefined : 'loading'
+            status: content ? 'success' : 'loading'
           };
         }
         return msg;  // 保持用户和其他消息不变
@@ -980,7 +986,7 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 结束处理 =================
     const handleStreamEnd = () => {
       isStreamEnded = true;
-      isLoading.value = false;
+      // isLoading.value = false;
       reader.cancel();
 
       // 最终状态更新
@@ -995,7 +1001,7 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 错误处理 =================
     const handleStreamError = (error: any) => {
       console.error('Stream error:', error);
-      isLoading.value = false;
+      // isLoading.value = false;
 
       // 只修改当前助手消息状态
       chats.value = chats.value.map(msg => {
@@ -1011,7 +1017,7 @@ const handleMessageSend = async (user_message: any) => {
     await processStream();
   } catch (error) {
     console.error('Message send error:', error);
-    isLoading.value = false;
+    // isLoading.value = false;
     message.error('消息发送失败');
   } finally {
     // 确保清空输入框（需要Chat组件配合）
