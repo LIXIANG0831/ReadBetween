@@ -595,7 +595,7 @@ class ChatService:
         # 一级检索
         now = datetime.now().strftime("%Y年%m月%d日")
         now_query = f"{now}{query}"
-        search_results = search_tool.search_baidu(query, size=3, lm=3)
+        search_results = search_tool.search_baidu(query, size=10, lm=3)
         # 二级检索
         for search_item in search_results:
             search_content = search_tool.get_page_detail(search_item.url)
