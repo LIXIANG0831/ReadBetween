@@ -2,7 +2,8 @@ import asyncio
 import json
 from abc import ABC, abstractmethod
 import dashscope
-from openai import OpenAI
+# from openai import OpenAI
+from openai import AsyncOpenAI as OpenAI
 
 from readbetween.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from readbetween.utils.redis_util import RedisUtil
@@ -38,7 +39,7 @@ class OpenAIModelProvider(BaseModelProvider):
 
     async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
         # OpenAI模型的文本生成逻辑
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=self.llm_name,
             messages=messages,
             temperature=temperature,
@@ -72,7 +73,7 @@ class CompatibleOpenAIModelProvider(BaseModelProvider):
 
     async def generate_text(self, messages, stream=False, temperature=0.1, **kwargs):
         # OpenAI模型的文本生成逻辑
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=self.llm_name,
             messages=messages,
             temperature=temperature,

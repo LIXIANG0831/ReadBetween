@@ -60,7 +60,13 @@ async def send_message(message_data: ChatMessageSend):
                     conversation_info=conversation_info,
                 )
             ),
-            media_type="text/event-stream"  # 设置正确的媒体类型
+            media_type="text/event-stream",  # 设置正确的媒体类型
+            headers={
+                "Transfer-Encoding": "chunked",  # 强制设置类型
+                "X-Accel-Buffering": "no",  # 防止Nginx等代理缓冲
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            }
         )
     except Exception as e:
         logger_util.error(f"send_message初始化错误: {e}")

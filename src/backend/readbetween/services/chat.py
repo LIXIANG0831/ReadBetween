@@ -273,7 +273,7 @@ class ChatService:
                 # yield f"data: [START]\n\n"
                 yield cls._format_stream_response(event="START", text="")
                 func_call_list = []  # 模型实际需要调用的工具列表
-                for chunk in response:
+                async for chunk in response:
                     if hasattr(chunk, 'choices') and chunk.choices:
                         if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
                             content = chunk.choices[0].delta.content or ""
@@ -419,7 +419,7 @@ class ChatService:
             stream=True,
         )
 
-        for chunk in second_response:
+        async for chunk in second_response:
             if hasattr(chunk, 'choices') and chunk.choices:
                 if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
                     content = chunk.choices[0].delta.content or ""
@@ -641,18 +641,10 @@ class ChatService:
 
     @classmethod
     def _format_stream_response(cls, event: str, text: str, extra=None):
+        data = {"event": event, "text": text}
         if extra is not None:
-            stream_resp = {
-                "event": event,
-                "text": text,
-                "extra": extra
-            }
-        else:
-            stream_resp = {
-                "event": event,
-                "text": text
-            }
-        return f"data: {json.dumps(stream_resp, ensure_ascii=False)}\n\n"
+            data["extra"] = extra
+        return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
     @classmethod
     def _init_user_query(cls, message, is_vl_query):
