@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import tempfile
 from datetime import timedelta
@@ -36,14 +37,19 @@ class MinioUtil:
                 logger_util.error(f"Bucket创建失败:{e}")
                 raise S3Error(code=500, message=f"Bucket创建失败:{e}")
 
-    def upload_file(self, file_path: str, object_name: str, bucket_name: str = default_bucket_name):
+    def upload_file(self, file_path: str, object_name: str, bucket_name: str = default_bucket_name, content_type: str = None):
         """上传文件到 MinIO"""
         try:
             if self.bucket_exists(bucket_name) is False:
                 self.create_bucket(bucket_name)
+            # 自动检测content_type
+            if content_type is None:
+                content_type, _ = mimetypes.guess_type(file_path)
+                if content_type is None:
+                    content_type = 'application/octet-stream'  # 默认的二进制流类型
             with open(file_path, 'rb') as file_data:
                 file_stat = os.stat(file_path)
-                self.client.put_object(bucket_name, object_name, file_data, file_stat.st_size)
+                self.client.put_object(bucket_name, object_name, file_data, file_stat.st_size, content_type)
                 logger_util.info(f"File '{file_path}' uploaded to bucket '{bucket_name}' as '{object_name}'.")
         except S3Error as e:
             logger_util.error(f"上传文件失败:{e}")
