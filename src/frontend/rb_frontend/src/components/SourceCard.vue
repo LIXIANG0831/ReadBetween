@@ -1,169 +1,249 @@
 <template>
-  <div
-    class="source-card"
-    :style="{
-      transition: open ? 'height 0.4s ease, width 0.4s ease' : 'height 0.4s ease',
-      height: open ? '30px' : '200px',
-      width: open ? '190px' : '100%',
-      background: 'var(--semi-color-tertiary-light-hover)',
-      borderRadius: '16px',
-      boxSizing: 'border-box',
-      marginBottom: '10px',
-    }"
-  >
-    <span
-      ref="spanRef"
-      class="collapsed-view"
-      :style="{
-        display: !open ? 'none' : 'flex',
-        width: 'fit-content',
-        columnGap: '10px',
-        background: 'var(--semi-color-tertiary-light-hover)',
-        borderRadius: '16px',
-        padding: '5px 10px',
-        cursor: 'pointer',
-        fontSize: '14px',
-        color: 'var(--semi-color-text-1)',
-      }"
-      @click="onOpen"
-    >
-      <span>基于{{ source.length }}个搜索来源</span>
-      <AvatarGroup size="extra-extra-small">
-        <Avatar v-for="(s, index) in source" :key="index" :src="s.avatar" />
-      </AvatarGroup>
-    </span>
-    <span
-      class="expanded-view"
-      :style="{
-        height: '100%',
-        boxSizing: 'border-box',
-        display: !open ? 'flex' : 'none',
-        flexDirection: 'column',
-        background: 'var(--semi-color-tertiary-light-hover)',
-        borderRadius: '16px',
-        padding: '12px',
-        boxSize: 'border-box',
-      }"
-      @click="onClose"
-    >
-      <span
-        class="expanded-header"
-        :style="{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '5px 10px',
-          columnGap: '10px',
-          color: 'var(--semi-color-text-1)',
-        }"
-      >
-        <span :style="{ fontSize: '14px', fontWeight: '500' }">参考来源</span>
-        <IconChevronUp />
-      </span>
-      <span
-        class="source-list"
-        :style="{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '10px',
-          overflow: 'scroll',
-          padding: '5px 10px',
-        }"
-      >
-        <span
-          v-for="s in source"
-          :key="s.url"
-          class="source-item"
-          :style="{
-            display: 'flex',
-            flexDirection: 'column',
-            rowGap: '5px',
-            flexBasis: '150px',
-            flexGrow: '1',
-            border: '1px solid var(--semi-color-border)',
-            borderRadius: '12px',
-            padding: '12px',
-            fontSize: '12px',
-          }"
-        >
-          <span class="source-item-header" :style="{ display: 'flex', columnGap: '5px', alignItems: 'center' }">
-            <Avatar :style="{ width: '16px', height: '16px', flexShrink: '0' }" shape="square" :src="s.avatar" />
-            <a
-              :href="s.url"
-              target="_blank"
-              class="source-title-link"
-              :style="{
-                color: 'var(--semi-color-text-2)',
-                textOverflow: 'ellipsis',
-                textDecoration: 'none', /* Remove underline */
-              }"
-            >
-              <span class="source-title" :style="{ color: 'var(--semi-color-text-2)', textOverflow: 'ellipsis' }">{{ s.title }}</span>
-
-            </a>
-          </span>
-          <!-- <span class="source-subtitle" :style="{ color: 'var(--semi-color-primary)', fontSize: '12px' }">{{ s.subTitle }}</span> -->
-          <!-- <span
-            class="source-content"
-            :style="{
-              display: '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: '3',
-              textOverflow: 'ellipsis',
-              overflow: 'hidden',
-              color: 'var(--semi-color-text-2)',
-            }"
-          >{{ s.content }}</span> -->
-        </span>
-      </span>
-    </span>
-  </div>
+  <t-card v-if="sources && sources.length > 0" class="source-card" :bordered="false">
+    <template #header>
+      <div class="source-header" @click="toggleCollapse">
+        <Filter3Icon />
+        <span class="header-text">信息来源</span>
+        <component :is="collapsed ? ChevronRightIcon : ChevronDownIcon" class="collapse-icon" />
+      </div>
+    </template>
+    <div class="source-list-wrapper" v-show="!collapsed">
+      <div class="source-list">
+        <t-tooltip v-for="(source, index) in processedSources" :key="index" :content="source.title || source.url" placement="top">
+          <a :href="source.url" target="_blank" rel="noopener noreferrer" class="source-item">
+            <div class="source-avatar">
+              <img v-if="source.avatar" :src="source.avatar" :alt="source.title" class="favicon" @error="handleImageError">
+              <div v-else class="default-avatar">
+                {{ getInitials(source.title || source.url) }}
+              </div>
+            </div>
+            <div class="source-content">
+              <div class="source-title" v-if="source.title">{{ truncate(source.title, 20) }}</div>
+              <div class="source-domain">{{ extractDomain(source.url) }}</div>
+            </div>
+          </a>
+        </t-tooltip>
+      </div>
+    </div>
+  </t-card>
 </template>
 
 <script setup lang="ts">
-import { defineComponent, ref, PropType } from 'vue';
-import { Avatar, AvatarGroup } from '@kousum/semi-ui-vue';
-import { IconChevronUp } from '@kousum/semi-icons-vue';
+import { ref, computed } from 'vue';
+import { Filter3Icon, ChevronRightIcon, ChevronDownIcon } from 'tdesign-icons-vue-next';
+import { Card as TCard, Tooltip as TTooltip } from 'tdesign-vue-next';
+import KbIcon from '@/assets/kb.svg';
 
-defineComponent({ name: 'SourceCard' }); // Optional: Explicitly name the component
-
-interface SourceItem {
-  avatar: string;
+interface Source {
   url: string;
-  title: string;
-  content: any;
+  title?: string;
+  source?: string;
+  avatar?: string;
 }
 
 const props = defineProps({
-  source: {
-    type: Array as PropType<SourceItem[]>,
-    required: true,
+  sources: {
+    type: Array as () => Source[],
+    default: () => []
   },
+  defaultCollapsed: {
+    type: Boolean,
+    default: true
+  }
 });
 
-const open = ref(true);
-const show = ref(false);
-const spanRef = ref(null);
+const collapsed = ref(props.defaultCollapsed);
 
-const onOpen = () => {
-  open.value = false;
-  show.value = true;
+const toggleCollapse = () => {
+  collapsed.value = !collapsed.value;
 };
 
-const onClose = () => {
-  open.value = true;
-  setTimeout(() => {
-    show.value = false;
-  }, 350);
+const processedSources = computed(() => {
+  return props.sources.map((item: Source) => {
+    try {
+      if (item.source === 'kb') {
+        return { 
+          ...item, 
+          avatar: KbIcon
+        };
+      } else if (item.source === 'web') {
+        const urlObj = new URL(item.url);
+        const faviconUrl = `${urlObj.origin}/favicon.ico`;
+        return { 
+          ...item, 
+          avatar: faviconUrl
+        };
+      }
+      return item;
+    } catch {
+      return item;
+    }
+  });
+});
+
+const handleImageError = (e: Event) => {
+  const target = e.target as HTMLImageElement;
+  target.style.display = 'none';
+  const parent = target.parentElement;
+  if (parent) {
+    const defaultAvatar = parent.querySelector('.default-avatar') as HTMLElement;
+    if (defaultAvatar) {
+      defaultAvatar.style.display = 'flex';
+    }
+  }
+};
+
+const getInitials = (text: string) => {
+  if (!text) return '?';
+  const words = text.split(' ');
+  if (words.length === 1) return text.charAt(0).toUpperCase();
+  return words[0].charAt(0).toUpperCase() + words[1].charAt(0).toUpperCase();
+};
+
+const truncate = (text: string, length: number) => {
+  if (!text) return '';
+  return text.length > length ? text.substring(0, length) + '...' : text;
+};
+
+const extractDomain = (url: string) => {
+  if (!url) return '';
+  try {
+    const domain = new URL(url).hostname.replace('www.', '');
+    return domain.length > 15 ? domain.substring(0, 15) + '...' : domain;
+  } catch {
+    return url.length > 15 ? url.substring(0, 15) + '...' : url;
+  }
 };
 </script>
 
-<style scoped>
-/* You can add scoped styles here if needed, but the component uses mostly inline styles */
+<style scoped lang="less">
 .source-card {
-  /* Example: If you want to add some global styling that's not inline */
+  margin: 12px 0;
+  background-color: var(--td-bg-color-container);
+  
+  :deep(.t-card__header) {
+    padding: 8px 12px;
+    border-bottom: none;
+  }
 }
-.collapsed-view, .expanded-view, .expanded-header, .source-list, .source-item, .source-item-header, .source-title, .source-subtitle, .source-content {
-  /* Example: If you want to add some global styling that's not inline */
+
+.source-header {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  color: var(--td-text-color-secondary);
+  
+  .t-icon {
+    font-size: 16px;
+  }
+  
+  .header-text {
+    margin: 0 8px;
+    font-size: 20px;
+    flex-grow: 1;
+  }
+  
+  .collapse-icon {
+    transition: transform 0.2s;
+  }
+  
+  &:hover {
+    color: var(--td-text-color-primary);
+  }
+}
+
+.source-list-wrapper {
+  overflow-x: auto;
+  padding: 0 8px 8px;
+  
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--td-scrollbar-color);
+    border-radius: 2px;
+  }
+}
+
+.source-list {
+  display: inline-flex;
+  gap: 8px;
+  padding: 0;
+  min-width: 100%;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 12px; /* 增大圆角 */
+  background-color: white;
+  text-decoration: none;
+  color: inherit;
+  min-width: 160px;
+  max-width: 200px;
+  box-sizing: border-box;
+  transition: all 0.2s;
+  border: 1px solid var(--td-component-stroke);
+  
+  &:hover {
+    border-color: var(--td-brand-color);
+    background-color: var(--td-bg-color-container-hover);
+  }
+}
+
+.source-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px; /* 增大圆角 */
+  background-color: var(--td-bg-color-component);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.favicon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.default-avatar {
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--td-brand-color);
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 8px; /* 增大圆角 */
+}
+
+.source-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.source-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--td-text-color-primary);
+}
+
+.source-domain {
+  font-size: 11px;
+  color: var(--td-text-color-placeholder);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

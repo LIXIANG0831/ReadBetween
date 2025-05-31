@@ -7,7 +7,6 @@
           <a-menu
             v-model:selectedKeys="activeKey"
             mode="inline"
-            :style="style"
             @click="handleConversationClick"
           >
             <a-button type="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
@@ -28,41 +27,103 @@
       </a-layout-sider>
       <a-layout>
         <a-layout-content class="main">
-          <div v-if="activeKey.length > 0" style="width: 100%;">
-              <!-- <div style="margin-bottom: 16px;">
-                <a-button @click="handleClearHistory" :disabled="!activeKey[0]">
-                  清除历史记录
-                </a-button>
-              </div> -->
-              <!-- :loading="isLoading" -->
-              <Chat
-              :chats="chats"
-              @message-send="handleMessageSend"
-              :message-key="msg => msg.timestamp.toString()"
-              
-              :roleConfig="roleConfig"
-              showClearContext
-              :style="commonChatOuterStyle"
-              :onClear="handleClearHistory"
-              :chatBoxRenderConfig="chatBoxConfig"
-              :renderInputArea="renderCustomInput"
-              :uploadProps="customUploadProps"
-              />
-            </div>
+          <div class="chat-box" v-if="activeKey.length > 0" style="width: 100%;">
+            
+            <t-chat
+            ref="chatRef"
+            style="height: 700px"
+            :clear-history="showclearHistory"
+            @clear="handleClearHistory"
+            :reverse="false"
+            :data="chatsList"
+            :is-stream-load="isStreamLoading"
+            :textLoading="isNewMsgLoading"
+            @scroll="handleChatScroll"
+            animation="moving"
+            >
+
+              <template #content="{ item, index }">
+                <t-chat-reasoning v-if="item.reasoning?.length > 0" expand-icon-placement="right">
+                  <template #header>
+                    <t-chat-loading v-if="isStreamLoading" text="思考中..." />
+                    <div v-else style="display: flex; align-items: center">
+                      <CheckCircleIcon style="color: var(--td-success-color-5); font-size: 20px; margin-right: 8px" />
+                      <span>已深度思考</span>
+                    </div>
+                  </template>
+                  <t-chat-content v-if="item.reasoning.length > 0" :content="item.reasoning" />
+                </t-chat-reasoning>
+                <!-- 工具调用卡片 -->
+                <ToolCallCard 
+                  v-if="item.role === 'tool' && item.tool_call_id" 
+                  :tool-call="findToolCall(item.tool_call_id)"
+                  :content="item.content"
+                />
+                <t-chat-content v-if="item.content && item.content.length > 0 && item.role != 'tool' " :content="item.content" />
+                <!-- 来源信息卡片 -->
+                <SourceCard v-if="item.source && item.source.length > 0" :sources="item.source" />
+              </template>
+              <template #actions="{ item, index }">
+                <t-chat-action
+                  :content="item.content"
+                  :operation-btn="['good', 'bad', 'replay', 'copy']"
+                  @operation="handleOperation"
+                />
+              </template>
+              <template #footer>
+                <t-chat-sender 
+                v-model="query"
+                :textarea-props="{
+                  placeholder: '请输入消息...',
+                }" 
+                :stop-disabled="isStreamLoading" 
+                @file-select="onFileSelect"
+                @send="handleMessageSend(query)" 
+                class="chat-sender"
+                @stop="onStop"> 
+                  <template #prefix>
+                    <div class="model-select">
+                      <t-button class="check-box" :class="{ 'is-active': isSearchEnabled }" variant="base" @click="toggleSearch">
+                        <SystemSumIcon />
+                        <span>联网搜索</span>
+                      </t-button>
+                    </div>
+                  </template>
+
+
+                  <!-- 自定义操作区域的内容，默认支持图片上传、附件上传和发送按钮 -->
+                  <template #suffix="{ renderPresets }">
+                    <!-- <component :is="renderPresets([
+                      { 
+                        name: 'uploadImage', 
+                        accept: 'image/*', 
+                        title: '上传图片',
+                        uploadProps: imageUploadProps.value
+                      },
+                      ])" /> -->
+                    <!-- 在这里可以进行自由的组合使用，或者新增预设 -->
+                    <!-- 不需要附件操作的使用方式 -->
+                    <!-- <component :is="renderPresets([])" /> -->
+                    <!-- 只需要附件上传的使用方式-->
+                    <!-- <component :is="renderPresets([{ name: 'uploadAttachment' }])" /> -->
+                    <!-- 只需要图片上传的使用方式-->
+                    <!-- <component :is="renderPresets([{ name: 'uploadImage' }])" /> -->
+                    <!-- 任意配置顺序-->
+                    <!-- <component :is="renderPresets([{ name: 'uploadAttachment' }, { name: 'uploadImage' }])" /> -->
+                  </template>
+                </t-chat-sender>
+              </template>  
+            </t-chat>
+            <t-button v-show="isShowToBottom" variant="text" class="bottomBtn" @click="backBottom">
+              <div class="to-bottom">
+                <ArrowDownIcon />
+              </div>
+            </t-button>
+
+          </div>
           <div v-else class="read-between-placeholder">
             ReadBetween
           </div>
-
-
-          <!-- <div style="padding: 16px;"> -->
-            <!-- <div style="margin-bottom: 16px;">
-              <a-button @click="handleClearHistory" :disabled="!activeKey[0]">
-                清除历史记录
-              </a-button>
-            </div> -->
-
-
-          <!-- </div> -->
         </a-layout-content>
       </a-layout>
     </a-layout>
@@ -159,9 +220,19 @@
 
 <script setup lang="ts">
 
-import { Chat, Button, MarkdownRender, Tooltip } from '@kousum/semi-ui-vue';
-import { ref, onMounted, computed, watch, h } from 'vue';
+import { ref, onMounted, computed, watch, h, nextTick } from 'vue';
 import { useMcpStore } from '@/store/mcpStore'
+
+
+import {
+  Chat as TChat,
+  ChatAction as TChatAction,
+  ChatContent as TChatContent,
+  ChatSender as TChatSender,
+  ChatItem as TChatItem,
+} from '@tdesign-vue-next/chat';
+import { SystemSumIcon, ArrowDownIcon } from 'tdesign-icons-vue-next';
+import { Button as TButton } from 'tdesign-vue-next';
 
 import {
   message,
@@ -193,8 +264,9 @@ import {
 import { listKnowledge } from '@/api/knowledge';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import SourceCard from '@/components/SourceCard.vue';
-// import ChatInput from '@/components/ChatInput.vue';
-// import escapeHtml from 'escape-html';
+import ToolCallCard from '@/components/ToolCallCard.vue'
+
+
 import type { Key } from 'ant-design-vue/es/_util/type';
 
 
@@ -202,11 +274,14 @@ import type { Key } from 'ant-design-vue/es/_util/type';
 interface ExtendedChatMessage {
   content: any;
   role: 'user' | 'assistant' | 'tool';
+  name?: any
+  avatar?: any
   source: any;
   status?: 'loading' | 'error' | 'success';
   timestamp: number;
   tool_calls?: any
   tool_call_id?: any
+  datetime?: any
 }
 
 interface StreamMessage {
@@ -227,20 +302,22 @@ interface CreateConversationParams extends Api.BaseConversationParams {
 
 const roleConfig = ref({
   user: {
-    name: 'User',
-    avatar: 'src/assets/human.svg'
+    name: '自己',
+    // avatar: 'src/assets/human.svg'
+    avatar: 'https://tdesign.gtimg.com/site/avatar.jpg'
   },
   assistant: {
-    name: 'Assistant',
-    avatar: 'src/assets/bot.svg'
+    name: '助手',
+    // avatar: 'src/assets/bot.svg'
+    avatar: 'https://tdesign.gtimg.com/site/chat-avatar.png'
   },
   tool: {
-    name: 'Tool',
+    name: '工具',
     avatar: 'src/assets/tool.svg'
   }
 });
 
-
+const query = ref('');
 
 const availableModelStore = useAvailableModelStore();
 const mcpStore = useMcpStore()
@@ -255,25 +332,6 @@ const mcpServerOptions = computed(() => {
   }))
 })
 
-// 状态管理
-const activeKey = ref<string[]>([]);
-const conversation_items = ref([]);
-const chats = ref<ExtendedChatMessage[]>([]);
-const knowledgeList = ref([]);
-const isCreateDialogVisible = ref(false);
-const isEditing = ref(false);
-const hints = ref<string[]>(["测试提示信息 1", "测试提示信息 2"]); // 初始化 hints 用于存储提示消息
-let sourceContent = ''; // 来源信息
-const isLoading = ref(false);
-
-
-// 聊天框外边框属性设置
-const commonChatOuterStyle = {
-  border: '1px solid var(--semi-color-border)',
-  borderRadius: '16px',
-  height: '700px'
-};
-
 // 表单数据
 const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
@@ -286,14 +344,48 @@ const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展�
   selectedMcpServices: [], // 用于MCP表单绑定的选中项
   mcp_server_configs: null, // 用于MCP-API提交的配置
 });
+// 状态管理
+const activeKey = ref<string[]>([]);
+const conversation_items = ref([]);
+const chatsList = ref<ExtendedChatMessage[]>([]);
+const toolCallsList = ref<ExtendedChatMessage[]>([]); // 完整的不进行任何过滤的chatsList 为了配合工具卡片展示
+const knowledgeList = ref([]);
+const isCreateDialogVisible = ref(false);
+const isEditing = ref(false);
+const isStreamLoading = ref(false); // stream是否结束
+const isNewMsgLoading = ref(false); // 新消息是否处于加载状态
+// 动态计算 clearHistory 的值
+const showclearHistory = computed(() => {
+  return chatsList.value.length > 1;
+});
+// 屏幕滚动
+const chatRef = ref(null);
+const isShowToBottom = ref(false);
+// 滚动到底部
+const backBottom = () => {
+  chatRef.value.scrollToBottom({
+    behavior: 'smooth',
+  });
+};
+// 是否显示回到底部按钮
+const handleChatScroll = function ({ e }) {
+  const scrollTop = e.target.scrollTop;
+  isShowToBottom.value = scrollTop > 200 && scrollTop < 1000;
+};
 
-// 样式计算
-const style = computed(() => ({
-  width: '100%',
-  background: token.value.colorBgContainer,
-  borderRadius: token.value.borderRadius,
-  flex: 1,
-}));
+// 查找对应的tool call
+const findToolCall = (toolCallId: string) => {
+  // 遍历所有消息找到对应的tool call
+  for (const msg of toolCallsList.value) {
+    if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+      const found = msg.tool_calls.find(tc => tc.id === toolCallId)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return null
+}
 
 // 获取会话列表
 const fetchConversations = async () => {
@@ -307,30 +399,83 @@ const fetchConversations = async () => {
   }
 };
 
+// 格式化 datetime，精确到秒
+const formatDateTime = (date) => {
+  const today = new Date();
+  const messageDate = new Date(date);
+
+  // 判断是否是今日消息
+  if (
+    messageDate.getFullYear() === today.getFullYear() &&
+    messageDate.getMonth() === today.getMonth() &&
+    messageDate.getDate() === today.getDate()
+  ) {
+    // 今日消息，显示 "今日 HH:mm"
+    return `今日 ${String(messageDate.getHours()).padStart(2, '0')}:${String(messageDate.getMinutes()).padStart(2, '0')}`;
+  }
+
+  // 判断是否是今年消息
+  if (messageDate.getFullYear() === today.getFullYear()) {
+    // 今年消息，显示 "MM-DD HH:mm"
+    return `${String(messageDate.getMonth() + 1).padStart(2, '0')}-${String(messageDate.getDate()).padStart(2, '0')} ${String(messageDate.getHours()).padStart(2, '0')}:${String(messageDate.getMinutes()).padStart(2, '0')}`;
+  }
+
+  // 不是今年消息，显示 "YYYY-MM-DD HH:mm"
+  return `${String(messageDate.getFullYear()).padStart(4, '0')}-${String(messageDate.getMonth() + 1).padStart(2, '0')}-${String(messageDate.getDate()).padStart(2, '0')} ${String(messageDate.getHours()).padStart(2, '0')}:${String(messageDate.getMinutes()).padStart(2, '0')}`;
+};
+
 // 获取消息历史
 const fetchMessageHistory = async (convId: string) => {
   try {
     const res = await getMessageHistory({ conv_id: convId });
     if (res.data.status_code === 200) {
-      chats.value = res.data.data.map(msg => ({
+
+      // 配合工具卡片查找调用信息
+      toolCallsList.value = res.data.data
+      .filter(msg => {  // 过滤掉助手tool_calls不为空，且content为空的消息
+          return (msg.role === "assistant" && msg.tool_calls && msg.tool_calls.length > 0);
+        })
+      .map(msg => ({
         content: JSON.parse(msg.content),
         role: msg.role || null,
+        name: roleConfig.value[msg.role].name, // 根据角色获取配置中的 name
+        avatar: roleConfig.value[msg.role].avatar, // 根据角色获取配置中的 avatar
         source: JSON.parse(msg.source),
         tool_call_id: msg.tool_call_id,
         tool_calls: JSON.parse(msg.tool_calls),
-        timestamp: new Date(msg.timestamp).getTime()
+        timestamp: new Date(msg.timestamp).getTime(),
+        datetime: formatDateTime(new Date(msg.timestamp))
       }));
-      console.log(chats.value)
+
+
+      chatsList.value = res.data.data
+      .filter(msg => {  // 过滤掉助手tool_calls不为空，且content为空的消息
+          const content = JSON.parse(msg.content || "null"); // 如果 content 不存在或为空，解析为 null
+          return !(msg.role === "assistant" && (!content || content === ""));
+        })
+      .map(msg => ({
+        content: JSON.parse(msg.content),
+        role: msg.role || null,
+        name: roleConfig.value[msg.role].name, // 根据角色获取配置中的 name
+        avatar: roleConfig.value[msg.role].avatar, // 根据角色获取配置中的 avatar
+        source: JSON.parse(msg.source),
+        tool_call_id: msg.tool_call_id,
+        tool_calls: JSON.parse(msg.tool_calls),
+        timestamp: new Date(msg.timestamp).getTime(),
+        datetime: formatDateTime(new Date(msg.timestamp))
+      }));
+      console.log(chatsList.value)
+      console.log(toolCallsList.value)
     }
     else {
       console.error('获取消息历史失败:', res.data); // 打印错误信息
       message.error('获取消息历史失败');
-      chats.value = []; // 出错时，确保 chats.value 仍然是空数组或数组
+      chatsList.value = []; // 出错时，确保 chats.value 仍然是空数组或数组
     }
   } catch (error) {
     console.error('获取消息历史异常:', error); // 打印异常信息
     message.error('获取消息历史失败');
-    chats.value = []; // 异常时，确保 chats.value 仍然是空数组或数组
+    chatsList.value = []; // 异常时，确保 chats.value 仍然是空数组或数组
   }
 };
 
@@ -349,32 +494,28 @@ const fetchKnowledgeList = async () => {
   }
 };
 
-// 自定义提示信息
-const renderHintBox = (props: { content: string, onHintClick: () => void, index: number }) => {
-  console.log('renderHintBox called', props.content);
-  const { content } = props; // 这里我们只需要 content，不需要 onHintClick 和 index
-  const commonHintStyle = { // 可以复用你之前定义的样式，或者根据 sourceContent 的特点自定义样式
-    border: '1px solid var(--semi-color-border)',
-    padding: '10px',
-    borderRadius: '10px',
-    color: 'var( --semi-color-text-1)',
-    display: 'block', // 修改为 block，让 sourceContent 独占一行
-    cursor: 'default', // 修改 cursor 为 default，因为 sourceContent 通常不需要点击
-    fontSize: '14px',
-    marginTop: '8px', // 可以添加一些 margin，与聊天内容分隔开
-    whiteSpace: 'pre-line' // 保留换行符，处理 sourceContent 中的换行
-  };
+// 文件（图片、附件）上传相关
+interface UploadFile {
+  uid: string;
+  name: string;
+  status: 'uploading' | 'done' | 'error';
+  url?: string;
+  type?: string;
+  size?: number;
+  response?: any;
+}
 
-  return h('div', { style: commonHintStyle}, content); // 使用 v-html 渲染 Markdown 内容
-};
+type UploadActionType = 'uploadImage' | 'uploadAttachment';
 
-
-
-// 自定义文件上传
-const uploadedFiles = ref<any[]>([]);
+interface FileSelectCallback {
+  files: FileList;
+  name: UploadActionType;
+}
+// 图片上传配置
+const uploadedImageFiles = ref<any[]>([]);
 const MAX_FILE_SIZE_KB = 5 * 1024;
 const MAX_FILE_COUNT = 5;
-const customUploadProps = ref({
+const imageUploadProps = ref({
   action: 'https://picui.cn/api/v1/upload', // 你的图片上传接口地址
   name: 'file', // 对应接口文档中的 image 参数名
   accept: 'image/*', // 接受所有图片类型
@@ -418,7 +559,7 @@ const customUploadProps = ref({
   },
   onChange: (info) => {
     // 过滤出状态为 'done' 的文件，更新 uploadedFiles
-    uploadedFiles.value = info.fileList.filter(file => file.status === 'success');
+    uploadedImageFiles.value = info.fileList.filter(file => file.status === 'success');
   },
   onSuccess: (response, file, fileList) => {
     console.log('onSuccess:', response, file, fileList);
@@ -452,367 +593,112 @@ const customUploadProps = ref({
   // 其他你可能需要的配置项...
 } as any);
 
-// 自定义对话框
-const isToolExpanded = ref(false); // 控制工具调用结果折叠状态的响应式变量
-const currentMessageTool = ref([]); // 当前会话使用到的工具
-const chatBoxConfig = ref({
-  renderChatBoxContent: (props) => {
-    const { role, message, defaultNode, className } = props;
-
-    // 如果 message.status 是 "loading"，返回加载状态
-    if (message.status === "loading" || (message.content === "" && Array.isArray(message.tool_calls) && message.tool_calls.length > 0)) {
-      return h("div", { class: className, style: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40px' } }, [
-        h(ASpin, { size: 'default' })
-      ]);
-    }
-
-    // 处理 tool_calls 如果存在
-    if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
-      currentMessageTool.value = message.tool_calls;
-      message.content = "调用工具ING";
-      // 历史记录中直接不处理这条消息
-    }
-
-    // 处理 tool 消息
-    if (message.role === 'tool' && message.tool_call_id) {
-      // 查找对应的 tool call
-      const toolCall = currentMessageTool.value.find(
-        tc => tc.id === message.tool_call_id
-      );
-      
-      if (toolCall) {
-        // 解析 arguments
-        let args = '';
-        try {
-          args = JSON.stringify(JSON.parse(toolCall.function.arguments), null, 2);
-        } catch {
-          args = toolCall.function.arguments;
-        }
-
-        // 解析 content
-        let content = '';
-        try {
-          content = JSON.stringify(JSON.parse(message.content), null, 2);
-        } catch {
-          content = message.content;
-        }
-
-        // 创建工具调用卡片
-        return h('div', { 
-          class: 'tool-call-card',
-          style: {
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            margin: '12px 0',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }
-        }, [
-          h('div', { 
-            class: 'tool-call-header',
-            style: {
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '12px 16px',
-              backgroundColor: '#f9fafb',
-              borderBottom: '1px solid #e5e7eb',
-              cursor: 'pointer'
-            },
-            onClick: () => isToolExpanded.value = !isToolExpanded.value
-          }, [
-            h('div', { 
-              style: {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }
-            }, [
-              h('div', {
-                style: {
-                  width: '24px',
-                  height: '24px',
-                  // backgroundColor: '#3b82f6',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: '12px'
-                }
-              }, '🔧'),
-              h('span', { 
-                class: 'tool-call-name',
-                style: {
-                  fontWeight: '500',
-                  color: '#111827'
-                }
-              }, `${toolCall.function.name}`)
-            ]),
-            h('button', { 
-              class: 'tool-call-toggle',
-              style: {
-                background: 'none',
-                border: 'none',
-                color: '#3b82f6',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }
-            }, [
-              isToolExpanded.value ? '收起' : '展开',
-              h('span', {
-                style: {
-                  transition: 'transform 0.2s',
-                  transform: isToolExpanded.value ? 'rotate(180deg)' : 'rotate(0deg)'
-                }
-              }, '▼')
-            ])
-          ]),
-          isToolExpanded.value && h('div', { 
-            class: 'tool-call-details',
-            style: {
-              padding: '16px',
-              backgroundColor: 'white'
-            }
-          }, [
-            h('div', { 
-              class: 'tool-call-section',
-              style: {
-                marginBottom: '16px'
-              }
-            }, [
-              h('div', { 
-                class: 'tool-call-title',
-                style: {
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#6b7280',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center'
-                }
-              }, [
-                h('span', {
-                  style: {
-                    display: 'inline-block',
-                    width: '4px',
-                    height: '16px',
-                    backgroundColor: '#3b82f6',
-                    marginRight: '8px',
-                    borderRadius: '2px'
-                  }
-                }),
-                '参数'
-              ]),
-              h('pre', { 
-                class: 'tool-call-content',
-                style: {
-                  margin: 0,
-                  padding: '12px',
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: '6px',
-                  overflowX: 'auto',
-                  fontSize: '13px',
-                  lineHeight: '1.5',
-                  color: '#111827',
-                  fontFamily: 'monospace',
-                  whiteSpace: 'pre-wrap'
-                }
-              }, args)
-            ]),
-            h('div', { 
-              class: 'tool-call-section'
-            }, [
-              h('div', { 
-                class: 'tool-call-title',
-                style: {
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#6b7280',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center'
-                }
-              }, [
-                h('span', {
-                  style: {
-                    display: 'inline-block',
-                    width: '4px',
-                    height: '16px',
-                    backgroundColor: '#10b981',
-                    marginRight: '8px',
-                    borderRadius: '2px'
-                  }
-                }),
-                '结果'
-              ]),
-              h('pre', { 
-                class: 'tool-call-content',
-                style: {
-                  margin: 0,
-                  padding: '12px',
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: '6px',
-                  overflowX: 'auto',
-                  fontSize: '13px',
-                  lineHeight: '1.5',
-                  color: '#111827',
-                  fontFamily: 'monospace',
-                  whiteSpace: 'pre-wrap'
-                }
-              }, content)
-            ])
-          ])
-        ]);
-      }
-    }
-
-    // 处理来源数据
-    const processedHistorySourceCard = message.source && message.source.length > 0
-      ? message.source.map((item) => {
-          let faviconUrl = '';
-          if (item.source === 'kb') {
-            return { ...item, avatar: 'src/assets/kb.svg' };
-          } else if (item.source === 'web') {
-            const urlObj = new URL(item.url);
-            faviconUrl = `${urlObj.origin}/favicon.ico`;
-            return { ...item, avatar: faviconUrl };
-          }
-          return item;
-        }) : [];
-
-    let processedContent = '';  // 模型回复文本
-    if (Array.isArray(message.content)) {
-      message.content.forEach(item => {
-        if (item.type === 'text') {  // 处理问答message响应
-          processedContent += item.text + '\n';
-        } else if (item.type === 'image_url') {  // 处理多模态message响应
-          const imageUrl = item.image_url.url;
-          processedContent += `![](${imageUrl})\n`;
-        }
-      });
-    } else {
-      processedContent = message.content;
-    }
-
-    // 构建最终渲染内容
-    return h(
-      'div',
-      { class: className },
-      [
-        // 来源卡片（如果有）
-        message.source && message.source.length > 0 
-          ? h(SourceCard, { source: processedHistorySourceCard }) 
-          : null,
-        // 消息内容
-        h(MarkdownRender, { raw: processedContent, components: {} })
-      ].filter(Boolean) // 过滤掉null/undefined的节点
-    );
+// 文件上传配置 
+const attachmentUploadProps = ref({
+  action: '', // 你的文件上传接口地址
+  name: 'file',
+  accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar', // 支持的文件类型
+  multiple: true,
+  headers: {
+    'Authorization': `Bearer ${import.meta.env.VITE_UPLOAD_TOKEN}`,
+    'Accept': 'application/json'
+  },
+  beforeUpload: (file: File) => {
+    console.log('Before file upload:', file);
+    return true;
+  },
+  onChange: (info: { file: UploadFile; fileList: UploadFile[] }) => {
+    console.log('File upload change:', info);
+  },
+  onSuccess: (response: any, file: UploadFile, fileList: UploadFile[]) => {
+    console.log('File upload success:', response, file);
+  },
+  onError: (error: Error, file: UploadFile, fileList: UploadFile[]) => {
+    console.error('File upload error:', error);
   }
 });
 
-// 自定义输入区域渲染函数
-const isSearchEnabled = ref(false);
-const toggleSearch = () => isSearchEnabled.value = !isSearchEnabled.value;
-const renderCustomInput = (props) => {
-  return h('div', 
-    { style: { display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' } }, 
-    [
-      // 默认输入框（占据剩余空间）
-      h('div', { style: { flexGrow: 1 } }, [ // 使用 div 包裹 defaultNode 并设置 flexGrow
-          props.defaultNode
-      ]),
-      // 网络搜索图标按钮
-      h(Button, {
-        type: isSearchEnabled.value ? 'primary' : 'tertiary',
-        onClick: toggleSearch,
-        icon: () => h(Tooltip, { content: '联网搜索' }, [
-          h(GlobalOutlined, {
-            style: {
-              fontSize: '24px', // 设置图标大小
-            },
-          })
-        ]),
-        theme: "borderless",
-        style: {
-          paddingRight: '8px',
-          flexShrink: 0,
-          padding: '6px',
-          borderRadius: '50%',
-          width: '48px',     // Fixed width and height for button size
-          height: '48px',
-          border: 'none',
-          display: 'flex',       // Ensure icon is centered
-          alignItems: 'center',  // Vertically center icon
-          justifyContent: 'center' // Horizontally center icon
-        } // 调整图标按钮样式，去除文字部分的padding
-      })
-
-      // 如果还有其他图标按钮，可以放在这里，例如：
-      // h(Button, { ...otherButtonProps, icon: () => h(OtherIcon) }),
-    ]);
+const onFileSelect = ({ files, name }: FileSelectCallback) => {
+  if (files.length === 0) return;
+  
+  if (name === 'uploadImage') {
+    // 图片上传 - 使用 imageUploadProps 自动处理
+    console.log('图片上传已通过 imageUploadProps 处理');
+  } else if (name === 'uploadAttachment') {
+    // 使用新的文件上传逻辑
+    console.log('Attachment files selected:', files);
+    // handleFileUpload(files);
+  }
 };
 
-// 发送消息处理
+// 联网搜索
+const isSearchEnabled = ref(false);
+const toggleSearch = () => {
+  isSearchEnabled.value = !isSearchEnabled.value;
+  console.log(isSearchEnabled.value)
+}
+
+
 const handleMessageSend = async (user_message: any) => {
   if (!activeKey.value[0] || !user_message.trim()) return;
   try {
-    isLoading.value = true;
-
+    isStreamLoading.value = true;
+    isNewMsgLoading.value = true;
     
-    // 拼接UserMessage用于展示
-    // 检查 uploadedFiles 是否为空
-    if (uploadedFiles.value.length > 0) {
-        // 构造包含图片的 userMessage
-        const contentArray: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
-          { type: "text", text: user_message }
-        ];
-
-        uploadedFiles.value.forEach(file => {
-          if (file.response?.data?.links?.url) {  // 校验响应存在
-            let image_url = file.response.data.links.url
-            contentArray.push({
-              type: "image_url",
-              image_url: { url: image_url }
-            });
-          }
-        });
-  
-        // 修改为包含图片的 userMessage
-        user_message = contentArray
-
+    
+    
+    // ================= 用户输入处理阶段 =================
+    // 构建消息内容
+    let contentArray: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+    // 添加文本内容
+    if (user_message.trim()) {
+      contentArray.push({ type: "text", text: user_message });
     }
+    // 添加已上传的图片
+    uploadedImageFiles.value.forEach(file => {
+      if (file.url && file.type?.startsWith('image/')) {
+        contentArray.push({
+          type: "image_url",
+          image_url: { url: file.url }
+        });
+      }
+    })
 
     // ================= 消息创建阶段 =================
     // 创建完全独立的消息对象
+    let now_datetime = Date.now()
     const userMessage: ExtendedChatMessage = {
       content: user_message,  // 使用原始输入文本
       role: 'user',
+      name: roleConfig.value['user'].name,
+      avatar: roleConfig.value['user'].avatar,
       source: [],
-      timestamp: Date.now()
+      timestamp: now_datetime,
+      datetime: formatDateTime(now_datetime)
     };
 
     const assistantMessage: ExtendedChatMessage = {
       content: '',
       role: 'assistant',
       status: 'loading',
+      name: roleConfig.value['assistant'].name,
+      avatar: roleConfig.value['assistant'].avatar,
       source: [],
-      timestamp: userMessage.timestamp + 3  // 确保唯一性
+      timestamp: userMessage.timestamp + 3,  // 确保唯一性
+      datetime: formatDateTime(userMessage.timestamp + 3)
     };
 
     // 不可变更新消息列表
-    chats.value = [
-      ...chats.value,
+    chatsList.value = [
+      ...chatsList.value,
       userMessage,          // 用户消息固定不变
       assistantMessage      // 助手消息单独更新
     ];
+
+    // 滚动到底部
+    nextTick(() => {
+      chatRef.value?.scrollToBottom({ behavior: 'smooth' });
+    });
 
     // ================= 流处理阶段 =================
     const response = await sendMessage({
@@ -822,8 +708,10 @@ const handleMessageSend = async (user_message: any) => {
       temperature: CreateConversationForm.value.temperature
     });
 
+    // 情况 query 用户发送的文本内容
+    query.value = ""
     // 清空 uploadedFiles 文件上传列表
-    uploadedFiles.value = [];
+    uploadedImageFiles.value = [];
 
     if (!response.ok) throw new Error('Failed to get stream');
     // 检查响应头
@@ -874,8 +762,15 @@ const handleMessageSend = async (user_message: any) => {
 
         case 'MESSAGE':
           currentContent += data.text || '';
+          if (currentContent.length > 0){
+            isNewMsgLoading.value = false; // 开始输出新消息 取消加载状态
+          }
           // console.log(currentContent)
           updateAssistantContent(currentContent);
+          // 每次收到消息都滚动到底部
+          nextTick(() => {
+            chatRef.value?.scrollToBottom({ behavior: 'auto' });
+          });
           break;
 
         case 'SOURCE':
@@ -906,60 +801,103 @@ const handleMessageSend = async (user_message: any) => {
 
     // ================= 关键更新方法 =================
     const updateAssistantContent = (content: string) => {
-      // 严格匹配当前助手消息
-      chats.value = chats.value.map(msg => {
-        if (msg.timestamp === assistantMessage.timestamp) {
-          return {
-            ...msg,
-            content,
-            status: content ? 'success' : 'loading'
-          };
-        }
-        return msg;  // 保持用户和其他消息不变
-      });
+      // 获取最后一条消息
+      const lastMessageIndex = chatsList.value.length - 1;
+
+      // 检查最后一条消息是否存在且 role 是否为 "assistant"
+      if (lastMessageIndex >= 0 && chatsList.value[lastMessageIndex].role === "assistant") {
+        // 仅更新最后一条消息的内容和状态
+        chatsList.value = chatsList.value.map((msg, index) => {
+          if (index === lastMessageIndex) {
+            // 如果是最后一条消息且 role 为 "assistant"，则更新内容和状态
+            return {
+              ...msg,
+              content,
+              status: content ? 'success' : 'loading'
+            };
+          }
+          return msg; // 保持其他消息不变
+        });
+      } else {
+        // 如果最后一条消息的 role 不是 "assistant"，创建新的助手消息
+        let now_datetime = Date.now()
+        const newAssistantMessage: ExtendedChatMessage = {
+          content: '',
+          role: 'assistant',
+          status: 'loading',
+          name: roleConfig.value['assistant'].name,
+          avatar: roleConfig.value['assistant'].avatar,
+          source: [],
+          timestamp:now_datetime,  // 确保唯一性
+          datetime: formatDateTime(now_datetime)
+        };
+
+        chatsList.value = [
+          ...chatsList.value,
+          newAssistantMessage      // 更新二次调用的助手消息单
+        ];
+        
+      }
     };
   // ================= 处理工具开始调用事件 =================
   const handleToolStart = (toolStartData: any) =>  {
     // 向 chats 列表中插入一条新消息
     // 获取所有的工具名称
     const toolNames = toolStartData.map(tool => tool.function.name).join('，') || '未知工具';
-
+    let now_datetime = Date.now()
     const newAssistantCallToolMessage: ExtendedChatMessage = {
       role: "assistant",
+      name: roleConfig.value['assistant'].name,
+      avatar: roleConfig.value['assistant'].avatar,
       content: `正在调用工具：${toolNames}`,
-      timestamp: userMessage.timestamp + 1,
+      timestamp: now_datetime,
+      datetime: formatDateTime(now_datetime),
       tool_calls: toolStartData,
       source: null
     };
 
+    // 检查最后一条消息的 content 是否为空
+    if (chatsList.value.length > 0 && !chatsList.value[chatsList.value.length - 1].content) {
+      chatsList.value.pop(); // 删除最后一条消息（如果它的 content 为空）
+    }
+
     // 将新消息 push 到 chats.value 中
-    chats.value = [
-      ...chats.value,
+    chatsList.value = [
+      ...chatsList.value,
       newAssistantCallToolMessage
     ];
+    // 记录工具调用信息
+    toolCallsList.value = [
+      ...toolCallsList.value,
+      newAssistantCallToolMessage
+    ]
     
 
   }
   // ================= 处理工具调用结束时间 =================   
   const handleToolEnd = (toolEndData: any) =>  {
     // 向 chats 列表中插入一条新消息
+    let now_datetime = Date.now()
     const newToolMessage: ExtendedChatMessage = {
       role: "tool",
       tool_call_id: toolEndData.tool_call_id,
       content: toolEndData.content,
-      timestamp: userMessage.timestamp + 2,
-      source: null
+      source: null,
+      name: roleConfig.value['tool'].name,
+      avatar: roleConfig.value['tool'].avatar,
+      timestamp: now_datetime,
+      datetime: formatDateTime(now_datetime),
     };
 
     // 将新消息 push 到 chats.value 中
-    chats.value = [
-      ...chats.value,
+    chatsList.value = [
+      ...chatsList.value,
       newToolMessage
     ];
   }
   // ================= 处理来源数据的方法 =================
   const handleSourceData = (sourceData: any) => {
-    chats.value = chats.value.map(msg => {
+    chatsList.value = chatsList.value.map(msg => {
       if (msg.timestamp === assistantMessage.timestamp) {
         // 遍历 sourceData 并根据 source 值添加 avatar 属性
         const processedCurrentSourceCard = sourceData.map((item) => {
@@ -986,11 +924,11 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 结束处理 =================
     const handleStreamEnd = () => {
       isStreamEnded = true;
-      // isLoading.value = false;
+      isStreamLoading.value = false;
       reader.cancel();
 
       // 最终状态更新
-      chats.value = chats.value.map(msg => {
+      chatsList.value = chatsList.value.map(msg => {
         if (msg.timestamp === assistantMessage.timestamp) {
           return { ...msg, status: undefined };
         }
@@ -1001,10 +939,10 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 错误处理 =================
     const handleStreamError = (error: any) => {
       console.error('Stream error:', error);
-      // isLoading.value = false;
+      isStreamLoading.value = false;
 
       // 只修改当前助手消息状态
-      chats.value = chats.value.map(msg => {
+      chatsList.value = chatsList.value.map(msg => {
         if (msg.timestamp === assistantMessage.timestamp) {
           return { ...msg, status: 'error' };
         }
@@ -1017,7 +955,7 @@ const handleMessageSend = async (user_message: any) => {
     await processStream();
   } catch (error) {
     console.error('Message send error:', error);
-    // isLoading.value = false;
+    isStreamLoading.value = false;
     message.error('消息发送失败');
   } finally {
     // 确保清空输入框（需要Chat组件配合）
@@ -1034,7 +972,7 @@ const handleClearHistory = async () => {
 
   try {
     await clearMessageHistory({ conv_id: activeKey.value[0] });
-    chats.value = [];
+    chatsList.value = [];
     message.success('历史记录已清除');
   } catch (error) {
     message.error('清除历史记录失败');
@@ -1049,7 +987,7 @@ const handleDelete = async (convId: string) => {
     await fetchConversations();
     if (activeKey.value[0] === convId) {
       activeKey.value = [];
-      chats.value = [];
+      chatsList.value = [];
     }
   } catch (error) {
     message.error('删除会话失败');
@@ -1170,6 +1108,102 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 </script>
 
 <style scoped>
+::-webkit-scrollbar-thumb {
+  background-color: var(--td-scrollbar-color);
+}
+::-webkit-scrollbar-thumb:horizontal:hover {
+  background-color: var(--td-scrollbar-hover-color);
+}
+::-webkit-scrollbar-track {
+  background-color: var(--td-scroll-track-color);
+}
+
+.chat-box {
+  position: relative;
+  .bottomBtn {
+    position: absolute;
+    left: 50%;
+    margin-left: -20px;
+    bottom: 210px;
+    padding: 0;
+    border: 0;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    box-shadow: 0px 8px 10px -5px rgba(0, 0, 0, 0.08), 0px 16px 24px 2px rgba(0, 0, 0, 0.04),
+      0px 6px 30px 5px rgba(0, 0, 0, 0.05);
+  }
+  .to-bottom {
+    width: 60px;
+    height: 60px;
+    border: 1px solid #dcdcdc;
+    box-sizing: border-box;
+    background: var(--td-bg-color-container);
+    border-radius: 50%;
+    font-size: 24px;
+    line-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    .t-icon {
+      font-size: 24px;
+    }
+  }
+}
+.chat-sender {
+  .btn {
+    color: var(--td-text-color-disabled);
+    border: none;
+    &:hover {
+      color: var(--td-brand-color-hover);
+      border: none;
+      background: none;
+    }
+  }
+  .btn.t-button {
+    height: var(--td-comp-size-m);
+    padding: 0;
+  }
+  .model-select {
+    display: flex;
+    align-items: center;
+    .t-select {
+      width: 112px;
+      height: var(--td-comp-size-m);
+      margin-right: var(--td-comp-margin-s);
+      .t-input {
+        border-radius: 32px;
+        padding: 0 15px;
+      }
+      .t-input.t-is-focused {
+        box-shadow: none;
+      }
+    }
+    .check-box {
+      width: 112px;
+      height: var(--td-comp-size-m);
+      border-radius: 32px;
+      border: 0;
+      background: var(--td-bg-color-component);
+      color: var(--td-text-color-primary);
+      box-sizing: border-box;
+      flex: 0 0 auto;
+      .t-button__text {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        span {
+          margin-left: var(--td-comp-margin-xs);
+        }
+      }
+    }
+    .check-box.is-active {
+      border: 1px solid var(--td-brand-color-focus);
+      background: var(--td-brand-color-light);
+      color: var(--td-text-color-brand);
+    }
+  }
+}
 /* 保持原有样式不变 */
 .common-layout {
   min-height: 100vh;
