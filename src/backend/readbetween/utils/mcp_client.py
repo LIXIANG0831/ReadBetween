@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from contextlib import AsyncExitStack
+from datetime import timedelta
 from typing import Dict, Any, List, Union, Tuple
 from mcp.client.sse import sse_client
 from mcp import ClientSession, StdioServerParameters, stdio_client
@@ -158,7 +159,8 @@ class MCPClient:
 
             session, original_tool = self.tool_mapping[tool_name]
             try:
-                result = await session.call_tool(original_tool, tool_args)
+                read_timeout_seconds = timedelta(minutes=1)  # 工具调用超时时间
+                result = await session.call_tool(original_tool, tool_args, read_timeout_seconds)
                 results[tool_name] = {
                     "success": True,
                     "result": result,
