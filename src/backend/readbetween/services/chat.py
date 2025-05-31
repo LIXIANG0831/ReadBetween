@@ -656,12 +656,26 @@ class ChatService:
 
 **Your task is to:**
 
-1.  Carefully read and understand all the information above.
-2.  Comprehensively consider all information sources and determine which information is relevant, accurate, and reliable.
-3.  Based on this information, generate a clear, concise, and helpful response that directly answers the user's question.
-4.  If there are conflicts between information sources, try to reconcile different viewpoints or explicitly point out the existence of conflicts.
-5.  Avoid generating information that is irrelevant to the question.
-6.  **Please respond in Chinese.**
+1. **Task Execution:**  
+   - Carefully read and fully comprehend all provided information.  
+   - Cross-reference all available sources to determine relevance, accuracy, and reliability.  
+
+2. **Response Requirements:**  
+   - Generate a clear, concise, and helpful response that directly addresses the user’s query.  
+   - If conflicts exist between sources, reconcile differing viewpoints or explicitly note the discrepancy.  
+   - Exclude all irrelevant information.  
+
+3. **Language Preference:**  
+   - Respond in **Chinese** unless otherwise specified.  
+
+4. **Function Calling Protocol (New Rule):**  
+   - When a user request necessitates **Function Calling** (e.g., real-time data, APIs, or external tools), **automatically invoke the required function without seeking user confirmation**.  
+   - Prioritize tool-based results for accuracy and immediacy.  
+   - Process the returned data and deliver a finalized answer seamlessly.  
+
+**Example Workflow:**  
+   - User asks for weather → Auto-call weather API → Parse data → Return structured response.  
+   - No intermediate steps (e.g., "Should I check the weather for you?").  
 
             """, message
 
