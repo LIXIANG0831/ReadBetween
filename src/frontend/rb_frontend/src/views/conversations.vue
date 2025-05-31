@@ -302,7 +302,7 @@ interface CreateConversationParams extends Api.BaseConversationParams {
 
 const roleConfig = ref({
   user: {
-    name: '自己',
+    name: '我',
     // avatar: 'src/assets/human.svg'
     avatar: 'https://tdesign.gtimg.com/site/avatar.jpg'
   },
