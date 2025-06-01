@@ -26,6 +26,9 @@
           <a-tag :color="getStatusColor(record.status)">
             {{ getStatusText(record.status) }}
           </a-tag>
+          <a-tooltip v-if="record.extra" :title="record.extra">
+            <question-circle-outlined style="color: #999; cursor: help;" />
+          </a-tooltip>
         </template>
         <template v-if="column.key === 'action'">
           <a-button size="small" type="link" danger @click="deleteFile(record.id)">
@@ -94,7 +97,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { message } from 'ant-design-vue';
-import { UploadOutlined, LeftOutlined, DeleteOutlined } from '@ant-design/icons-vue';
+import { UploadOutlined, LeftOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 import { 
@@ -110,6 +113,7 @@ interface FileItem {
   status: number;
   create_time: string;
   update_time: string;
+  extra?: string | null;
 }
 
 interface UploadedFile {
