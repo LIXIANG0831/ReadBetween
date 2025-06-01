@@ -60,6 +60,16 @@
                   :content="item.content"
                 />
                 <t-chat-content v-if="item.content && item.content.length > 0 && item.role != 'tool' " :content="item.content" />
+                <!-- 新增图片展示 -->
+                <div v-if="item.image_url" class="chat-image-container">
+                  <img 
+                    :src="item.image_url" 
+                    class="chat-image" 
+                    :style="{ maxWidth: imageWidth(item.image_url) }"
+                    @load="onImageLoad"
+                    loading="lazy"
+                  />
+                </div>
                 <!-- 来源信息卡片 -->
                 <SourceCard v-if="item.source && item.source.length > 0" :sources="item.source" />
               </template>
@@ -93,14 +103,19 @@
 
                   <!-- 自定义操作区域的内容，默认支持图片上传、附件上传和发送按钮 -->
                   <template #suffix="{ renderPresets }">
-                    <!-- <component :is="renderPresets([
+                    <!-- 添加图片上传功能 -->
+                    <component :is="renderPresets([
                       { 
-                        name: 'uploadImage', 
-                        accept: 'image/*', 
-                        title: '上传图片',
-                        uploadProps: imageUploadProps.value
+                        name: 'uploadImage',
+                        uploadProps: imageUploadProps,
+                        action: handleFileUpload
                       },
-                      ])" /> -->
+                      {
+                        name: 'uploadAttachment',
+                        uploadProps: attachmentUploadProps,
+                        action: handleFileUpload
+                      }
+                    ])" />
                     <!-- 在这里可以进行自由的组合使用，或者新增预设 -->
                     <!-- 不需要附件操作的使用方式 -->
                     <!-- <component :is="renderPresets([])" /> -->
@@ -232,7 +247,7 @@ import {
   ChatItem as TChatItem,
 } from '@tdesign-vue-next/chat';
 import { SystemSumIcon, ArrowDownIcon } from 'tdesign-icons-vue-next';
-import { Button as TButton } from 'tdesign-vue-next';
+import { Button as TButton, MessagePlugin } from 'tdesign-vue-next';
 
 import {
   message,
@@ -274,6 +289,7 @@ import type { Key } from 'ant-design-vue/es/_util/type';
 interface ExtendedChatMessage {
   content: any;
   role: 'user' | 'assistant' | 'tool';
+  image_url?: any; // 用于前端图片显示
   name?: any
   avatar?: any
   source: any;
@@ -358,6 +374,28 @@ const isNewMsgLoading = ref(false); // 新消息是否处于加载状态
 const showclearHistory = computed(() => {
   return chatsList.value.length > 1;
 });
+
+// 存储图片尺寸信息
+const imageDimensions = ref({})
+
+// 根据图片尺寸决定显示宽度
+const imageWidth = (url) => {
+  const dimensions = imageDimensions.value[url]
+  if (dimensions && dimensions.height > dimensions.width * 1.5) {
+    return '60%'
+  }
+  return '80%'
+}
+
+// 图片加载完成回调
+const onImageLoad = (event) => {
+  const img = event.target
+  imageDimensions.value[img.src] = {
+    width: img.naturalWidth,
+    height: img.naturalHeight
+  }
+}
+
 // 屏幕滚动
 const chatRef = ref(null);
 const isShowToBottom = ref(false);
@@ -453,17 +491,48 @@ const fetchMessageHistory = async (convId: string) => {
           const content = JSON.parse(msg.content || "null"); // 如果 content 不存在或为空，解析为 null
           return !(msg.role === "assistant" && (!content || content === ""));
         })
-      .map(msg => ({
-        content: JSON.parse(msg.content),
-        role: msg.role || null,
-        name: roleConfig.value[msg.role].name, // 根据角色获取配置中的 name
-        avatar: roleConfig.value[msg.role].avatar, // 根据角色获取配置中的 avatar
-        source: JSON.parse(msg.source),
-        tool_call_id: msg.tool_call_id,
-        tool_calls: JSON.parse(msg.tool_calls),
-        timestamp: new Date(msg.timestamp).getTime(),
-        datetime: formatDateTime(new Date(msg.timestamp))
-      }));
+      .map(msg => {
+          let parsedContent;
+          try {
+            parsedContent = JSON.parse(msg.content);
+          } catch (e) {
+            parsedContent = msg.content; // 如果解析失败，使用原始内容
+          }
+
+          // 处理content，确保最终是字符串
+          let finalContent;
+          let imageUrl = null; // 存储图片URL用于页面显示
+          if (Array.isArray(parsedContent)) {  // 处理多模态问答对
+            // 处理多部分内容（text + image_url等）
+            finalContent = parsedContent.map(part => {
+              if (part.type === 'text') {
+                return part.text;
+              } else if (part.type === 'image_url') {
+                imageUrl = part.image_url.url;
+              }
+              return '';
+            }).join('\n\n');
+          } else if (typeof parsedContent === 'string') {  // 处理普通问答对
+            // 已经是字符串，直接使用
+            finalContent = parsedContent;
+          } else {
+            // 其他情况转为字符串
+            finalContent = JSON.stringify(parsedContent);
+          }
+
+          return {
+            content: finalContent,
+            image_url: imageUrl,
+            role: msg.role || null,
+            name: roleConfig.value[msg.role].name, // 根据角色获取配置中的 name
+            avatar: roleConfig.value[msg.role].avatar, // 根据角色获取配置中的 avatar
+            source: JSON.parse(msg.source),
+            tool_call_id: msg.tool_call_id,
+            tool_calls: JSON.parse(msg.tool_calls),
+            timestamp: new Date(msg.timestamp).getTime(),
+            datetime: formatDateTime(new Date(msg.timestamp))
+          };
+        });
       console.log(chatsList.value)
       console.log(toolCallsList.value)
     }
@@ -505,129 +574,132 @@ interface UploadFile {
   response?: any;
 }
 
-type UploadActionType = 'uploadImage' | 'uploadAttachment';
-
-interface FileSelectCallback {
-  files: FileList;
-  name: UploadActionType;
-}
-// 图片上传配置
+// 已上传的图片文件列表
 const uploadedImageFiles = ref<any[]>([]);
+// 图片上传配置
 const MAX_FILE_SIZE_KB = 5 * 1024;
-const MAX_FILE_COUNT = 5;
+const MAX_FILE_COUNT = 1;
 const imageUploadProps = ref({
-  action: 'https://picui.cn/api/v1/upload', // 你的图片上传接口地址
-  name: 'file', // 对应接口文档中的 image 参数名
   accept: 'image/*', // 接受所有图片类型
   multiple: false, // 根据你的需求设置是否允许多文件上传
-  // data: {}, // 如果需要额外的请求参数，在这里设置
-  limit: MAX_FILE_COUNT,
-  // maxSize: MAX_FILE_SIZE_KB,
-  addOnPasting: true,
-  headers: {
-    'Authorization': `Bearer ${import.meta.env.VITE_IMAGE_BED_TOKEN}`,
-    'Accept': 'application/json'
-  }, // 如果需要自定义请求头，在这里设置
-  onExceed: (fileList) => {
-    message.error(`图片数量不能超过 ${MAX_FILE_COUNT}个!`);
-  },
-  // onSizeError: (file, fileList) => {
-  //   message.error(`图片大小不能超过 ${MAX_FILE_SIZE_KB}KB!`);
-  // },
-  beforeUpload: (obj) => {
-    // 上传实际接口之前
-    console.log('beforeUpload:', obj);
-    
-    // 可以进行文件类型和大小的校验
-    const fileType = obj.file.fileInstance.type; // 获取文件类型
-    const fileSize = obj.file.fileInstance.size; // 获取文件大小（字节）
-    
-    const isLtMaxSize = fileSize / 1024 <= MAX_FILE_SIZE_KB;
-    if (!isLtMaxSize) {
-      message.error(`图片大小不能超过 ${MAX_FILE_SIZE_KB}KB!`);
-      return { 
-        shouldUpload: false, 
-        fileInstance: obj.file.fileInstance, 
-        autoRemove: true 
-      }; // 返回对象，设置 autoRemove 为 true
-    }
-    return true;
-  },
-  afterUpload: (obj) => {
-    // 上传实际接口之后
-    console.log('afterUpload:', obj);
-  },
-  onChange: (info) => {
-    // 过滤出状态为 'done' 的文件，更新 uploadedFiles
-    uploadedImageFiles.value = info.fileList.filter(file => file.status === 'success');
-  },
-  onSuccess: (response, file, fileList) => {
-    console.log('onSuccess:', response, file, fileList);
-    if (response && response.status === true) {
-      message.success(`${file.name} 上传成功.`);
-      // 在这里处理上传成功后的逻辑，例如将返回的图片 URL 显示在聊天框中
-      // 你可能需要更新你的 chats 状态，添加一条包含图片消息的新项
-      const imageUrl = response.data.url; // 假设你的接口返回的 data.url 是图片地址
-      // 注意：你需要根据你的聊天消息结构来添加这条图片消息
-      // 例如：
-      // chats.value = [
-      //   ...chats.value,
-      //   {
-      //   role: 'user', // 或者 'assistant'，取决于谁发送的图片
-      //   content: `![](${imageUrl})`, // 使用 Markdown 图片语法
-      //   source: [],
-      //   timestamp: Date.now(),
-      //   },
-      // ];
-    } else {
-      message.error(`${file.name} 上传失败.`);
-    }
-  },
-  onError: (error, file, fileList) => {
-    console.error('onError:', error, file, fileList);
-    message.error(`${file.name} 上传失败.`);
-  },
-  onProgress: (percent, file) => {
-    console.log(`${file.name} 上传中: ${percent}%`);
-  },
-  // 其他你可能需要的配置项...
 } as any);
-
-// 文件上传配置 
+// 附件上传配置 
 const attachmentUploadProps = ref({
-  action: '', // 你的文件上传接口地址
-  name: 'file',
   accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar', // 支持的文件类型
   multiple: true,
-  headers: {
-    'Authorization': `Bearer ${import.meta.env.VITE_UPLOAD_TOKEN}`,
-    'Accept': 'application/json'
-  },
-  beforeUpload: (file: File) => {
-    console.log('Before file upload:', file);
-    return true;
-  },
-  onChange: (info: { file: UploadFile; fileList: UploadFile[] }) => {
-    console.log('File upload change:', info);
-  },
-  onSuccess: (response: any, file: UploadFile, fileList: UploadFile[]) => {
-    console.log('File upload success:', response, file);
-  },
-  onError: (error: Error, file: UploadFile, fileList: UploadFile[]) => {
-    console.error('File upload error:', error);
-  }
 });
 
-const onFileSelect = ({ files, name }: FileSelectCallback) => {
-  if (files.length === 0) return;
-  
-  if (name === 'uploadImage') {
-    // 图片上传 - 使用 imageUploadProps 自动处理
-    console.log('图片上传已通过 imageUploadProps 处理');
-  } else if (name === 'uploadAttachment') {
-    // 使用新的文件上传逻辑
-    console.log('Attachment files selected:', files);
-    // handleFileUpload(files);
+const handleFileUpload = async (params: { files: File[]; name }) => {
+  if (params.name === 'uploadImage') {
+    console.log('图片上传逻辑', params)
+    // 1. 检查文件数量
+    if (params.files.length > MAX_FILE_COUNT || uploadedImageFiles.value.length > MAX_FILE_COUNT - 1) {
+      MessagePlugin.error(`单次仅允许上传 ${MAX_FILE_COUNT}张图片!`);
+      return;
+    }
+
+    // 检查所有文件类型和大小
+    for (const file of params.files) {
+      if (!file.type.startsWith('image/')) {
+        MessagePlugin.error(`${file.name} 不是图片文件!`);
+        return;
+      }
+
+      const isLtMaxSize = file.size / 1024 <= MAX_FILE_SIZE_KB;
+      if (!isLtMaxSize) {
+        MessagePlugin.error(`${file.name} 大小不能超过 ${MAX_FILE_SIZE_KB}KB!`);
+        return;
+      }
+    }
+
+    // 初始化上传状态
+    uploadedImageFiles.value = params.files.map(file => ({
+      name: file.name,
+      status: 'progress',
+      percent: 0
+    }));
+
+    // 上传所有文件
+    try {
+      const uploadPromises = params.files.map(async (file, index) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('https://picui.cn/api/v1/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_IMAGE_BED_TOKEN}`,
+          },
+          body: formData
+        });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const result = await response.json();
+        console.log('上传结果:', result);
+
+        if (result && result.status === true) {
+          // 更新单个文件的上传状态
+          uploadedImageFiles.value[index] = {
+            name: file.name,
+            status: 'success',
+            response: result,
+            type: result.data.mimetype,
+            url: result.data.links.url,
+            markdown: result.data.links.markdown
+          };
+          
+          MessagePlugin.success(`${file.name} 上传成功.`);
+          return result;
+        } else {
+          throw new Error(result?.message || '上传失败');
+        }
+      });
+
+      // 等待所有上传完成
+      const results = await Promise.all(uploadPromises);
+      console.log('所有文件上传完成:', results);
+
+      // 触发change事件（如果需要）
+      // emit('change', {
+      //   fileList: uploadedImageFiles.value,
+      //   currentFiles: uploadedImageFiles.value,
+      //   type: 'success'
+      // });
+
+    } catch (error) {
+      console.error('上传错误:', error);
+      MessagePlugin.error(`部分文件上传失败: ${error.message}`);
+      
+      // 更新失败文件的状态（Promise.all会失败所有文件，但我们可以标记具体失败的文件）
+      // 这里简单处理，实际可能需要更详细的错误处理
+      uploadedImageFiles.value.forEach(file => {
+        if (file.status === 'progress') {
+          file.status = 'fail';
+          file.error = error.message;
+        }
+      });
+
+      // 触发change事件（如果需要）
+      // emit('change', {
+      //   fileList: uploadedImageFiles.value,
+      //   currentFiles: uploadedImageFiles.value,
+      //   type: 'fail'
+      // });
+    }
+  } else if (params.name === 'uploadAttachment'){
+    console.log('附件上传逻辑', params)
+  }
+}
+
+
+const onFileSelect = (params: { files: File[]; name }) => {
+  if (params.files.length === 0) return;
+  // 仅做日志记录 由action实现上传逻辑
+  if (params.name === 'uploadImage') {
+    console.log('选择了图片文件:', params.files);
+  } else if (params.name === 'uploadAttachment') {
+    console.log('选择了附件文件:', params.files);
   }
 };
 
@@ -650,25 +722,36 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 用户输入处理阶段 =================
     // 构建消息内容
     let contentArray: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
-    // 添加文本内容
-    if (user_message.trim()) {
-      contentArray.push({ type: "text", text: user_message });
-    }
+    
     // 添加已上传的图片
+    console.log('上传图片文件：', uploadedImageFiles.value)
+    let multimodel_content
+    let multimodel_image_url
     uploadedImageFiles.value.forEach(file => {
+      // console.log(file.url)
+      // console.log(file.type?.startsWith('image/'))
+      if (user_message.trim()) {
+        contentArray.push({ type: "text", text: user_message });
+        multimodel_content = user_message
+      }
       if (file.url && file.type?.startsWith('image/')) {
         contentArray.push({
           type: "image_url",
           image_url: { url: file.url }
         });
+        multimodel_image_url = file.url 
       }
+      // 修改文本问答为多模态问答
+      user_message = contentArray
     })
+
 
     // ================= 消息创建阶段 =================
     // 创建完全独立的消息对象
     let now_datetime = Date.now()
     const userMessage: ExtendedChatMessage = {
-      content: user_message,  // 使用原始输入文本
+      content: (typeof user_message === 'object') ? multimodel_content : user_message,  // 使用原始输入文本
+      image_url: (typeof user_message === 'object') ? multimodel_image_url : null,
       role: 'user',
       name: roleConfig.value['user'].name,
       avatar: roleConfig.value['user'].avatar,
@@ -676,6 +759,7 @@ const handleMessageSend = async (user_message: any) => {
       timestamp: now_datetime,
       datetime: formatDateTime(now_datetime)
     };
+    console.log(userMessage)
 
     const assistantMessage: ExtendedChatMessage = {
       content: '',
@@ -939,7 +1023,9 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 错误处理 =================
     const handleStreamError = (error: any) => {
       console.error('Stream error:', error);
-      isStreamLoading.value = false;
+      message.error('消息处理失败');
+      isNewMsgLoading.value = false
+      isStreamLoading.value = false
 
       // 只修改当前助手消息状态
       chatsList.value = chatsList.value.map(msg => {
@@ -948,14 +1034,21 @@ const handleMessageSend = async (user_message: any) => {
         }
         return msg;  // 用户消息保持原样
       });
+      
+      // 3秒后自动删除错误消息
+      setTimeout(() => {
+        chatsList.value = chatsList.value.filter(msg => 
+          msg.timestamp !== assistantMessage.timestamp
+        );
+      }, 3000);
 
-      message.error('消息处理失败');
     };
 
     await processStream();
   } catch (error) {
     console.error('Message send error:', error);
-    isStreamLoading.value = false;
+    isStreamLoading.value = false
+    isNewMsgLoading.value = false
     message.error('消息发送失败');
   } finally {
     // 确保清空输入框（需要Chat组件配合）
@@ -1108,6 +1201,37 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 </script>
 
 <style scoped>
+.chat-image-container {
+  margin: 12px 0;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.chat-image {
+  max-width: 80%; /* 默认宽度 */
+  max-height: 400px; /* 控制最大高度 */
+  border-radius: 8px;
+  object-fit: contain;
+  background-color: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-border-level-1-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .chat-image {
+    max-width: 100%;
+    max-height: 300px;
+  }
+}
+
+/* 悬停效果 */
+.chat-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
 ::-webkit-scrollbar-thumb {
   background-color: var(--td-scrollbar-color);
 }
