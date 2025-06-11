@@ -375,9 +375,15 @@ class ChatService:
         openai_messages = []
         for msg in messages:
             if msg.role == "user":
+                content = json.loads(msg.content)
+                # 'message': 'At most 1 image(s) may be provided in one request.
+                # 清洗历史多模态交互信息
+                # 多模态image_url在使用后, 应无需再组装到 messages 中.
+                if isinstance(content, list) and len(content) > 0 and isinstance(content[0], dict):
+                    content = content[0].get('text', '')
                 openai_messages.append({
                     "role": msg.role,
-                    "content": json.loads(msg.content)
+                    "content": content
                 })
             elif msg.role == "tool":
                 openai_messages.append({
