@@ -43,9 +43,10 @@
             >
 
               <template #content="{ item, index }">
+                
                 <t-chat-reasoning v-if="item.reasoning?.length > 0" expand-icon-placement="right">
                   <template #header>
-                    <t-chat-loading v-if="isStreamLoading" text="思考中..." />
+                    <t-chat-loading v-if="isStreamLoading && item.content.length === 0" text="思考中..." />
                     <div v-else style="display: flex; align-items: center">
                       <CheckCircleIcon style="color: var(--td-success-color-5); font-size: 20px; margin-right: 8px" />
                       <span>已深度思考</span>
@@ -53,6 +54,8 @@
                   </template>
                   <t-chat-content v-if="item.reasoning.length > 0" :content="item.reasoning" />
                 </t-chat-reasoning>
+
+
                 <!-- 工具调用卡片 -->
                 <ToolCallCard 
                   v-if="item.role === 'tool' && item.tool_call_id" 
@@ -73,6 +76,7 @@
                 <!-- 来源信息卡片 -->
                 <SourceCard v-if="item.source && item.source.length > 0" :sources="item.source" />
               </template>
+              
               <template #actions="{ item, index }">
                 <t-chat-action
                   :content="item.content"
@@ -245,8 +249,10 @@ import {
   ChatContent as TChatContent,
   ChatSender as TChatSender,
   ChatItem as TChatItem,
+  ChatReasoning as TChatReasoning,
+  ChatLoading as TChatLoading
 } from '@tdesign-vue-next/chat';
-import { SystemSumIcon, ArrowDownIcon } from 'tdesign-icons-vue-next';
+import { SystemSumIcon, ArrowDownIcon, CheckCircleIcon } from 'tdesign-icons-vue-next';
 import { Button as TButton, MessagePlugin } from 'tdesign-vue-next';
 
 import {
@@ -298,6 +304,7 @@ interface ExtendedChatMessage {
   tool_calls?: any
   tool_call_id?: any
   datetime?: any
+  reasoning?: any
 }
 
 interface StreamMessage {
@@ -500,7 +507,7 @@ const fetchMessageHistory = async (convId: string) => {
           }
 
           // 处理content，确保最终是字符串
-          let finalContent;
+          let finalContent = '';
           let imageUrl = null; // 存储图片URL用于页面显示
           if (Array.isArray(parsedContent)) {  // 处理多模态问答对
             // 处理多部分内容（text + image_url等）
@@ -520,8 +527,19 @@ const fetchMessageHistory = async (convId: string) => {
             finalContent = JSON.stringify(parsedContent);
           }
 
+          // 提取<think>和</think>之间的内容作为reasoningContent
+          let reasoningContent = null;
+          const thinkTagRegex = /<think>(.*?)<\/think>/s;
+          const thinkMatch = finalContent.match(thinkTagRegex);
+          if (thinkMatch && thinkMatch[1]) {
+            reasoningContent = thinkMatch[1].trim();
+          }
+          // 移除<think>和</think>之间的内容作为finalContent
+          finalContent = finalContent.replace(thinkTagRegex, '').trim();
+
           return {
             content: finalContent,
+            reasoning: reasoningContent,
             image_url: imageUrl,
             role: msg.role || null,
             name: roleConfig.value[msg.role].name, // 根据角色获取配置中的 name
@@ -763,6 +781,7 @@ const handleMessageSend = async (user_message: any) => {
 
     const assistantMessage: ExtendedChatMessage = {
       content: '',
+      reasoning: '',
       role: 'assistant',
       status: 'loading',
       name: roleConfig.value['assistant'].name,
@@ -888,6 +907,44 @@ const handleMessageSend = async (user_message: any) => {
       // 获取最后一条消息
       const lastMessageIndex = chatsList.value.length - 1;
 
+      // 解析content，提取thinking和普通内容
+      let thinkingContent = '';
+      let normalContent = '';
+
+      // 临时变量用于跟踪是否在think标签内
+      let inThinkTag = false;
+      let buffer = '';
+
+      for (let i = 0; i < content.length; i++) {
+        // 检查是否遇到<think>开始标签
+        if (content.substr(i, 7) === '<think>' && !inThinkTag) {
+          inThinkTag = true;
+          i += 6; // 跳过标签
+          continue;
+        }
+        
+        // 检查是否遇到</think>结束标签
+        if (content.substr(i, 8) === '</think>' && inThinkTag) {
+          inThinkTag = false;
+          thinkingContent += buffer;
+          buffer = '';
+          i += 7; // 跳过标签
+          continue;
+        }
+        
+        // 根据当前状态积累内容
+        if (inThinkTag) {
+          buffer += content[i];
+        } else {
+          normalContent += content[i];
+        }
+      }
+      
+      // 如果think标签未关闭，把buffer内容加到thinkingContent
+      if (inThinkTag) {
+        thinkingContent += buffer;
+      }
+
       // 检查最后一条消息是否存在且 role 是否为 "assistant"
       if (lastMessageIndex >= 0 && chatsList.value[lastMessageIndex].role === "assistant") {
         // 仅更新最后一条消息的内容和状态
@@ -896,7 +953,8 @@ const handleMessageSend = async (user_message: any) => {
             // 如果是最后一条消息且 role 为 "assistant"，则更新内容和状态
             return {
               ...msg,
-              content,
+              content: normalContent,
+              reasoning: thinkingContent || msg.reasoning, // 保留已有的reasoning如果没有新的thinking内容
               status: content ? 'success' : 'loading'
             };
           }
@@ -906,7 +964,8 @@ const handleMessageSend = async (user_message: any) => {
         // 如果最后一条消息的 role 不是 "assistant"，创建新的助手消息
         let now_datetime = Date.now()
         const newAssistantMessage: ExtendedChatMessage = {
-          content: '',
+          content: normalContent,
+          reasoning: thinkingContent,
           role: 'assistant',
           status: 'loading',
           name: roleConfig.value['assistant'].name,
