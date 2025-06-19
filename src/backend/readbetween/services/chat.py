@@ -268,15 +268,35 @@ class ChatService:
                     stream=True,
                     tools=openai_tools,
                     tool_choice="auto" if len(openai_tools) > 0 else "none",
+                    extra_body={  # 默认开启思考模式
+                        "thinking_budget": 1024
+                    },
                 )
 
                 # yield f"data: [START]\n\n"
                 yield cls._format_stream_response(event="START", text="")
+
                 func_call_list = []  # 模型实际需要调用的工具列表
+                thinking_opened = False  # 标记是否已经开始输出思维链内容
+
                 async for chunk in response:
                     if hasattr(chunk, 'choices') and chunk.choices:
                         if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
-                            content = chunk.choices[0].delta.content or ""
+
+                            # 深度思考支持
+                            reasoning_content = chunk.choices[0].delta.reasoning_content if hasattr(chunk.choices[0].delta, 'reasoning_content') else None
+                            if reasoning_content is not None:
+                                if not thinking_opened:
+                                    content = f"<think>{reasoning_content}"
+                                    thinking_opened = True
+                                else:
+                                    content = reasoning_content
+                            elif thinking_opened:
+                                content = "</think>"
+                                thinking_opened = False
+                            else:
+                                content = chunk.choices[0].delta.content or ""
+
                             if content is not None:
                                 full_response.append(content)
                                 # yield f"data: {content}\n\n"
