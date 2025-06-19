@@ -159,16 +159,15 @@ class ChatService:
     async def stream_chat_response(
             cls,
             message_data: ChatMessageSendPlus,
+            mcp_client: MCPClient = None,
             is_recursion: bool = False
     ) -> Generator:
         """流式聊天处理"""
         # 初始化变量
-        ## 来源信息
-        source_msg_list: List[SourceMsg] = []
+        source_msg_list: List[SourceMsg] = []  # 来源信息返回列表
         kb_source_list = None  # RAG知识库来源信息
         web_source_list = None  # 网络来源信息
-        ## MCP客户端
-        mcp_client = None  # 初始化 mcp_client as None
+        should_cleanup = False  # 标记是否需要清理 MCP Client
 
         conversation_info: ConversationInfo = message_data.conversation_info
         if not conversation_info:
@@ -206,19 +205,20 @@ class ChatService:
             )
             user_msg_id = user_msg.id
 
-        # 准备MCP工具
+        # 准备MCP Client 获取MCP Tool列表
         openai_tools = []
-        if conversation_info.conversation.mcp_server_configs:
+        if not is_recursion and conversation_info.conversation.mcp_server_configs:  # 只在第一次调用时创建MCP Client
             mcp_client = MCPClient(conversation_info.conversation.mcp_server_configs)
             await mcp_client.initialize_sessions()
-            tools = await mcp_client.get_all_tools()
-            for k, v in tools.items():
-                for inner_k, inner_v in v.items():
-                    inner_v["name"] = inner_v["prefixed_name"]
-                    openai_tools.append({
-                        'type': 'function',
-                        'function': inner_v
-                    })
+            should_cleanup = True
+        tools = await mcp_client.get_all_tools() # 获取 MCP Tool列表
+        for k, v in tools.items():
+            for inner_k, inner_v in v.items():
+                inner_v["name"] = inner_v["prefixed_name"]
+                openai_tools.append({
+                    'type': 'function',
+                    'function': inner_v
+                })
 
         # 构建消息历史
         system_prompt = [{'role': 'system', 'content': conversation_info.conversation.system_prompt}]
@@ -305,7 +305,7 @@ class ChatService:
 
                 # 递归调用处理工具响应
                 message_data.conversation_info = await cls.get_conversation_info(message_data.conv_id)
-                async for content in cls.stream_chat_response(message_data, True):
+                async for content in cls.stream_chat_response(message_data, mcp_client, True):
                     yield content
 
             # 收集来源信息
@@ -316,13 +316,14 @@ class ChatService:
 
             # 保存助手响应
             assistant_content = "".join(full_response)
-            await MessageDao.create_message(
-                conv_id=message_data.conv_id,
-                role="assistant",
-                content=json.dumps(assistant_content, ensure_ascii=False),
-                source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False) if len(
-                    list(set(source_msg_list))) > 0 else None,
-            )
+            if assistant_content.strip():  # 如果内容为空或只有空白字符不进行保存
+                await MessageDao.create_message(
+                    conv_id=message_data.conv_id,
+                    role="assistant",
+                    content=json.dumps(assistant_content, ensure_ascii=False),
+                    source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False) if len(
+                        list(set(source_msg_list))) > 0 else None,
+                )
 
             # 返回来源信息
             if not is_recursion and (len(source_msg_list) != 0):
@@ -343,7 +344,7 @@ class ChatService:
                     logger_util.error(f"消息回滚失败: {delete_error}")
             yield cls._format_stream_response(event="ERROR", text=str(e))
         finally:
-            if mcp_client:
+            if should_cleanup and mcp_client:
                 try:
                     await mcp_client.cleanup()
                 except Exception as cleanup_error:
