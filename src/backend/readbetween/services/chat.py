@@ -228,8 +228,12 @@ class ChatService:
         if not is_recursion:
             current_message = [{'role': 'user', 'content': final_query}]
             messages = system_prompt + history_messages + current_message
+            logger_util.debug(f"\n完整模型请求信息:\n{messages}")
+            logger_util.debug(f"\n本次模型请求信息:\n{current_message}")
         else:
             messages = system_prompt + history_messages
+            logger_util.debug(f"\n工具递归调用中...\n模型请求信息:\n{messages}")
+
 
         try:
             # 初始化模型客户端
