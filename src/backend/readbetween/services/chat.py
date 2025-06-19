@@ -211,7 +211,7 @@ class ChatService:
             mcp_client = MCPClient(conversation_info.conversation.mcp_server_configs)
             await mcp_client.initialize_sessions()
             should_cleanup = True
-        tools = await mcp_client.get_all_tools() # 获取 MCP Tool列表
+        tools = await mcp_client.get_all_tools()  # 获取 MCP Tool列表
         for k, v in tools.items():
             for inner_k, inner_v in v.items():
                 inner_v["name"] = inner_v["prefixed_name"]
