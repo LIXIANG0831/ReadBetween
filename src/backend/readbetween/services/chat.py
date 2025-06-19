@@ -156,237 +156,198 @@ class ChatService:
         return await MessageDao.delete_conversation_messages(conv_id)
 
     @classmethod
-    async def stream_chat_response(cls, message_data: ChatMessageSendPlus) -> Generator:
+    async def stream_chat_response(
+            cls,
+            message_data: ChatMessageSendPlus,
+            is_recursion: bool = False
+    ) -> Generator:
         """流式聊天处理"""
-        # 来源信息
+        # 初始化变量
+        ## 来源信息
         source_msg_list: List[SourceMsg] = []
-        # 初始化 mcp_client as None
-        mcp_client = None
-        # 获取对话配置
+        kb_source_list = None  # RAG知识库来源信息
+        web_source_list = None  # 网络来源信息
+        ## MCP客户端
+        mcp_client = None  # 初始化 mcp_client as None
+
         conversation_info: ConversationInfo = message_data.conversation_info
         if not conversation_info:
             raise HTTPException(status_code=404, detail="对话不存在")
 
-        # 判断问答类型
-        content = json.loads(message_data.message)
-        is_multimodal_query = False
-        if isinstance(content, str):  # 普通问答
-            logger_util.debug("普通问答")
-        elif isinstance(content, list):  # 多模态问答
-            logger_util.debug("多模态问答")
-            # 多模态问答时 忽略知识库/网络检索/记忆功能
-            is_multimodal_query = True
-        else:
-            logger_util.error("数据类型既不是 str 也不是 list")
-            raise Exception("数据类型既不是 str 也不是 list")
+        # 非递归调用时的预处理
+        if not is_recursion:
+            # 处理用户输入和各类检索
+            content = json.loads(message_data.message)
+            is_multimodal = isinstance(content, list)
 
-        # 最终给模型的用户输入[+RAG/Web等参考信息] 和 用户初始输入
-        final_query, first_query = cls._init_user_query(content, is_multimodal_query)
-        # 获取知识库召回内容
-        kb_source_list = None
-        knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(
-            conversation_info.conversation.id)  # 获取关联KB
-        if len(knowledge_bases) > 0 and is_multimodal_query is False:
-            logger_util.debug(f"用户开启并使用知识库检索")
-            try:
-                final_query, kb_source_list = await cls._append_kb_recall_msg(knowledge_bases, final_query)
-            except Exception as e:
-                logger_util.error(f"知识库召回内容失败: {e}")
+            # 初始化最终查询和原始查询
+            final_query, first_query = cls._init_user_query(content, is_multimodal)
 
-        # 获取网络搜索内容
-        web_source_list = None
-        if message_data.search is True and is_multimodal_query is False:
-            logger_util.debug(f"用户开启并使用网络检索")
-            try:
+            # 处理知识库检索
+            if not is_multimodal:
+                knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(
+                    conversation_info.conversation.id)
+                if knowledge_bases:
+                    final_query, kb_source_list = await cls._append_kb_recall_msg(knowledge_bases, final_query)
+
+            # 处理网络搜索
+            if message_data.search and not is_multimodal:
                 final_query, web_source_list = await cls._append_web_search_msg(content, final_query)
-            except Exception as e:
-                logger_util.error(f"网络检索失败：{e}")
 
-        # 添加/召回记忆
-        if conversation_info.conversation.use_memory == 1 and is_multimodal_query is False:
-            logger_util.debug(f"用户开启并使用记忆")
-            try:
+            # 处理记忆
+            if conversation_info.conversation.use_memory == 1 and not is_multimodal:
                 final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
-                logger_util.debug(f"用户召回记忆:\n{final_query}")
-            except Exception as e:
-                logger_util.error(f"记忆召回失败: {e}")
 
-        # 启用MCP
-        mcp_server_configs = conversation_info.conversation.mcp_server_configs
-        openai_tools = []
-        if mcp_server_configs is not None:
-            logger_util.debug("用户开启MCP功能")
-            # 获取MCP工具列表
-            mcp_client = MCPClient(mcp_server_configs)
-            await mcp_client.initialize_sessions()
-            tools = await mcp_client.get_all_tools()
-            for k, v in tools.items():
-                for inner_k, inner_v in v.items():
-                    inner_v["name"] = inner_v["prefixed_name"]  # 工具名使用 prefixed_name 方便获取 session
-                    openai_tools.append(
-                        {
-                            'type': 'function',
-                            'function': inner_v
-                        }
-                    )
-
-        # 获取 历史记录
-        # 构造 OpenAI 请求参数
-        system_prompt = [{'role': 'system', 'content': f'{conversation_info.conversation.system_prompt}'}]
-        history_messages = await cls._build_openai_messages(message_data.conv_id)
-        current_message = [{'role': 'user', 'content': final_query}]
-        messages = system_prompt + history_messages + current_message
-        logger_util.debug(f"\n本次请求模型Query信息:\n {final_query}")
-        logger_util.debug(f"\n本次请求模型完整Query消息\n: {messages}")
-
-        # 保存用户消息并记录ID
-        try:
+            # 保存用户消息
             user_msg = await MessageDao.create_message(
                 conv_id=message_data.conv_id,
                 role="user",
                 content=json.dumps(first_query, ensure_ascii=False),
             )
             user_msg_id = user_msg.id
-            logger_util.debug(f"保存用户消息ID: {user_msg_id}")
-        except Exception as e:
-            logger_util.error(f"保存用户消息失败: {e}")
-            yield f"data: [ERROR] 消息保存失败\n\n"
-            return
+
+        # 准备MCP工具
+        openai_tools = []
+        if conversation_info.conversation.mcp_server_configs:
+            mcp_client = MCPClient(conversation_info.conversation.mcp_server_configs)
+            await mcp_client.initialize_sessions()
+            tools = await mcp_client.get_all_tools()
+            for k, v in tools.items():
+                for inner_k, inner_v in v.items():
+                    inner_v["name"] = inner_v["prefixed_name"]
+                    openai_tools.append({
+                        'type': 'function',
+                        'function': inner_v
+                    })
+
+        # 构建消息历史
+        system_prompt = [{'role': 'system', 'content': conversation_info.conversation.system_prompt}]
+        history_messages = await cls._build_openai_messages(message_data.conv_id)
+
+        # 添加当前消息（如果是非递归调用）
+        if not is_recursion:
+            current_message = [{'role': 'user', 'content': final_query}]
+            messages = system_prompt + history_messages + current_message
+        else:
+            messages = system_prompt + history_messages
 
         try:
-            # 获取当前会话渠道模型配置
-            model_cfg: ModelAvailableCfgInfo = conversation_info.model_cfg
-            # 创建模型调用客户端
+            # 初始化模型客户端
+            model_cfg = conversation_info.model_cfg
             client = ModelFactory.create_client(config=model_cfg)
-            # 完整的模型回复
+
             full_response = []
-            try:
-                response = await client.generate_text(
-                    messages=messages,
-                    temperature=message_data.temperature or conversation_info.conversation.temperature,
-                    max_tokens=message_data.max_tokens,
-                    stream=True,
-                    tools=openai_tools,
-                    tool_choice="auto" if len(openai_tools) > 0 else "none",
-                    extra_body={  # 默认开启思考模式
-                        "thinking_budget": 1024
-                    },
-                )
+            func_call_list = []
+            thinking_opened = False
 
-                # yield f"data: [START]\n\n"
-                yield cls._format_stream_response(event="START", text="")
+            # 开始流式响应
+            yield cls._format_stream_response(event="START", text="")
 
-                func_call_list = []  # 模型实际需要调用的工具列表
-                thinking_opened = False  # 标记是否已经开始输出思维链内容
+            response = await client.generate_text(
+                messages=messages,
+                temperature=message_data.temperature or conversation_info.conversation.temperature,
+                max_tokens=message_data.max_tokens,
+                stream=True,
+                tools=openai_tools,
+                tool_choice="auto" if openai_tools else "none",
+                extra_body={"thinking_budget": 1024},
+            )
 
-                async for chunk in response:
-                    if hasattr(chunk, 'choices') and chunk.choices:
-                        if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+            async for chunk in response:
+                if not chunk.choices:
+                    continue
 
-                            # 深度思考支持
-                            reasoning_content = chunk.choices[0].delta.reasoning_content if hasattr(chunk.choices[0].delta, 'reasoning_content') else None
-                            if reasoning_content is not None:
-                                if not thinking_opened:
-                                    content = f"<think>{reasoning_content}"
-                                    thinking_opened = True
-                                else:
-                                    content = reasoning_content
-                            elif thinking_opened:
-                                content = "</think>"
-                                thinking_opened = False
-                            else:
-                                content = chunk.choices[0].delta.content or ""
+                delta = chunk.choices[0].delta
 
-                            if content is not None:
-                                full_response.append(content)
-                                # yield f"data: {content}\n\n"
-                                yield cls._format_stream_response(event="MESSAGE", text=content)
+                # 处理思考链内容
+                if hasattr(delta, 'reasoning_content'):
+                    reasoning = delta.reasoning_content
+                    if reasoning:
+                        content = f"<think>{reasoning}" if not thinking_opened else reasoning
+                        thinking_opened = True
+                    elif thinking_opened:
+                        content = "</think>"
+                        thinking_opened = False
+                    else:
+                        content = ""
 
-                        if hasattr(chunk.choices[0], 'delta') and chunk.choices[0].delta.tool_calls:
-                            for tcchunk in chunk.choices[0].delta.tool_calls:
-                                if len(func_call_list) <= tcchunk.index:
-                                    func_call_list.append({
-                                        "id": "",
-                                        "type": "function",
-                                        "function": {"name": "", "arguments": ""}
-                                    })
-                                tc = func_call_list[tcchunk.index]
-                                if tcchunk.id:
-                                    tc["id"] += tcchunk.id
-                                if tcchunk.function.name:
-                                    tc["function"]["name"] += tcchunk.function.name
-                                if tcchunk.function.arguments:
-                                    tc["function"]["arguments"] += tcchunk.function.arguments
+                    if content:
+                        full_response.append(content)
+                        yield cls._format_stream_response(event="MESSAGE", text=content)
 
-                # 调用MCP工具获取结果
-                try:
-                    if len(func_call_list) > 0:  # 模型是否进行工具调用的判断条件
-                        # 进行MCP工具调用返回流式工具信息
-                        async for response in cls._handle_tool_calls(message_data.conv_id, func_call_list, mcp_client):
-                            # 已进行 _format_stream_response 格式化处理
-                            # Event -> TOOL_START(开始工具调用) | TOOL_END(完成工具调用)
-                            yield response
+                # 处理普通消息内容
+                elif hasattr(delta, 'content') and delta.content:
+                    content = delta.content
+                    full_response.append(content)
+                    yield cls._format_stream_response(event="MESSAGE", text=content)
 
-                        # 拼接工具响应信息 触发二次模型调用
-                        full_response = []
-                        async for content in cls._stream_second_model_response(client, conversation_info, message_data):
-                            full_response.append(content)
-                            yield cls._format_stream_response(event="MESSAGE", text=content)
+                # 处理工具调用
+                if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                    for tcchunk in delta.tool_calls:
+                        if len(func_call_list) <= tcchunk.index:
+                            func_call_list.append({
+                                "id": "",
+                                "type": "function",
+                                "function": {"name": "", "arguments": ""}
+                            })
+                        tc = func_call_list[tcchunk.index]
+                        if tcchunk.id:
+                            tc["id"] += tcchunk.id
+                        if tcchunk.function.name:
+                            tc["function"]["name"] += tcchunk.function.name
+                        if tcchunk.function.arguments:
+                            tc["function"]["arguments"] += tcchunk.function.arguments
 
-                except Exception as e:
-                    error_msg = f"MCP调用失败: {str(e)}"
-                    raise Exception(error_msg)
+            # 处理工具调用结果
+            if func_call_list:
+                async for response in cls._handle_tool_calls(message_data.conv_id, func_call_list, mcp_client):
+                    yield response
 
-                finally:
-                    # 确保无论成功还是失败都会释放MCP连接
-                    if mcp_client is not None:  # Only cleanup if mcp_client was actually initialized
-                        try:
-                            await mcp_client.cleanup()
-                        except Exception as cleanup_error:
-                            logger_util.error(f"清理MCP客户端时出错: {cleanup_error}")
+                # 递归调用处理工具响应
+                message_data.conversation_info = await cls.get_conversation_info(message_data.conv_id)
+                async for content in cls.stream_chat_response(message_data, True):
+                    yield content
 
-            except Exception as e:
-                error_msg = f"模型响应失败: {str(e)}"
-                raise Exception(error_msg)
-
-            # 返回来源信息
+            # 收集来源信息
             if web_source_list is not None:
                 source_msg_list.extend(web_source_list)
             if kb_source_list is not None:
                 source_msg_list.extend(kb_source_list)
 
             # 保存助手响应
-            try:
-                assistant_content = "".join(full_response)
-                await MessageDao.create_message(
-                    conv_id=message_data.conv_id,
-                    role="assistant",
-                    content=json.dumps(assistant_content, ensure_ascii=False),
-                    source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False) if len(
-                        list(set(source_msg_list))) > 0 else None,
-                )
-                logger_util.debug(f"保存助手响应消息: {assistant_content}")
-            except Exception as e:
-                error_msg = f"保存助手响应信息失败: {e}"
-                raise Exception(error_msg)
+            assistant_content = "".join(full_response)
+            await MessageDao.create_message(
+                conv_id=message_data.conv_id,
+                role="assistant",
+                content=json.dumps(assistant_content, ensure_ascii=False),
+                source=json.dumps([msg.to_dict() for msg in list(set(source_msg_list))], ensure_ascii=False) if len(
+                    list(set(source_msg_list))) > 0 else None,
+            )
 
-            if len(source_msg_list) != 0:
-                # yield f"data: [SOURCE] {[source_msg.to_dict() for source_msg in list(set(source_msg_list))]}\n\n"
-                yield cls._format_stream_response(event="SOURCE", text="", extra=[source_msg.to_dict() for source_msg in
-                                                                                  list(set(source_msg_list))])
-            # yield f"data: [END]\n\n"
+            # 返回来源信息
+            if not is_recursion and (len(source_msg_list) != 0):
+                yield cls._format_stream_response(
+                    event="SOURCE",
+                    text="",
+                    extra=[source_msg.to_dict() for source_msg in list(set(source_msg_list))]
+                )
+
             yield cls._format_stream_response(event="END", text="")
 
         except Exception as e:
-            logger_util.error(f"模型调用或保存模型回复失败: {str(e)}")
-            # 回滚用户保存消息
-            try:
-                await MessageDao.delete_message(user_msg_id)
-                logger_util.info(f"已回滚用户消息: {user_msg_id}")
-            except Exception as delete_error:
-                logger_util.error(f"消息回滚失败: {delete_error}")
-            # yield f"data: [ERROR] {e}\n\n"
-            yield cls._format_stream_response(event="ERROR", text=f"{e}")
+            logger_util.error(f"模型调用失败: {str(e)}")
+            if not is_recursion:
+                try:
+                    await MessageDao.delete_message(user_msg_id)
+                except Exception as delete_error:
+                    logger_util.error(f"消息回滚失败: {delete_error}")
+            yield cls._format_stream_response(event="ERROR", text=str(e))
+        finally:
+            if mcp_client:
+                try:
+                    await mcp_client.cleanup()
+                except Exception as cleanup_error:
+                    logger_util.error(f"清理MCP客户端时出错: {cleanup_error}")
 
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
@@ -601,7 +562,6 @@ class ChatService:
                 if retrieve_result.source == 'es' and float(retrieve_result.score) > 4.5:  # 较为严格的召回
                     recall_chunk += f"Title: {retrieve_result.metadata['title']}\nContent: {retrieve_result.text}\n\n"
                     logger_util.debug(f"ES Score: {float(retrieve_result.score)}")
-
 
         if recall_chunk:
             return f"""
