@@ -211,14 +211,15 @@ class ConversationService:
             mcp_client = MCPClient(conversation_info.conversation.mcp_server_configs)
             await mcp_client.initialize_sessions()
             should_cleanup = True
-        tools = await mcp_client.get_all_tools()  # 获取 MCP Tool列表
-        for k, v in tools.items():
-            for inner_k, inner_v in v.items():
-                inner_v["name"] = inner_v["prefixed_name"]
-                openai_tools.append({
-                    'type': 'function',
-                    'function': inner_v
-                })
+        if mcp_client:
+            tools = await mcp_client.get_all_tools()  # 获取 MCP Tool列表
+            for k, v in tools.items():
+                for inner_k, inner_v in v.items():
+                    inner_v["name"] = inner_v["prefixed_name"]
+                    openai_tools.append({
+                        'type': 'function',
+                        'function': inner_v
+                    })
 
         # 构建消息历史
         system_prompt = [{'role': 'system', 'content': conversation_info.conversation.system_prompt}]
