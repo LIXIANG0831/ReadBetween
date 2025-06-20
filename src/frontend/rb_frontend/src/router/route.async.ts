@@ -4,7 +4,16 @@ import type { RouteRecordRaw } from 'vue-router';
 const asyncRoutes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    name: 'conversations',
+    name: 'Home',
+    meta: {
+      title: '主页',
+      icon: '',
+    },
+    component: () => import('../views/home.vue'),
+  },
+  {
+    path: '/conversations',
+    name: 'Conversations',
     meta: {
       title: '对话',
       icon: '',
@@ -13,7 +22,7 @@ const asyncRoutes: Array<RouteRecordRaw> = [
   },
   {
     path: '/knowledge',
-    name: 'knowledge',
+    name: 'Knowledge',
     meta: {
       title: '知识库管理',
       icon: '',
@@ -22,7 +31,7 @@ const asyncRoutes: Array<RouteRecordRaw> = [
   },
   {
     path: '/knowledge_file/:kbId',
-    name: 'knowledge_file',
+    name: 'Knowledge_file',
     meta: {
       title: '知识库文件管理',
       icon: '',
@@ -31,7 +40,7 @@ const asyncRoutes: Array<RouteRecordRaw> = [
   },
   {
     path: '/model_cfg',
-    name: 'model_cfg',
+    name: 'Model_cfg',
     meta: {
       title: '模型管理',
       icon: '',
@@ -40,7 +49,7 @@ const asyncRoutes: Array<RouteRecordRaw> = [
   },
   {
     path: '/memory',
-    name: 'memory',
+    name: 'Memory',
     meta: {
       title: '记忆管理',
       icon: '',
@@ -49,7 +58,7 @@ const asyncRoutes: Array<RouteRecordRaw> = [
   },
   {
     path: '/mcp',
-    name: 'mcp',
+    name: 'Mcp',
     meta: {
       title: 'MCP管理',
       icon: '',

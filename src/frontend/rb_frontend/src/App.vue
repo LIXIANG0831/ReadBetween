@@ -1,154 +1,187 @@
 <script setup lang="ts">
-import zhCN from 'ant-design-vue/es/locale/zh_CN';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { ToolOutlined, FolderOpenOutlined, HomeOutlined, BookOutlined, RocketOutlined, DeploymentUnitOutlined } from '@ant-design/icons-vue';
-import { XProvider } from 'ant-design-x-vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import {
+  HomeIcon,
+  BookIcon,
+  TreeRoundDotVerticalIcon,
+  ToolsIcon,
+  RocketIcon
+} from 'tdesign-icons-vue-next'
+import { ConfigProvider as TConfigProvider } from 'tdesign-vue-next'
 
-const locale = zhCN;
-const router = useRouter();
-const activeIndex = ref('0');
+const router = useRouter()
+const activeIndex = ref('0')
 
-const handleSelect = (event: { key: string }) => {
-  const key = event.key;
-  if (key === '0') {
-    router.push('/');
-  } else if (key === '1') {
-    router.push('/knowledge');
-  }
-  else if (key === '2') {
-    router.push('/memory');
-  }
-  else if (key === '3') {
-    router.push('/model_cfg');
-  }
-  else if (key === '4') {
-    router.push('/mcp');
-  }
-};
+const menuItems = [
+  { value: '0', icon: HomeIcon, label: '渠道管理', route: '/conversations' },
+  { value: '1', icon: BookIcon, label: '知识库管理', route: '/knowledge' },
+  { value: '2', icon: TreeRoundDotVerticalIcon, label: '记忆管理', route: '/memory' },
+  { value: '4', icon: ToolsIcon, label: 'MCP管理', route: '/mcp' },
+  { value: '3', icon: RocketIcon, label: '模型管理', route: '/model_cfg' }
+]
 
-
+const handleSelect = (value: string) => {
+  activeIndex.value = value
+  const selectedItem = menuItems.find(item => item.value === value)
+  if (selectedItem) {
+    router.push(selectedItem.route)
+  }
+}
 </script>
 
 <template>
-  <XProvider :locale="locale">
-    <a-layout style="height: 100vh; overflow: hidden;">
-      <a-layout-sider 
-        width="200" 
-        theme="light"
-        class="ant-layout-sider-custom"
-      >
-        <a-menu
-          mode="inline"
-          :default-selected-keys="[activeIndex]"
-          @click="handleSelect"
-          class="menu-container"
+  <TConfigProvider :global-config="{
+    theme: {
+      primaryColor: '#1890ff'
+    }
+  }">
+    <t-layout class="app-container">
+      <!-- 侧边栏 -->
+      <t-aside class="app-sidebar">
+        <div class="sidebar-header">
+          <h2>ReadBetween</h2>
+        </div>
+        
+        <t-menu
+          v-model="activeIndex"
+          theme="light"
+          @change="handleSelect"
+          class="sidebar-menu"
         >
-          <a-menu-item key="0">
+          <t-menu-item 
+            v-for="item in menuItems"
+            :key="item.value"
+            :value="item.value"
+          >
             <template #icon>
-              <HomeOutlined />
+              <component :is="item.icon" />
             </template>
-            <span>渠道管理</span>
-          </a-menu-item>
-          
-          <a-menu-item key="1">
-            <template #icon>
-              <BookOutlined />
-            </template>
-            <span>知识库管理</span>
-          </a-menu-item>
+            {{ item.label }}
+          </t-menu-item>
+        </t-menu>
+      </t-aside>
 
-          <a-menu-item key="2">
-            <template #icon>
-              <DeploymentUnitOutlined />
-            </template>
-            <span>记忆管理</span>
-          </a-menu-item>
-
-          <a-menu-item key="4">
-            <template #icon>
-              <ToolOutlined />
-            </template>
-            <span>MCP管理</span>
-          </a-menu-item>
-
-          <a-menu-item key="3">
-            <template #icon>
-              <RocketOutlined />
-            </template>
-            <span>模型管理</span>
-          </a-menu-item>
-
-          <!-- <a-menu-item key="4">
-            <template #icon>
-              <RocketOutlined />
-            </template>
-            <span>🚀 语言管理</span>
-          </a-menu-item> -->
-        </a-menu>
-      </a-layout-sider>
-
-      <a-layout>
-        <a-layout-content class="content-wrapper">
+      <!-- 主内容区 -->
+      <t-layout>
+        <t-content class="app-content">
           <router-view />
-        </a-layout-content>
-      </a-layout>
-    </a-layout>
-  </XProvider>
+        </t-content>
+      </t-layout>
+    </t-layout>
+  </TConfigProvider>
 </template>
 
-<style scoped>
-/* 移除默认边距 */
-:deep(.ant-layout) {
-  margin: 0;
-  padding: 0;
+<style lang="scss" scoped>
+// 全局变量定义
+:root {
+  --sidebar-width: 240px;
+  --primary-color: #1890ff;
+  --primary-light-color: #e6f7ff; 
+  --text-primary: #1d2129;
+  --text-secondary: #4e5969;
+  --border-color: #e5e6eb;
+  --bg-color: #f7f8fa;
+  --white: #ffffff;
 }
 
-.ant-layout-sider-custom {
-  background: #fff;
-  border-right: 1px solid #e8e8e8;
+// 基础布局
+.app-container {
   height: 100vh;
-  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1); /* 添加阴影 */
-  border-radius: 0 8px 8px 0; /* 添加圆角 */
+  display: flex;
+  background-color: var(--bg-color);
 }
 
-.menu-container {
-  border-right: 0;
-  height: calc(100vh - 16px); /* 留出滚动条空间 */
-  padding: 8px 0;
+// 侧边栏样式
+.app-sidebar {
+  width: var(--sidebar-width);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  box-shadow: 1px 0 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 100;
+  border-right: 1px solid var(--border-color);
+  transition: width 0.2s ease;
+
+  .sidebar-header {
+    padding: 20px;
+    color: var(--primary-color);
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+    
+    h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+  }
 }
 
-.content-wrapper {
+// 菜单样式
+.sidebar-menu {
+  flex: 1;
+  background: transparent;
+  border-right: none;
+  padding: 8px 12px;
+  width: 100%;
+
+  :deep(.t-menu__item) {
+    color: var(--text-primary);
+    border-radius: 6px;
+    margin: 16px 0;
+    transition: all 0.2s ease;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 12px;
+    font-size: 18px;
+
+    &:hover {
+      background-color: var(--primary-light-color);
+    }
+
+    &.t-is-active {
+      background-color: var(--primary-light-color);
+      color: var(--primary-color);
+      // 添加左边框效果（Ant Design风格）
+      border-left: 3px solid var(--primary-color);
+      padding-left: 9px; // 原12px减去3px边框
+    }
+
+    .t-icon {
+      font-size: 18px;
+      margin-right: 10px;
+      color: var(--text-secondary);
+    }
+  }
+}
+
+// 主内容区
+.app-content {
   padding: 20px;
-  height: 100vh;
+  background-color: var(--white);
+  height: calc(100vh - 40px);
   overflow-y: auto;
-  background: #f0f2f5;
-  border-radius: 8px; /* 添加圆角 */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* 添加阴影 */
+  border-radius: 8px 0 0 0;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
 }
 </style>
 
 <style>
-/* 全局样式重置 */
 html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 #app {
   height: 100vh;
-}
-
-/* 调整菜单项样式 */
-.ant-menu-item {
-  margin: 4px 8px !important;
-  border-radius: 4px;
-  transition: background-color 0.3s ease; /* 添加过渡效果 */
-}
-
-.ant-menu-item-selected {
-  background-color: #e6f7ff !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* 添加选中状态阴影 */
+  color: #1d2129;
 }
 </style>

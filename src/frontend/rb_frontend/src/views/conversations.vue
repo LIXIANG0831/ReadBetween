@@ -196,7 +196,24 @@
           </a-select>
         </a-form-item>
         <a-form-item label="系统提示" name="system_prompt">
-          <a-textarea v-model:value="CreateConversationForm.system_prompt" :rows="4" />
+          <!-- <a-textarea v-model:value="CreateConversationForm.system_prompt" :rows="4" /> -->
+          <MonacoEditor
+            v-model:modelValue="CreateConversationForm.system_prompt"
+            language="markdown"
+            style="height: 100px;"
+            :editorOptions="{
+              theme: 'vs',
+              fontSize: 12,
+              minimap: { enabled: false },
+              lineNumbers: 'off',
+              wordWrap: 'on',
+              renderWhitespace: 'selection',
+              quickSuggestions: false,
+              links: true,
+              autoClosingBrackets: 'never',
+              autoIndent: 'keep'
+            }"
+          />
         </a-form-item>
         <a-form-item label="温度">
           <div class="slider-container">
@@ -381,7 +398,7 @@ const mcpServerOptions = computed(() => {
 // 表单数据
 const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
-  system_prompt: '你是我的AI助手',
+  system_prompt: '# 角色\n我是由`ReadBetween`构建的智能助理。\n\n# 要求\n- 严格按照用户要求回复问题。\n- 遵循社会主义核心价值观。\n',
   model: availableModelStore.llmAvailableModelCfg && availableModelStore.llmAvailableModelCfg.length > 0 ? availableModelStore.llmAvailableModelCfg[0].id : null, 
   temperature: 0.3,
   knowledge_base_ids: [],
@@ -1257,7 +1274,7 @@ const handleModalClose = () => {
   CreateConversationForm.value = {
     title: '新渠道',
     model: availableModelStore.llmAvailableModelCfg && availableModelStore.llmAvailableModelCfg.length > 0 ? availableModelStore.llmAvailableModelCfg[0].id : null,
-    system_prompt: '你是我的AI助手',
+    system_prompt: '# 角色\n我是由`ReadBetween`构建的智能助理。\n\n# 要求\n- 严格按照用户要求回复问题。\n- 遵循社会主义核心价值观。\n',
     temperature: 0.3,
     knowledge_base_ids: [],
     use_memory: true, // 初始化 use_memory 为 true

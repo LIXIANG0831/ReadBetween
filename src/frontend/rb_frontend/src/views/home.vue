@@ -1,197 +1,180 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import { MessagePlugin } from 'tdesign-vue-next';
+
+const channels = ref([
+  { id: 1, name: '微信渠道', status: 'active', users: 1250 },
+  { id: 2, name: 'APP渠道', status: 'active', users: 3420 },
+  { id: 3, name: '网页渠道', status: 'inactive', users: 780 },
+]);
+
+const columns = [
+  { colKey: 'name', title: '渠道名称', width: 150 },
+  { colKey: 'status', title: '状态', width: 100 },
+  { colKey: 'users', title: '用户数', width: 120 },
+  { colKey: 'operations', title: '操作', width: 150 },
+];
+
+const handleEdit = (id: number) => {
+  MessagePlugin.success(`编辑渠道 ${id}`);
+};
+</script>
+
 <template>
-  <div class="image-container">
-    <div class="search-input">
-      <el-input
-        v-model="searchVal"
-        style="width: 800px"
-        :placeholder="t('button.searchPlaceholder')"
-        class="input-with-search"
-        @keyup.enter="getBQB"
+  <div class="home-container">
+    <t-card :bordered="false" class="welcome-card">
+      <div class="welcome-content">
+        <h2>欢迎回来！</h2>
+        <p>今日新增用户 128 人，总对话量 2,456 次</p>
+      </div>
+    </t-card>
+
+    <t-card title="渠道管理" class="channel-card" :bordered="false">
+      <template #actions>
+        <t-button theme="primary" variant="outline">
+          <template #icon>
+            <t-icon name="add" />
+          </template>
+          新增渠道
+        </t-button>
+      </template>
+      
+      <t-table
+        :data="channels"
+        :columns="columns"
+        row-key="id"
+        hover
+        stripe
       >
-        <template #append>
-          <el-button @click="getBQB">{{ t('button.search') }}</el-button>
+        <template #status="{ row }">
+          <t-tag :theme="row.status === 'active' ? 'success' : 'danger'" variant="light">
+            {{ row.status === 'active' ? '活跃' : '停用' }}
+          </t-tag>
         </template>
-      </el-input>
-    </div>
+        <template #operations="{ row }">
+          <t-space>
+            <t-button size="small" theme="primary" variant="text" @click="handleEdit(row.id)">
+              编辑
+            </t-button>
+            <t-button size="small" theme="danger" variant="text">
+              删除
+            </t-button>
+          </t-space>
+        </template>
+      </t-table>
+    </t-card>
 
-    <LoginDialog />
-
-    <ul v-infinite-scroll="load" :infinite-scroll-disabled="disabled" class="infinite-list">
-      <li v-for="(item, index) in countList" :key="index" class="infinite-list-item">
-        <el-card>
-          <el-image
-            :src="item.url"
-            :zoom-rate="1.2"
-            :max-scale="7"
-            :min-scale="0.2"
-            :preview-src-list="[item.url]"
-            :initial-index="0"
-            fit="contain"
-          />
-          <div class="icon-box">
-            <el-icon color="red" @click="likeBQB(item)">
-              <IconBxsLike />
-            </el-icon>
-            <p>{{ item.likes }}</p>
-            <el-icon color="#409eff" @click="dislikeBQB(item)">
-              <IconBxsDislike />
-            </el-icon>
-            <p>{{ item.dislikes }}</p>
+    <div class="metric-grid">
+      <t-card :bordered="false" shadow class="metric-card">
+        <div class="metric-content">
+          <t-icon name="user" size="24px" class="metric-icon" />
+          <div>
+            <div class="metric-value">5,280</div>
+            <div class="metric-label">总用户数</div>
           </div>
-        </el-card>
-      </li>
-    </ul>
-    <el-pagination
-      v-model:current-page="currentPage"
-      :page-size="size"
-      :pager-count="11"
-      layout="prev, pager, next"
-      :total="total"
-      @current-change="handleCurrentChange"
-    />
+        </div>
+      </t-card>
+      
+      <t-card :bordered="false" shadow class="metric-card">
+        <div class="metric-content">
+          <t-icon name="activity" size="24px" class="metric-icon" />
+          <div>
+            <div class="metric-value">1,245</div>
+            <div class="metric-label">今日活跃</div>
+          </div>
+        </div>
+      </t-card>
+      
+      <t-card :bordered="false" shadow class="metric-card">
+        <div class="metric-content">
+          <t-icon name="chat" size="24px" class="metric-icon" />
+          <div>
+            <div class="metric-value">3,672</div>
+            <div class="metric-label">今日对话</div>
+          </div>
+        </div>
+      </t-card>
+      
+      <t-card :bordered="false" shadow class="metric-card">
+        <div class="metric-content">
+          <t-icon name="thumb-up" size="24px" class="metric-icon" />
+          <div>
+            <div class="metric-value">89%</div>
+            <div class="metric-label">满意率</div>
+          </div>
+        </div>
+      </t-card>
+    </div>
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from 'vue';
-import IconBxsLike from '~icons/bxs/like';
-import IconBxsDislike from '~icons/bxs/dislike';
-import { bqbDislikes, bqbLikes, bqbList } from '@/api/bqb';
-import { ElMessage } from 'element-plus';
-
-const { t } = useI18n();
-const size = ref(10);
-const count = ref(0);
-const total = ref(1);
-const currentPage = ref(1);
-const countList = ref([]);
-const loading = ref(false);
-const noMore = computed(() => count.value >= 100);
-const disabled = computed(() => loading.value || noMore.value);
-const searchVal = ref();
-const load = () => {
-  loading.value = true;
-  setTimeout(() => {
-    loading.value = false;
-  }, 500);
-};
-
-function getBQB() {
-  bqbList({
-    name: searchVal.value,
-    page: currentPage.value,
-    size: size.value,
-  }).then((res) => {
-    countList.value = [];
-    res.data.data.forEach((element: string) => {
-      countList.value.push(element);
-    });
-    total.value = res.data.total;
-  });
+<style scoped>
+.home-container {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-function likeBQB(item) {
-  bqbLikes({ key: item.key }).then((res) => {
-    ElMessage.success(res.msg);
-    item.likes++;
-  });
+.welcome-card {
+  margin-bottom: 16px;
+  background-color: var(--td-brand-color-1);
+  border-left: 4px solid var(--td-brand-color);
 }
 
-function dislikeBQB(item) {
-  bqbDislikes({ key: item.key }).then((res) => {
-    ElMessage.success(res.msg);
-    item.dislikes++;
-  });
+.welcome-content {
+  padding: 12px 16px;
 }
 
-const handleCurrentChange = (val) => {
-  getBQB();
-};
+.welcome-content h2 {
+  margin: 0 0 8px 0;
+  color: var(--td-text-color-primary);
+  font-size: 18px;
+}
 
-onMounted(() => {
-  getBQB();
-});
-</script>
+.welcome-content p {
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+}
 
-<style lang="scss" scoped>
-.image-container {
-  position: relative;
-  box-sizing: border-box;
-  width: 100%;
-  height: 85vh;
-  padding-top: 80px;
+.channel-card {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
 
-  .center-text {
-    height: 20px;
-    margin: 10px 0;
-    font-size: 14px;
-    text-align: center;
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
 
-    p {
-      padding: 0;
-      margin: 0;
-    }
-  }
+.metric-card {
+  padding: 16px;
+  border-radius: 8px;
+}
 
-  .search-input {
-    position: absolute;
-    top: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
+.metric-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-  .infinite-list {
-    display: flex;
-    flex-wrap: wrap;
-    place-content: flex-start center;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    overflow-y: auto;
-    list-style: none;
-  }
+.metric-icon {
+  color: var(--td-brand-color);
+  background-color: var(--td-brand-color-1);
+  padding: 8px;
+  border-radius: 50%;
+}
 
-  .infinite-list-item {
-    width: 350px;
-    height: 350px;
-    margin: 10px;
+.metric-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+}
 
-    .el-card {
-      width: 350px;
-      height: 100%;
-    }
-
-    :deep(.el-card__body) {
-      box-sizing: border-box;
-      height: 100%;
-      padding: 30px 20px 40px;
-      text-align: center;
-
-      .el-image {
-        height: 100%;
-      }
-
-      .icon-box {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        margin-top: 5px;
-        font-size: 15px;
-
-        p {
-          margin: 0 10px 0 5px;
-        }
-      }
-
-      .el-icon {
-        font-size: 20px;
-        cursor: pointer;
-      }
-    }
-  }
-
-  :deep(.el-pagination) {
-    justify-content: center;
-  }
+.metric-label {
+  font-size: 13px;
+  color: var(--td-text-color-secondary);
+  margin-top: 4px;
 }
 </style>

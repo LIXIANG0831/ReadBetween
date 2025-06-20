@@ -5,7 +5,20 @@
       <MonacoEditor
         v-model:model-value="mcpStore.mcpConfig"
         language="json"
-        :options="{ minimap: { enabled: false }, fontSize: 14 }"
+        :editorOptions="{
+          theme: 'vs-dark',
+          fontSize: 14,
+          minimap: { enabled: true },
+          lineNumbers: 'on',
+          wordWrap: 'on',
+          autoClosingBrackets: 'always',
+          autoIndent: 'full',
+          formatOnPaste: true,
+          formatOnType: true,
+          suggest: {
+            showWords: false
+          }
+        }"
       />
       <a-button type="primary" @click="saveMcpConfig" style="margin-top: 16px;">保 存</a-button>
     </a-card>

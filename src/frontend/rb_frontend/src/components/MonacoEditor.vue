@@ -9,6 +9,7 @@ import * as monaco from 'monaco-editor'
 const props = defineProps<{
   modelValue: string
   language?: string
+  editorOptions?: monaco.editor.IStandaloneEditorConstructionOptions
 }>()
 
 const emit = defineEmits<{
@@ -18,20 +19,36 @@ const emit = defineEmits<{
 const editorContainer = ref<HTMLElement | null>(null)
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
 
+// 默认配置
+const defaultOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
+  automaticLayout: true,
+  scrollBeyondLastLine: false,
+  fontSize: 14,
+  minimap: { enabled: false },  // 默认关闭小地图
+  lineNumbers: 'off',          // 默认关闭行号
+  formatOnPaste: true,
+  formatOnType: true,
+  glyphMargin: false,
+  folding: false,
+  lineDecorationsWidth: 0,
+  lineNumbersMinChars: 0,
+  renderLineHighlight: 'none',
+  overviewRulerBorder: false,
+  hideCursorInOverviewRuler: true
+}
+
 const initEditor = () => {
   if (!editorContainer.value) return
 
-  editor = monaco.editor.create(editorContainer.value, {
-    value: props.modelValue,
-    language: props.language || 'json',
-    theme: 'vs-dark',
-    automaticLayout: true,
-    scrollBeyondLastLine: false,
-    fontSize: 14,
-    minimap: { enabled: false },
-    formatOnPaste: true,
-    formatOnType: true,
-  })
+  // 合并配置 - 用户传入的 editorOptions 会覆盖默认配置
+  const options: monaco.editor.IStandaloneEditorConstructionOptions = {
+    ...defaultOptions,
+    language: props.language || 'plaintext',
+    ...props.editorOptions,  // 用户自定义配置
+    value: props.modelValue   // 确保 value 不会被覆盖
+  }
+
+  editor = monaco.editor.create(editorContainer.value, options)
 
   editor.onDidChangeModelContent(() => {
     const value = editor?.getValue()
@@ -51,21 +68,36 @@ watch(
     }
   }
 )
+
+watch(
+  () => props.language,
+  () => {
+    if (editor) {
+      const model = editor.getModel()
+      if (model) {
+        monaco.editor.setModelLanguage(model, props.language || 'plaintext')
+      }
+    }
+  }
+)
 </script>
 
 <style scoped>
 .editor-container {
   width: 100%;
-  height: 500px; /* 设置你需要的高度 */
+  min-width: 100px;
+  max-width: 1500px;
+  height: 500px;
   border: 1px solid #ddd;
-  border-radius: 8px; /* 设置圆角 */
+  border-radius: 8px;
+  margin: 0 auto;
 }
 </style>
 
-<!-- 全局样式或额外的样式标签 -->
 <style>
 .monaco-editor .monaco-editor-background,
 .monaco-editor .monaco-editor .lines-content {
-  border-radius: 8px !important; /* 确保使用足够的优先级 */
+  border-radius: 8px !important;
+  padding-left: 8px !important;
 }
 </style>

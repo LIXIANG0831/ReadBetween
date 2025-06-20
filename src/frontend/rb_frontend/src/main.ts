@@ -13,6 +13,9 @@ import App from './App.vue';
 import 'element-plus/dist/index.css';
 import '@/assets/styles/index.scss';
 
+import 'tdesign-vue-next/es/style/index.css'
+import TDesign from 'tdesign-vue-next'
+
 const i18n = createI18n({
   locale: 'en',
   messages,
@@ -23,6 +26,7 @@ app.use(Antd)
 app.use(router);
 app.use(store);
 app.use(i18n);
+app.use(TDesign)
 
 
 app.mount('#app');
