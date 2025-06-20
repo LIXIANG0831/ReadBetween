@@ -8,6 +8,7 @@
 docker/*/
 docker/.docker-compose.yml
 node_modules
+.DS_Store
 
 __pycache__/
 *.py[cod]
