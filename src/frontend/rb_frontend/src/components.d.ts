@@ -11,16 +11,12 @@ declare module 'vue' {
     ElCol: typeof import('element-plus/es')['ElCol']
     ElResult: typeof import('element-plus/es')['ElResult']
     ElRow: typeof import('element-plus/es')['ElRow']
-    EnReadme: typeof import('./components/EnReadme.md')['default']
     Header: typeof import('./components/Header.vue')['default']
     KnowledgeGraph: typeof import('./components/KnowledgeGraph.vue')['default']
-    LoginDialog: typeof import('./components/LoginDialog.vue')['default']
-    MonacoEditor: typeof import('./components/MonacoEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SourceCard: typeof import('./components/SourceCard.vue')['default']
     ToolCallCard: typeof import('./components/ToolCallCard.vue')['default']
     VoiceInteraction: typeof import('./components/VoiceInteraction.vue')['default']
-    ZhReadme: typeof import('./components/ZhReadme.md')['default']
   }
 }

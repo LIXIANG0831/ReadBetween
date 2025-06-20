@@ -27,7 +27,6 @@ const handleSelect = (event: { key: string }) => {
   }
 };
 
-import VoiceInteraction from '@/components/VoiceInteraction.vue'
 
 </script>
 
