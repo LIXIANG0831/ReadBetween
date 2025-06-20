@@ -18,7 +18,7 @@ from ...services.constant import System_Embedding_Name
 
 if TYPE_CHECKING:
     from .conversation_knowledge_link import ConversationKnowledgeLink
-    from .conversations import Conversation
+    from .conversation import Conversation
 
 class KnowledgeBase(AwsomeDBModel):
     __tablename__ = "knowledge"

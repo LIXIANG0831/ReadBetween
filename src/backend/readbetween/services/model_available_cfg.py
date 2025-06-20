@@ -10,7 +10,7 @@ class ModelAvailableCfgService(BaseService):
 
     @classmethod
     async def delete_model_available_cfg(cls, id):
-        from readbetween.models.dao.conversations import ConversationDao
+        from readbetween.models.dao.conversation import ConversationDao
         from readbetween.models.dao.knowledge import KnowledgeDao
         # 删除关联该模型的会话
         await ConversationDao.delete_by_available_id(id)

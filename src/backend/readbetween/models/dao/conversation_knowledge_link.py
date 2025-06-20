@@ -13,7 +13,7 @@ from readbetween.models.dao.knowledge import Knowledge
 from readbetween.utils.logger_util import logger_util
 
 if TYPE_CHECKING:
-    from .conversations import Conversation
+    from .conversation import Conversation
     from .knowledge import Knowledge
 
 

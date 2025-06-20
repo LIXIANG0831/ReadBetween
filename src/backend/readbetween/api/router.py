@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from readbetween.api.health import router as health_router
-from readbetween.api.v1.chat import router as chat_router
+from readbetween.api.v1.conversation import router as chat_router
 from readbetween.api.v1.knowledge import router as knowledge_router
 from readbetween.api.v1.knowledge_file import router as knowledge_file_router
 from readbetween.api.v1.model_setting_cfg import router as model_setting_cfg_router

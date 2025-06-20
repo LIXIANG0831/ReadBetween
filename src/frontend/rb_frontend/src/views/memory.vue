@@ -50,7 +50,7 @@ import {
 import { theme } from 'ant-design-vue';
 import {
   listConversations,
-} from '@/api/conversations';
+} from '@/api/conversation';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import KnowledgeGraph from '@/components/KnowledgeGraph.vue'; // 引入 KnowledgeGraph 组件
 

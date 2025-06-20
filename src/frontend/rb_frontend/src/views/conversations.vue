@@ -281,7 +281,7 @@ import {
   clearMessageHistory,
   getMessageHistory,
   sendMessage
-} from '@/api/conversations';
+} from '@/api/conversation';
 import { listKnowledge } from '@/api/knowledge';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import SourceCard from '@/components/SourceCard.vue';

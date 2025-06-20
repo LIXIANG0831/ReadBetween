@@ -6,7 +6,7 @@ from mcp.types import CallToolResult, TextContent, ImageContent, EmbeddedResourc
 from readbetween.models.dao.model_available_cfg import ModelAvailableCfgDao
 from readbetween.models.schemas.source import SourceMsg
 from readbetween.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
-from readbetween.models.dao.conversations import ConversationDao, Conversation
+from readbetween.models.dao.conversation import ConversationDao, Conversation
 from readbetween.models.dao.knowledge import KnowledgeDao, Knowledge
 from readbetween.models.dao.messages import MessageDao
 from readbetween.models.schemas.response import PageModel
@@ -34,7 +34,7 @@ minio_client = MinioUtil()
 redis_client = RedisUtil()
 
 
-class ChatService:
+class ConversationService:
 
     @classmethod
     async def create_conversation(cls, create_data: ChatCreate):

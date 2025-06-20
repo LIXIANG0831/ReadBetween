@@ -6,55 +6,55 @@ from readbetween.models.v1.chat import ChatRequest, ChatMessageSendPlus
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.model_factory import ModelFactory
 from readbetween.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
-from readbetween.services.chat import ChatService
+from readbetween.services.conversation import ConversationService
 
 router = APIRouter(tags=["模型会话"])
 
 
-@router.post("/conversations/create")
+@router.post("/conversation/create")
 async def create_conversation(create_data: ChatCreate):
     try:
-        return resp_200(await ChatService.create_conversation(create_data))
+        return resp_200(await ConversationService.create_conversation(create_data))
     except Exception as e:
         logger_util.error(f"create_conversation error: {e}")
         return resp_500(message=str(e))
 
 
-@router.post("/conversations/delete")
+@router.post("/conversation/delete")
 async def delete_conversation(conv_id: str):
     try:
-        return resp_200(await ChatService.delete_conversation(conv_id))
+        return resp_200(await ConversationService.delete_conversation(conv_id))
     except Exception as e:
         logger_util.error(f"delete_conversation error: {e}")
         return resp_500(message=str(e))
 
 
-@router.post("/conversations/update")
+@router.post("/conversation/update")
 async def update_conversation(update_data: ChatUpdate):
     try:
-        return resp_200(await ChatService.update_conversation(update_data))
+        return resp_200(await ConversationService.update_conversation(update_data))
     except Exception as e:
         logger_util.error(f"update_conversation error: {e}")
         return resp_500(message=str(e))
 
 
-@router.get("/conversations/list")
+@router.get("/conversation/list")
 async def list_conversations(page: int = 1, size: int = 10):
     try:
-        return resp_200(await ChatService.list_conversations(page, size))
+        return resp_200(await ConversationService.list_conversations(page, size))
     except Exception as e:
         logger_util.error(f"list_conversations error: {e}")
         return resp_500(message=str(e))
 
 
-@router.post("/conversations/messages/send", response_class=StreamingResponse)
+@router.post("/conversation/messages/send", response_class=StreamingResponse)
 async def send_message(message_data: ChatMessageSend):
     try:
         # 获取详细会话配置信息 通过缓存避免重复查询
-        conversation_info = await ChatService.get_conversation_info(message_data.conv_id)
+        conversation_info = await ConversationService.get_conversation_info(message_data.conv_id)
         # 返回StreamingResponse包装的生成器
         return StreamingResponse(
-            ChatService.stream_chat_response(
+            ConversationService.stream_chat_response(
                 ChatMessageSendPlus(
                     **message_data.dict(),  # 解包ChatMessageSend
                     conversation_info=conversation_info,
@@ -79,19 +79,19 @@ async def send_message(message_data: ChatMessageSend):
         return StreamingResponse(error_generator(), media_type="text/event-stream")
 
 
-@router.get("/conversations/messages/history")
+@router.get("/conversation/messages/history")
 async def get_message_history(conv_id: str, limit: int = 100):
     try:
-        return resp_200(await ChatService.get_message_history(conv_id, limit))
+        return resp_200(await ConversationService.get_message_history(conv_id, limit))
     except Exception as e:
         logger_util.error(f"get_message_history error: {e}")
         return resp_500(message=str(e))
 
 
-@router.post("/conversations/messages/clear")
+@router.post("/conversation/messages/clear")
 async def clear_message_history(conv_id: str):
     try:
-        return resp_200(await ChatService.clear_message_history(conv_id))
+        return resp_200(await ConversationService.clear_message_history(conv_id))
     except Exception as e:
         logger_util.error(f"clear_message_history error: {e}")
         return resp_500(message=str(e))
