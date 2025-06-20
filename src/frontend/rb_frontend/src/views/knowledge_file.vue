@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { message } from 'ant-design-vue';
 import { UploadOutlined, LeftOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -321,8 +321,19 @@ const saveConfiguration = async () => {
   }
 };
 
+let refreshInterval: number | null = null;
+
 onMounted(() => {
   fetchFileList();
+  // 设置每5秒刷新一次
+  refreshInterval = window.setInterval(fetchFileList, 5000);
+});
+
+onUnmounted(() => {
+  // 清除定时器
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
 });
 </script>
 

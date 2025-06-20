@@ -85,6 +85,29 @@
                 />
               </template>
               <template #footer>
+                <!-- 新增独立的图片预览区域，放在输入框上方 -->
+                <div class="image-preview-container" v-if="uploadedImageFiles.length > 0">
+                  <div 
+                    v-for="(file, index) in uploadedImageFiles" 
+                    :key="file.uid || index"
+                    class="image-preview-item"
+                    :class="{ 'is-uploading': file.status === 'progress' }"
+                  >
+                    <img 
+                      :src="getImagePreview(file)" 
+                      alt="Preview" 
+                      class="preview-image"
+                    />
+                    <div class="upload-indicator" v-if="file.status === 'progress'">
+                      <t-spinner size="small" />
+                      <span class="upload-text">上传中...</span>
+                    </div>
+                    <div class="remove-btn" @click="removeImage(index)">
+                      <CloseIcon />
+                    </div>
+                  </div>
+                </div>
+
                 <t-chat-sender 
                 v-model="query"
                 :textarea-props="{
@@ -252,7 +275,7 @@ import {
   ChatReasoning as TChatReasoning,
   ChatLoading as TChatLoading
 } from '@tdesign-vue-next/chat';
-import { SystemSumIcon, ArrowDownIcon, CheckCircleIcon } from 'tdesign-icons-vue-next';
+import { SystemSumIcon, ArrowDownIcon, CheckCircleIcon, CloseIcon } from 'tdesign-icons-vue-next';
 import { Button as TButton, MessagePlugin } from 'tdesign-vue-next';
 
 import {
@@ -610,9 +633,10 @@ const attachmentUploadProps = ref({
 const handleFileUpload = async (params: { files: File[]; name }) => {
   if (params.name === 'uploadImage') {
     console.log('图片上传逻辑', params)
+    
     // 1. 检查文件数量
-    if (params.files.length > MAX_FILE_COUNT || uploadedImageFiles.value.length > MAX_FILE_COUNT - 1) {
-      MessagePlugin.error(`单次仅允许上传 ${MAX_FILE_COUNT}张图片!`);
+    if (params.files.length > MAX_FILE_COUNT || uploadedImageFiles.value.length + params.files.length > MAX_FILE_COUNT) {
+      MessagePlugin.error(`最多允许上传 ${MAX_FILE_COUNT} 张图片!`);
       return;
     }
 
@@ -630,86 +654,94 @@ const handleFileUpload = async (params: { files: File[]; name }) => {
       }
     }
 
-    // 初始化上传状态
-    uploadedImageFiles.value = params.files.map(file => ({
+    // 为每个文件创建上传状态对象
+    const newFiles = params.files.map(file => ({
       name: file.name,
-      status: 'progress',
-      percent: 0
+      status: 'progress' as const,
+      percent: 0,
+      uid: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      file: file,
+      preview: URL.createObjectURL(file)
     }));
 
-    // 上传所有文件
+    // 追加到 uploadedImageFiles
+    uploadedImageFiles.value = [...uploadedImageFiles.value, ...newFiles];
+
     try {
-      const uploadPromises = params.files.map(async (file, index) => {
-        const formData = new FormData();
-        formData.append('file', file);
+      // 上传所有文件
+      const uploadResults = await Promise.all(
+        params.files.map(async (file, index) => {
+          const formData = new FormData();
+          formData.append('file', file);
 
-        const response = await fetch('https://picui.cn/api/v1/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_IMAGE_BED_TOKEN}`,
-          },
-          body: formData
-        });
-        
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const result = await response.json();
-        console.log('上传结果:', result);
-
-        if (result && result.status === true) {
-          // 更新单个文件的上传状态
-          uploadedImageFiles.value[index] = {
-            name: file.name,
-            status: 'success',
-            response: result,
-            type: result.data.mimetype,
-            url: result.data.links.url,
-            markdown: result.data.links.markdown
-          };
+          const response = await fetch('https://picui.cn/api/v1/upload', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_IMAGE_BED_TOKEN}`,
+            },
+            body: formData
+          });
           
-          MessagePlugin.success(`${file.name} 上传成功.`);
-          return result;
-        } else {
-          throw new Error(result?.message || '上传失败');
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+          const result = await response.json();
+          console.log('上传结果:', result);
+
+          if (result && result.status === true) {
+            return result;
+          } else {
+            throw new Error(result?.message || '上传失败');
+          }
+        })
+      );
+
+      // 更新上传状态
+      uploadedImageFiles.value = uploadedImageFiles.value.map((file, index) => {
+        if (index >= uploadedImageFiles.value.length - params.files.length) {
+          const result = uploadResults[index - (uploadedImageFiles.value.length - params.files.length)];
+          if (result) {
+            MessagePlugin.success(`${file.name} 上传成功`);
+            return {
+              ...file,
+              status: 'success' as const,
+              response: result,
+              type: result.data.mimetype,
+              url: result.data.links.url,
+              markdown: result.data.links.markdown
+            };
+          }
         }
+        return file;
       });
-
-      // 等待所有上传完成
-      const results = await Promise.all(uploadPromises);
-      console.log('所有文件上传完成:', results);
-
-      // 触发change事件（如果需要）
-      // emit('change', {
-      //   fileList: uploadedImageFiles.value,
-      //   currentFiles: uploadedImageFiles.value,
-      //   type: 'success'
-      // });
 
     } catch (error) {
       console.error('上传错误:', error);
       MessagePlugin.error(`部分文件上传失败: ${error.message}`);
       
-      // 更新失败文件的状态（Promise.all会失败所有文件，但我们可以标记具体失败的文件）
-      // 这里简单处理，实际可能需要更详细的错误处理
-      uploadedImageFiles.value.forEach(file => {
+      // 标记失败的文件
+      uploadedImageFiles.value = uploadedImageFiles.value.map(file => {
         if (file.status === 'progress') {
-          file.status = 'fail';
-          file.error = error.message;
+          return {
+            ...file,
+            status: 'fail' as const,
+            error: error.message
+          };
         }
+        return file;
       });
-
-      // 触发change事件（如果需要）
-      // emit('change', {
-      //   fileList: uploadedImageFiles.value,
-      //   currentFiles: uploadedImageFiles.value,
-      //   type: 'fail'
-      // });
     }
-  } else if (params.name === 'uploadAttachment'){
+  } else if (params.name === 'uploadAttachment') {
     console.log('附件上传逻辑', params)
   }
 }
-
+// 获取图片预览
+const getImagePreview = (file) => {
+  return file.url || file.preview;
+}
+// 新增移除图片方法
+const removeImage = (index) => {
+  uploadedImageFiles.value.splice(index, 1);
+};
 
 const onFileSelect = (params: { files: File[]; name }) => {
   if (params.files.length === 0) return;
@@ -1472,5 +1504,80 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
   /* Font adjustments */
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* A common sans-serif stack */
   font-weight: 400; /* Light or Regular, try 300 or 400 */
+}
+
+/* 图片预览容器样式 - 移除上传状态相关样式 */
+.image-preview-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 8px;
+  background: var(--td-bg-color-secondarycontainer);
+  border-radius: 8px;
+  border: 1px dashed var(--td-border-level-2-color);
+}
+
+/* 单个预览项基础样式 */
+.image-preview-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--td-border-level-1-color);
+}
+
+/* 只有正在上传的图片才置灰 */
+.image-preview-item.is-uploading {
+  opacity: 0.7;
+  filter: grayscale(50%);
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 上传指示器样式 */
+.upload-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: white;
+  font-size: 12px;
+}
+
+.upload-text {
+  margin-top: 4px;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.remove-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
 }
 </style>
