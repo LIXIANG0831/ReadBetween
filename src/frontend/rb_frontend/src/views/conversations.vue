@@ -1597,4 +1597,12 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
   background: rgba(0, 0, 0, 0.7);
   transform: scale(1.1);
 }
+
+/* 解决思考中内容空白间隙问题 */
+:deep(.t-chat__text__assistant) p,
+:deep(.t-chat__text__assistant) ul,
+:deep(.t-chat__text__assistant) ol {
+    margin: 0;
+    line-height: 1.5;
+}
 </style>
