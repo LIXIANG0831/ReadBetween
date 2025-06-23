@@ -17,8 +17,8 @@ const menuItems = [
   { value: '0', icon: HomeIcon, label: '渠道管理', route: '/conversations' },
   { value: '1', icon: BookIcon, label: '知识库管理', route: '/knowledge' },
   { value: '2', icon: TreeRoundDotVerticalIcon, label: '记忆管理', route: '/memory' },
-  { value: '4', icon: ToolsIcon, label: 'MCP管理', route: '/mcp' },
-  { value: '3', icon: RocketIcon, label: '模型管理', route: '/model_cfg' }
+  { value: '3', icon: ToolsIcon, label: 'MCP管理', route: '/mcp' },
+  { value: '4', icon: RocketIcon, label: '模型管理', route: '/model_cfg' },
 ]
 
 const handleSelect = (value: string) => {
