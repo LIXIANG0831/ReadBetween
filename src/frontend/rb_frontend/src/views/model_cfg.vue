@@ -118,10 +118,10 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'action'">
-            <a-button type="link" @click="handleSetDefault(record)" class="action-link">
+            <a-button @click="handleSetDefault(record)">
               ⭐ 添加模型
             </a-button>
-            <a-button type="link" @click="handleDeleteModel(record)" class="action-link">
+            <a-button @click="handleDeleteModel(record)" style="margin-left: 10px;">
               🗑️ 删除
             </a-button>
           </template>
@@ -136,6 +136,7 @@
       centered
       :destroyOnClose="true"
       @cancel="addDialogVisible = false"
+      class="modal-size-lg"
     >
       <a-form :model="addForm" :label-col="{ span: 4 }">
         <a-form-item label="🏢供应商">
@@ -161,6 +162,7 @@
       centered
       :destroyOnClose="true"
       @cancel="setDefaultDialogVisible = false"
+      class="modal-size-lg"
     >
       <a-form :model="setDefaultForm" :label-col="{ span: 4 }">
         <a-form-item label="模型类型" required>  <!-- 修改 Label 为 "模型类型" -->
@@ -529,13 +531,6 @@ const addAvailableModel = async () => {
   opacity: 0.9;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-.action-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 500;
 }
 
 @media (max-width: 768px) {

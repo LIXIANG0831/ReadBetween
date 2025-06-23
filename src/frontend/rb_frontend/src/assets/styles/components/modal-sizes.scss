@@ -1,0 +1,51 @@
+// src/assets/style/modal-sizes.scss
+
+// 弹窗尺寸变量
+$modal-sm: 400px;
+$modal-md: 600px;
+$modal-lg: 800px;
+$modal-xl: 1000px;
+
+// 小型弹窗
+.modal-size-sm {
+  width: $modal-sm !important;
+  max-width: 90vw;
+  
+  .ant-modal-content {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+}
+
+// 中型弹窗
+.modal-size-md {
+  width: $modal-md !important;
+  max-width: 90vw;
+  
+  .ant-modal-content {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
+
+// 大型弹窗
+.modal-size-lg {
+  width: $modal-lg !important;
+  max-width: 90vw;
+  
+  .ant-modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+// 超大型弹窗
+.modal-size-xl {
+  width: $modal-xl !important;
+  max-width: 95vw;
+  
+  .ant-modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}

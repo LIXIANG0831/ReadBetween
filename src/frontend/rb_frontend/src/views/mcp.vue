@@ -20,7 +20,7 @@
           }
         }"
       />
-      <a-button type="primary" @click="saveMcpConfig" style="margin-top: 16px;">保 存</a-button>
+      <t-button theme="primary" @click="saveMcpConfig" style="margin-top: 16px;">保 存</t-button>
     </a-card>
 
     <!-- MCP服务器工具列表详情 -->

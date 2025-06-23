@@ -11,7 +11,7 @@ import {
 import { ConfigProvider as TConfigProvider } from 'tdesign-vue-next'
 
 const router = useRouter()
-const activeIndex = ref('0')
+const activeIndex = ref('')
 
 const menuItems = [
   { value: '0', icon: HomeIcon, label: '渠道管理', route: '/conversations' },
@@ -31,11 +31,7 @@ const handleSelect = (value: string) => {
 </script>
 
 <template>
-  <TConfigProvider :global-config="{
-    theme: {
-      primaryColor: '#1890ff'
-    }
-  }">
+  <TConfigProvider :theme="{ primaryColor: '#3875F6' }">
     <t-layout class="app-container">
       <!-- 侧边栏 -->
       <t-aside class="app-sidebar">
@@ -75,9 +71,9 @@ const handleSelect = (value: string) => {
 <style lang="scss" scoped>
 // 全局变量定义
 :root {
-  --sidebar-width: 240px;
-  --primary-color: #1890ff;
-  --primary-light-color: #e6f7ff; 
+  --sidebar-width: 280px;
+  --primary-color: #3875F6;  
+  --primary-light-color: #EBF1FF; 
   --text-primary: #1d2129;
   --text-secondary: #4e5969;
   --border-color: #e5e6eb;
@@ -109,13 +105,13 @@ const handleSelect = (value: string) => {
     padding: 20px;
     color: var(--primary-color);
     text-align: center;
-    border-bottom: 1px solid var(--border-color);
     
     h2 {
-      margin: 0;
+      margin-top: 20px;
       font-size: 22px;
       font-weight: 600;
       letter-spacing: 0.5px;
+      color: var(--primary-color);
     }
   }
 }
@@ -148,9 +144,25 @@ const handleSelect = (value: string) => {
     &.t-is-active {
       background-color: var(--primary-light-color);
       color: var(--primary-color);
-      // 添加左边框效果（Ant Design风格）
-      border-left: 3px solid var(--primary-color);
-      padding-left: 9px; // 原12px减去3px边框
+      position: relative;
+      font-weight: 500;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background-color: var(--primary-color);
+        border-radius: 0 3px 3px 0;
+      }
+      
+      .t-icon {
+        color: var(--primary-color);
+      }
+      
+      transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
     }
 
     .t-icon {
@@ -170,9 +182,7 @@ const handleSelect = (value: string) => {
   border-radius: 8px 0 0 0;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
 }
-</style>
 
-<style>
 html, body {
   margin: 0;
   padding: 0;

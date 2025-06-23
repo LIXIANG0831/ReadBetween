@@ -9,9 +9,9 @@
             mode="inline"
             @click="handleConversationClick"
           >
-            <a-button type="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
+            <t-button theme="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
               新建渠道
-            </a-button>
+            </t-button>
             <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
               <template #icon>
                 <CommentOutlined />
@@ -172,9 +172,9 @@
 
     <!-- 新建会话弹窗 -->
     <a-modal
+      class="modal-size-xl"
       v-model:open="isCreateDialogVisible"
       :title="isEditing ? '编辑渠道' : '新建渠道'"
-      width="500px"
       @cancel="handleModalClose"
     >
       <a-form :model="CreateConversationForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
@@ -264,14 +264,14 @@
         </a-form-item>
         <!-- 新增 use_memory 开关 -->
         <a-form-item label="启用记忆" name="use_memory">
-          <a-switch v-model:checked="CreateConversationForm.use_memory" />
+          <t-switch size="large" v-model:checked="CreateConversationForm.use_memory" />
         </a-form-item>
       </a-form>
       <template #footer>
-        <a-button @click="handleModalClose">取消</a-button>
-        <a-button type="primary" @click="handleConversationSubmit">
+        <t-button theme="primary" @click="handleConversationSubmit" style="margin-right: 10px">
           {{ isEditing ? '更新' : '创建' }}
-        </a-button>
+        </t-button>
+        <t-button theme="default" @click="handleModalClose">取消</t-button>
       </template>
     </a-modal>
   </div>
@@ -292,8 +292,16 @@ import {
   ChatReasoning as TChatReasoning,
   ChatLoading as TChatLoading
 } from '@tdesign-vue-next/chat';
-import { SystemSumIcon, ArrowDownIcon, CheckCircleIcon, CloseIcon } from 'tdesign-icons-vue-next';
-import { Button as TButton, MessagePlugin } from 'tdesign-vue-next';
+import { 
+  SystemSumIcon, 
+  ArrowDownIcon, 
+  CheckCircleIcon, 
+  CloseIcon 
+} from 'tdesign-icons-vue-next';
+import { 
+  Button as TButton, 
+  MessagePlugin 
+} from 'tdesign-vue-next';
 
 import {
   message,
@@ -311,7 +319,6 @@ import {
   DeleteOutlined,
   EditOutlined,
   CommentOutlined,
-  GlobalOutlined
 } from '@ant-design/icons-vue';
 import {
   createConversation,

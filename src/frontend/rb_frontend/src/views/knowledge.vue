@@ -1,127 +1,119 @@
 <template>
   <div class="knowledge-container">
-    <h2>📚  知识库列表</h2>
+    <h2>📚 知识库列表</h2>
     <!-- 创建知识库按钮和搜索框 -->
     <div class="action-bar">
-      <a-button type="primary" @click="handleCreate" class="create-button">
-        <template #icon><PlusOutlined /></template>
+      <t-button theme="primary" @click="handleCreate" class="create-button">
+        <template #icon><t-icon name="add" /></template>
         创建知识库 📚
-      </a-button>
-      <a-input
-        v-model:value="searchKeyword"
+      </t-button>
+      <t-input
+        v-model="searchKeyword"
         placeholder="🔍 输入知识库名称搜索"
         style="width: 200px"
         class="search-input"
       />
     </div>
 
-    <a-table :dataSource="filterTableData" :columns="columns" rowKey="id" :pagination="false" class="knowledge-table">
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'enable_layout'">
-          <span v-if="record.enable_layout === 1" class="text-success">✅</span>
-          <span v-else class="text-muted">❌</span>
-        </template>
-        <template v-if="column.key === 'action'">
-          <a-button type="link" @click="handleView(record.id)" class="action-button">
-            <template #icon><EyeOutlined /></template>
-            查看
-          </a-button>
-          <a-button type="link" @click="handleEdit(record)" class="action-button">
-            <template #icon><EditOutlined /></template>
-            编辑
-          </a-button>
-          <a-popconfirm
-            title="是否确认删除？"
-            @confirm="handleDelete(record.id)"
-          >
-            <a-button type="link" danger class="action-button">
-              <template #icon><DeleteOutlined /></template>
-              删除
-            </a-button>
-          </a-popconfirm>
-        </template>
+    <t-table
+      :data="filterTableData"
+      :columns="columns"
+      row-key="id"
+      :pagination="paginationConfig"
+      @page-change="handlePageChange"
+      class="knowledge-table"
+    >
+      <template #enable_layout="{ row }">
+        <span v-if="row.enable_layout === 1" class="text-success">✅</span>
+        <span v-else class="text-muted">❌</span>
       </template>
-    </a-table>
-
-    <!-- 分页组件 -->
-    <a-pagination
-      v-model:current="paginationConfig.current"
-      v-model:pageSize="paginationConfig.pageSize"
-      :total="paginationConfig.total"
-      show-size-changer
-      @change="handlePageChange"
-      @showSizeChange="handlePageChange"
-      class="pagination"
-    />
+      <template #operation="{ row }">
+        <t-button variant="text" theme="primary" @click="handleView(row.id)" class="action-button">
+          <template #icon><t-icon name="browse" /></template>
+          查看
+        </t-button>
+        <t-button variant="text" theme="primary" @click="handleEdit(row)" class="action-button">
+          <template #icon><t-icon name="edit" /></template>
+          编辑
+        </t-button>
+        <t-popconfirm
+          content="是否确认删除？"
+          @confirm="handleDelete(row.id)"
+        >
+          <t-button variant="text" theme="danger" class="action-button">
+            <template #icon><t-icon name="delete" /></template>
+            删除
+          </t-button>
+        </t-popconfirm>
+      </template>
+    </t-table>
 
     <!-- 编辑弹窗 -->
-    <a-modal
-      v-model:open="isEditDialogVisible"
-      title="📝 编辑知识库"
-      @cancel="isEditDialogVisible = false"
-      class="edit-modal"
+    <t-dialog
+      v-model:visible="isEditDialogVisible"
+      header="📝 编辑知识库"
+      :on-cancel="() => isEditDialogVisible = false"
+      class="dialog-size-xl"
     >
-      <a-form :model="editFormData" :label-col="{ span: 4 }">
-        <a-form-item label="知识库名称">
-          <a-input v-model:value="editFormData.name" />
-        </a-form-item>
-        <a-form-item label="嵌入模型" required>
-          <a-input v-model:value="editFormData.embedding_name" disabled />
-        </a-form-item>
-        <a-form-item label="描述">
-          <a-textarea v-model:value="editFormData.desc" />
-        </a-form-item>
-      </a-form>
+      <t-form :data="editFormData" :label-width="80">
+        <t-form-item label="知识库名称" name="name">
+          <t-input v-model="editFormData.name" />
+        </t-form-item>
+        <t-form-item label="嵌入模型" required name="embedding_name">
+          <t-input v-model="editFormData.embedding_name" disabled />
+        </t-form-item>
+        <t-form-item label="描述" name="desc">
+          <t-textarea v-model="editFormData.desc" />
+        </t-form-item>
+      </t-form>
       <template #footer>
-        <a-button @click="isEditDialogVisible = false">取消</a-button>
-        <a-button type="primary" @click="saveEdit">保存</a-button>
+        <t-button variant="outline" @click="isEditDialogVisible = false">取消</t-button>
+        <t-button theme="primary" @click="saveEdit">保存</t-button>
       </template>
-    </a-modal>
+    </t-dialog>
 
     <!-- 创建知识库弹窗 -->
-    <a-modal
-      v-model:open="isCreateDialogVisible"
-      title="📚 创建知识库"
-      @cancel="isCreateDialogVisible = false"
-      class="create-modal"
+    <t-dialog
+      v-model:visible="isCreateDialogVisible"
+      header="📚 创建知识库"
+      :on-cancel="() => isCreateDialogVisible = false"
+      class="modal-size-lg"
     >
-      <a-form :model="createFormData" :label-col="{ span: 4 }">
-        <a-form-item label="知识库名称" required>
-          <a-input v-model:value="createFormData.name" />
-        </a-form-item>
-        <a-form-item label="嵌入模型" required>
-          <a-select
-            v-model:value="createFormData.available_model_id"
+      <t-form :data="createFormData" :label-width="80">
+        <t-form-item label="知识库名称" required name="name">
+          <t-input v-model="createFormData.name" />
+        </t-form-item>
+        <t-form-item label="嵌入模型" required name="available_model_id">
+          <t-select
+            v-model="createFormData.available_model_id"
             placeholder="请选择嵌入模型"
+            clearable
+            filterable
           >
-            <a-select-option value="">
-              系统内置嵌入模型
-            </a-select-option>
-            <a-select-option
+            <t-option value="" label="系统内置嵌入模型" />
+            <t-option
               v-for="model in embeddingModelList"
               :key="model.id"
               :value="model.id"
-            >
-              {{ model.name }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="描述">
-          <a-textarea v-model:value="createFormData.desc" />
-        </a-form-item>
-        <a-form-item label="启用版面识别">
-          <a-switch
-            v-model:checked="createFormData.enable_layout"
-            :checkedValue="1"
-            :unCheckedValue="0"
+              :label="model.name"
+            />
+          </t-select>
+        </t-form-item>
+        <t-form-item label="描述" name="desc">
+          <t-textarea v-model="createFormData.desc" />
+        </t-form-item>
+        <t-form-item label="启用版面识别" name="enable_layout">
+          <t-switch
+            v-model="createFormData.enable_layout"
+            :custom-value="[1, 0]"
           />
-        </a-form-item>
-      </a-form>
+        </t-form-item>
+      </t-form>
       <template #footer>
-        <a-button @click="isCreateDialogVisible = false">取消</a-button>
-        <a-button type="primary" @click="saveCreate">创建</a-button>
+        <t-button variant="outline" @click="isCreateDialogVisible = false">取消</t-button>
+        <t-button theme="primary" @click="saveCreate">创建</t-button>
       </template>
-    </a-modal>
+    </t-dialog>
   </div>
 </template>
 
@@ -129,14 +121,6 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
-import {
-  CheckOutlined,
-  CloseOutlined,
-  PlusOutlined,
-  EyeOutlined,
-  EditOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons-vue'
 import {
   listKnowledge,
   updateKnowledge,
@@ -184,43 +168,38 @@ const router = useRouter()
 
 const paginationConfig = ref({
   current: 1,
-  pageSize: 10,
+  pageSize: 5,
   total: 0,
 })
 
 const columns = [
   {
+    colKey: 'name',
     title: '知识库名称',
-    dataIndex: 'name',
-    key: 'name',
   },
   {
+    colKey: 'desc',
     title: '描述',
-    dataIndex: 'desc',
-    key: 'desc',
   },
   {
+    colKey: 'embedding_name',
     title: '嵌入模型',
-    dataIndex: 'embedding_name',
-    key: 'embedding_name',
   },
   {
+    colKey: 'enable_layout',
     title: '启用版面识别',
-    key: 'enable_layout',
   },
   {
+    colKey: 'create_time',
     title: '创建时间',
-    dataIndex: 'create_time',
-    key: 'create_time',
   },
   {
+    colKey: 'update_time',
     title: '更新时间',
-    dataIndex: 'update_time',
-    key: 'update_time',
   },
   {
+    colKey: 'operation',
     title: '操作',
-    key: 'action',
     align: 'right',
   },
 ]
@@ -242,11 +221,9 @@ const fetchKnowledgeList = async () => {
 
 onMounted(() => {
   fetchKnowledgeList();
-  // 在组件挂载时加载默认模型配置
   availableModelStore.loadAvailableModelCfg();
 });
 
-// 监听 embeddingAvailableModelCfg 的变化
 watch(
   () => availableModelStore.embeddingAvailableModelCfg,
   (newVal) => {
@@ -311,7 +288,6 @@ const handleCreate = () => {
 
 const saveCreate = async () => {
   try {
-    // 如果选择的是"系统内置嵌入模型"，则将 available_model_id 设置为 null
     if (createFormData.value.available_model_id === '') {
       createFormData.value.available_model_id = null;
     }
@@ -325,13 +301,12 @@ const saveCreate = async () => {
   }
 }
 
-const handlePageChange = (page: number, pageSize: number) => {
-  paginationConfig.value.current = page
-  paginationConfig.value.pageSize = pageSize
+const handlePageChange = (pageInfo: any) => {
+  paginationConfig.value.current = pageInfo.current
+  paginationConfig.value.pageSize = pageInfo.pageSize
   fetchKnowledgeList()
 }
 </script>
-
 
 <style scoped>
 .knowledge-container {
@@ -372,21 +347,11 @@ const handlePageChange = (page: number, pageSize: number) => {
   margin-right: 8px;
 }
 
-.pagination {
-  margin-top: 20px;
-  text-align: right;
-}
-
 .text-success {
-  color: #52c41a;
+  color: var(--td-success-color);
 }
 
 .text-muted {
-  color: rgba(0, 0, 0, 0.25);
-}
-
-.edit-modal,
-.create-modal {
-  border-radius: 8px;
+  color: var(--td-text-color-placeholder);
 }
 </style>

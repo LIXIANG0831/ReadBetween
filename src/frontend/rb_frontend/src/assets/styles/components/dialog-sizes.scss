@@ -1,0 +1,58 @@
+
+// 弹窗尺寸变量
+$dialog-sm: 400px;
+$dialog-md: 600px;
+$dialog-lg: 800px;
+$dialog-xl: 1000px;
+
+// 小型弹窗
+.dialog-size-sm {
+  .t-dialog {
+    width: $dialog-sm !important;
+    max-width: 90vw;
+    
+    &__body {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+  }
+}
+
+// 中型弹窗
+.dialog-size-md {
+  .t-dialog {
+    width: $dialog-md !important;
+    max-width: 90vw;
+    
+    &__body {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+  }
+}
+
+// 大型弹窗
+.dialog-size-lg {
+  .t-dialog {
+    width: $dialog-lg !important;
+    max-width: 90vw;
+    
+    &__body {
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+  }
+}
+
+// 超大型弹窗
+.dialog-size-xl {
+  .t-dialog {
+    width: $dialog-xl !important;
+    max-width: 95vw;
+    
+    &__body {
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+  }
+}
