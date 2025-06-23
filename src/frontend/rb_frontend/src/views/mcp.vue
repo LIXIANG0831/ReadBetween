@@ -202,15 +202,6 @@ const saveMcpConfig = async () => {
 
 
 <style scoped>
-.common-layout {
-  min-height: 100vh;
-  padding: 16px;
-  max-width: 1800px;
-  margin: 0 auto;
-  background-color: var(--td-bg-color-container);
-  border-radius: var(--td-radius-default);
-}
-
 .mb-6 {
   margin-bottom: 24px;
 }

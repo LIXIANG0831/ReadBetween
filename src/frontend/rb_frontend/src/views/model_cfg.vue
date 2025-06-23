@@ -1,5 +1,5 @@
 <template>
-  <div class="model-cfg-container">
+  <div class="common-layout">
     <div class="providers-container">
       <a-card 
         v-for="provider in providers" 
@@ -430,16 +430,6 @@ const addAvailableModel = async () => {
 </script>
 
 <style scoped>
-.model-cfg-container {
-  min-height: 100vh;
-  padding: 15px;
-  max-width: 1800px;
-  margin: 0 auto;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
 .providers-container {
   display: flex;
   flex-wrap: wrap;

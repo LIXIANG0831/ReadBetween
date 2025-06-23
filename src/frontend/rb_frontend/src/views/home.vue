@@ -21,7 +21,7 @@ const handleEdit = (id: number) => {
 </script>
 
 <template>
-  <div class="home-container">
+  <div class="common-layout">
     <t-card :bordered="false" class="welcome-card">
       <div class="welcome-content">
         <h2>欢迎回来！</h2>
@@ -109,11 +109,6 @@ const handleEdit = (id: number) => {
 </template>
 
 <style scoped>
-.home-container {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
 .welcome-card {
   margin-bottom: 16px;
   background-color: var(--td-brand-color-1);

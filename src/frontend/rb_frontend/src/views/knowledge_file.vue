@@ -1,5 +1,5 @@
 <template>
-  <div class="knowledge-file-container">
+  <div class="common-layout">
     <h2>📑 知识库文件列表</h2>
 
     <div class="action-bar">
@@ -356,18 +356,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.knowledge-file-container {
-  min-height: 100vh;
-  padding: 15px;
-  max-width: 1800px;
-  margin: 0 auto;
-  background-color: var(--td-bg-color-container);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-}
-
 .action-bar {
   display: flex;
   justify-content: space-between;

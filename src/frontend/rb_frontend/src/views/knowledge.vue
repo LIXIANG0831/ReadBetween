@@ -1,5 +1,5 @@
 <template>
-  <div class="knowledge-container">
+  <div class="common-layout">
     <h2>📚 知识库列表</h2>
     <!-- 创建知识库按钮和搜索框 -->
     <div class="action-bar">
@@ -309,17 +309,6 @@ const handlePageChange = (pageInfo: any) => {
 </script>
 
 <style scoped>
-.knowledge-container {
-  min-height: 100vh;
-  padding: 15px;
-  max-width: 1800px;
-  margin: 0 auto;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-}
 
 .action-bar {
   display: flex;

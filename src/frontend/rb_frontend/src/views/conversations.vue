@@ -1443,19 +1443,6 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
     }
   }
 }
-/* 保持原有样式不变 */
-.common-layout {
-  min-height: 100vh;
-  padding: 15px;
-  max-width: 1800px;
-  margin: 0 auto;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
 
 .aside {
   background-color: v-bind('token.colorBgContainer');
