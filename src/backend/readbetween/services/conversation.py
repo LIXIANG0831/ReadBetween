@@ -281,7 +281,7 @@ class ConversationService:
                         yield cls._format_stream_response(event="MESSAGE", text=content)
 
                 # 处理普通消息内容
-                elif hasattr(delta, 'content') and delta.content:
+                if hasattr(delta, 'content') and delta.content and not thinking_opened:
                     content = delta.content
                     full_response.append(content)
                     yield cls._format_stream_response(event="MESSAGE", text=content)
