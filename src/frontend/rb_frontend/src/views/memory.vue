@@ -1,74 +1,63 @@
 <template>
   <div class="common-layout">
-    <a-layout style="height: 100vh;">
-      <a-layout-sider width="250px" class="aside" style="height: 100%;margin-bottom: 16px;">
-        <div style="padding: 16px;height: 100%;display: flex;flex-direction: column;">
-
-          <div style="margin-bottom: 16px; color: var(--semi-color-text-2);">
+    <t-layout style="height: 100vh;">
+      <t-aside width="250px" class="aside">
+        <div style="padding: 16px; height: 100%; display: flex; flex-direction: column;">
+          <div style="margin-bottom: 16px; color: var(--td-text-color-secondary);">
             <span>渠道记忆</span>
             <p style="font-size: 12px; margin-top: 4px;">点击渠道查看记忆图谱。</p>
           </div>
 
-          <a-menu
-            v-model:selectedKeys="activeKey"
-            mode="inline"
-            :style="style"
-            @click="handleConversationClick"
+          <t-menu
+            v-model="activeKey"
+            theme="light"
+            style="flex: 1;"
+            @change="handleConversationClick"
           >
-            <a-menu-item v-for="item in filteredItems" :key="item.id" class="menu-item">
+            <t-menu-item 
+              v-for="item in filteredItems" 
+              :key="item.id" 
+              :value="item.id"
+              class="menu-item"
+            >
               <template #icon>
-                <message-outlined />
+                <t-icon name="chat" />
               </template>
-              <span>{{ item.title || `会话 ${item.id}` }}</span>
-            </a-menu-item>
-          </a-menu>
+              {{ item.title || `会话 ${item.id}` }}
+            </t-menu-item>
+          </t-menu>
         </div>
-      </a-layout-sider>
-      <a-layout>
-        <a-layout-content class="main">
-          <div v-if="activeKey.length > 0" style="width: 100%;">
-            <KnowledgeGraph :user-id="activeKey[0]"></KnowledgeGraph>
+      </t-aside>
+      <t-layout>
+        <t-content class="main">
+          <div v-if="activeKey" class="graph-container">
+            <KnowledgeGraph :user-id="activeKey"></KnowledgeGraph>
           </div>
           <div v-else class="read-between-placeholder">
             ReadBetween
           </div>
-        </a-layout-content>
-      </a-layout>
-    </a-layout>
+        </t-content>
+      </t-layout>
+    </t-layout>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import {
-  message,
-  Menu as AMenu,
-} from 'ant-design-vue';
-import {
-  MessageOutlined
-} from '@ant-design/icons-vue';
-import { theme } from 'ant-design-vue';
+  MessagePlugin,
+} from 'tdesign-vue-next';
 import {
   listConversations,
 } from '@/api/conversation';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
-import KnowledgeGraph from '@/components/KnowledgeGraph.vue'; // 引入 KnowledgeGraph 组件
-
+import KnowledgeGraph from '@/components/KnowledgeGraph.vue';
 
 const availableModelStore = useAvailableModelStore();
-const { token } = theme.useToken();
 
 // 状态管理
-const activeKey = ref<string[]>([]);
+const activeKey = ref<string>('');
 const items = ref<Api.Conversation[]>([]);
-
-// 样式计算
-const style = computed(() => ({
-  width: '100%',
-  background: token.value.colorBgContainer,
-  borderRadius: token.value.borderRadius,
-  flex: 1,
-}));
 
 // 获取会话列表
 const fetchConversations = async () => {
@@ -78,13 +67,13 @@ const fetchConversations = async () => {
       items.value = res.data.data.data;
     }
   } catch (error) {
-    message.error('获取会话列表失败');
+    MessagePlugin.error('获取会话列表失败');
   }
 };
 
 // 会话点击处理
-const handleConversationClick = ({ key }: { key: string }) => {
-  activeKey.value = [key];
+const handleConversationClick = (key: string) => {
+  activeKey.value = key;
 };
 
 // 初始化
@@ -101,29 +90,15 @@ const filteredItems = computed(() => {
 
 <style scoped>
 .aside {
-  background-color: v-bind('token.colorBgContainer');
+  background-color: var(--td-bg-color-container);
   overflow: auto;
   height: 100%;
-}
-
-.slider-container {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.value-display {
-  width: 50px;
-  text-align: center;
-  padding: 0 8px;
-  background: v-bind('token.colorFillAlter');
-  border-radius: 4px;
-  margin-left: 12px;
+  border-right: 1px solid var(--td-component-stroke);
 }
 
 .main {
-  background-color: v-bind('token.colorBgElevated');
-  padding: 16px;
+  background-color: var(--td-bg-color-container);
+  padding: 24px;
   flex: 1;
   overflow: auto;
   height: 100%;
@@ -133,43 +108,35 @@ const filteredItems = computed(() => {
   position: relative;
 }
 
-.action-icons {
-  display: none;
-  position: absolute;
-  right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.menu-item:hover .action-icons {
-  display: flex;
-}
-
-.action-icon {
-  margin-left: 8px;
-  cursor: pointer;
-}
-
-.a-layout, .a-layout-sider, .a-layout-content {
-  height: 100%;
-}
-
 .read-between-placeholder {
-  font-size: 96px; /* Adjust as needed */
-  color: #999; /* Adjust as needed */
+  font-size: 96px;
+  color: var(--td-text-color-placeholder);
   text-align: center;
-
-  /* Make it fill the parent container */
   width: 100%;
   height: 100%;
-
-  /* Center the text both horizontally and vertically */
   display: flex;
-  justify-content: center; /* Horizontal centering */
-  align-items: center;     /* Vertical centering */
+  justify-content: center;
+  align-items: center;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 300;
+  opacity: 0.6;
+}
 
-  /* Font adjustments */
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* A common sans-serif stack */
-  font-weight: 400; /* Light or Regular, try 300 or 400 */
+.graph-container {
+  width: 100%;
+  height: 100%;
+  background: var(--td-bg-color-page);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+}
+
+/* Add smooth transitions for better UX */
+.t-menu {
+  transition: all 0.3s ease;
+}
+
+.t-menu-item {
+  transition: background-color 0.2s ease;
 }
 </style>

@@ -197,7 +197,7 @@ const getStatusTheme = (status: number) => {
 const getStatusText = (status: number) => {
   switch (status) {
     case 1:
-      return '🎉 已解析';
+      return '🎉 解析完成';
     case -1:
       return '❌ 解析失败';
     default:

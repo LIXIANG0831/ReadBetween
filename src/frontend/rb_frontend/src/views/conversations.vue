@@ -3,7 +3,6 @@
     <a-layout style="height: 100vh;">
       <a-layout-sider width="250px" class="aside" style="height: 100%;margin-bottom: 16px;">
         <div style="padding: 16px;height: 100%;display: flex;flex-direction: column;">
-
           <a-menu
             v-model:selectedKeys="activeKey"
             mode="inline"
@@ -14,7 +13,7 @@
             </t-button>
             <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
               <template #icon>
-                <CommentOutlined />
+                <t-icon name="chat" />
               </template>
               <span>{{ item.title || `会话 ${item.id}` }}</span>
               <div class="action-icons">
@@ -264,14 +263,14 @@
         </a-form-item>
         <!-- 新增 use_memory 开关 -->
         <a-form-item label="启用记忆" name="use_memory">
-          <t-switch size="large" v-model:checked="CreateConversationForm.use_memory" />
+          <t-switch size="large" v-model="CreateConversationForm.use_memory" />
         </a-form-item>
       </a-form>
       <template #footer>
-        <t-button theme="primary" @click="handleConversationSubmit" style="margin-right: 10px">
+        <t-button theme="default" @click="handleModalClose" style="margin-right: 10px">取消</t-button>
+        <t-button theme="primary" @click="handleConversationSubmit">
           {{ isEditing ? '更新' : '创建' }}
         </t-button>
-        <t-button theme="default" @click="handleModalClose">取消</t-button>
       </template>
     </a-modal>
   </div>
@@ -1251,6 +1250,7 @@ const handleConversationSubmit = async () => {
 
     // 使用对象解构排除 model 字段
     const { model, ...rest } = CreateConversationForm.value;
+    console.log(CreateConversationForm.value)
     const submitForm = {
       ...rest,
       available_model_id: model,  // 直接使用 model 值，因为它已经是 id
