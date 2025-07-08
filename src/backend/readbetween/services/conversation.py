@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime
 
@@ -182,20 +183,54 @@ class ConversationService:
             # 初始化最终查询和原始查询
             final_query, first_query = cls._init_user_query(content, is_multimodal)
 
-            # 处理知识库检索
+            # 多模态问答 默认不启用
             if not is_multimodal:
+                # 并发执行任务
+                tasks = []
+
+                # 处理知识库检索
                 knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(
                     conversation_info.conversation.id)
                 if knowledge_bases:
-                    final_query, kb_source_list = await cls._append_kb_recall_msg(knowledge_bases, final_query)
+                    # Desperate -- 修改为并发执行 修改原 append 逻辑为直接返回
+                    # final_query, kb_source_list = await cls._append_kb_recall_msg(knowledge_bases, final_query)
+                    tasks.append(cls._append_kb_recall_msg(knowledge_bases, content))
 
-            # 处理网络搜索
-            if message_data.search and not is_multimodal:
-                final_query, web_source_list = await cls._append_web_search_msg(content, final_query)
 
-            # 处理记忆
-            if conversation_info.conversation.use_memory == 1 and not is_multimodal:
-                final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
+                # 处理网络搜索
+                if message_data.search:
+                    # Desperate -- 修改为并发执行 修改原 append 逻辑为直接返回
+                    # final_query, web_source_list = await cls._append_web_search_msg(content, final_query)
+                    tasks.append(cls._append_web_search_msg(content))
+
+                # 处理记忆
+                if conversation_info.conversation.use_memory == 1:
+                    # Desperate -- 修改为并发执行 修改原 append 逻辑为直接返回
+                    # final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
+                    tasks.append(cls._append_memory_msg(content, message_data.conv_id, 3))
+
+                # 并发执行所有任务
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger_util.error(f"并发任务执行出错: {str(result)}")
+                        continue
+
+                    if not result:
+                        continue
+
+                    if len(result) == 1:
+                        add_context = result[0]  # 假设记忆处理只返回更新后的final_query
+                    elif len(result) == 2:
+                        add_context, source_list = result
+                        if source_list and isinstance(source_list, list):
+                            if all(isinstance(item, SourceMsg) and item.source == "kb" for item in source_list):
+                                kb_source_list = source_list
+                            else:
+                                web_source_list = source_list
+                    # 拼接上下文
+                    final_query = f"{final_query}\n{add_context}"
+
 
             # 保存用户消息
             user_msg = await MessageDao.create_message(
@@ -524,7 +559,7 @@ class ConversationService:
         }
 
     @classmethod
-    async def _append_kb_recall_msg(cls, knowledge_bases: List[Knowledge], message: str):
+    async def _append_kb_recall_msg(cls, knowledge_bases: List[Knowledge], query: str):
         recall_chunk = ""
         source_list: List[SourceMsg] = []
         if knowledge_bases:
@@ -539,7 +574,7 @@ class ConversationService:
                 milvus_knowledge_info[model_cfg].append(knowledge_obj)
 
             retrieve_resp = await RetrieverService.retrieve(
-                query=message,
+                query=query,
                 mode="both",
                 milvus_knowledge_info=milvus_knowledge_info,
                 milvus_fields=['text', 'title', 'source'],
@@ -573,14 +608,12 @@ class ConversationService:
             return f"""
 **RAG Retrieval Information:** This is relevant information retrieved from a knowledge base, which may contain the answer to the question or related background knowledge.
 {recall_chunk.strip()}
-
-{message}
             """, source_list
         else:
-            return message, None
+            return "", None
 
     @classmethod
-    async def _append_web_search_msg(cls, query: str, message: str):
+    async def _append_web_search_msg(cls, query: str):
         search_tool = WebSearchTool()
         web_search_info = ""
         source_list: List[SourceMsg] = []
@@ -598,14 +631,12 @@ class ConversationService:
             return f"""
 **Web Search Information:** This is relevant information gathered from internet searches, which may contain the latest information or different perspectives.
 {web_search_info}
-
-{message}
             """, source_list
         else:
-            return message, None
+            return "", None
 
     @classmethod
-    async def _append_memory_msg(cls, query: str, message: str, user_id, limit: int = 3):
+    async def _append_memory_msg(cls, query: str, user_id, limit: int = 3):
         # user_id 用来标识唯一记忆
         from readbetween.services.constant import memory_config
         memory_tool = MemoryUtil(memory_config)
@@ -622,13 +653,11 @@ class ConversationService:
         # 图记忆
         graph_entities = related_memories.get("relations", [])
         if len(graph_entities) == 0 and len(original_memories) == 0:
-            return message
+            return ""
         else:
             return f"""
 **User Memory Information:** This is information about the user's past conversations and preferences, which can help you better understand the user's needs.
 {memory_str}
-
-{message}
             """
 
     @classmethod
