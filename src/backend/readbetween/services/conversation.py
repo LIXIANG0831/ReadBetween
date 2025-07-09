@@ -18,7 +18,8 @@ from typing import Generator, List, Dict
 from readbetween.models.v1.chat import ConversationInfo
 from readbetween.models.v1.knowledge import KnowledgeInfo
 from readbetween.models.v1.model_available_cfg import ModelAvailableCfgInfo
-from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation, Ex_PrefixRedisConversation
+from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation, Ex_PrefixRedisConversation, \
+    SourceMsgType
 from readbetween.services.conversation_knowledge_link import ConversationKnowledgeLinkService
 from readbetween.services.knowledge import KnowledgeService
 from readbetween.services.retriever import RetrieverService
@@ -186,7 +187,7 @@ class ConversationService:
             # 多模态问答 默认不启用
             if not is_multimodal:
                 # 并发执行任务
-                tasks = []
+                concurrent_tasks = []
 
                 # 处理知识库检索
                 knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(
@@ -194,42 +195,55 @@ class ConversationService:
                 if knowledge_bases:
                     # Desperate -- 修改为并发执行 修改原 append 逻辑为直接返回
                     # final_query, kb_source_list = await cls._append_kb_recall_msg(knowledge_bases, final_query)
-                    tasks.append(cls._append_kb_recall_msg(knowledge_bases, content))
+                    concurrent_tasks.append(cls._append_kb_recall_msg(knowledge_bases, content))
 
 
                 # 处理网络搜索
                 if message_data.search:
                     # Desperate -- 修改为并发执行 修改原 append 逻辑为直接返回
                     # final_query, web_source_list = await cls._append_web_search_msg(content, final_query)
-                    tasks.append(cls._append_web_search_msg(content))
+                    concurrent_tasks.append(cls._append_web_search_msg(content))
 
                 # 处理记忆
                 if conversation_info.conversation.use_memory == 1:
                     # Desperate -- 修改为并发执行 修改原 append 逻辑为直接返回
                     # final_query = await cls._append_memory_msg(content, final_query, message_data.conv_id, 3)
-                    tasks.append(cls._append_memory_msg(content, message_data.conv_id, 3))
+                    concurrent_tasks.append(cls._append_memory_msg(content, message_data.conv_id, 3))
 
                 # 并发执行所有任务
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                for result in results:
+                task_results = await asyncio.gather(*concurrent_tasks, return_exceptions=True)
+                for result in task_results:
+                    # 处理异常情况
                     if isinstance(result, Exception):
                         logger_util.error(f"并发任务执行出错: {str(result)}")
                         continue
-
+                    # 跳过空结果
                     if not result:
                         continue
 
-                    if len(result) == 1:
-                        add_context = result[0]  # 假设记忆处理只返回更新后的final_query
-                    elif len(result) == 2:
-                        add_context, source_list = result
-                        if source_list and isinstance(source_list, list):
-                            if all(isinstance(item, SourceMsg) and item.source == "kb" for item in source_list):
-                                kb_source_list = source_list
+                    # 解析结果
+                    try:
+                        add_context = result[0]  # 第一个元素总是要添加的上下文
+
+                        # 如果有第二个元素，处理来源列表
+                        if len(result) > 1 and isinstance(result[1], list):
+                            source_list = result[1]
+                            if not source_list:
+                                continue
+
+                            # 分类来源类型
+                            if all(isinstance(item, SourceMsg) and item.source == SourceMsgType.KB for item in
+                                   source_list):
+                                kb_source_list.extend(source_list)
                             else:
-                                web_source_list = source_list
-                    # 拼接上下文
-                    final_query = f"{final_query}\n{add_context}"
+                                web_source_list.extend(source_list)
+
+                        # 更新最终查询
+                        final_query = f"{final_query}\n{add_context}"
+
+                    except (IndexError, TypeError) as e:
+                        logger_util.error(f"结果解析错误: {str(e)}，结果: {result}")
+                        continue
 
 
             # 保存用户消息
@@ -593,7 +607,7 @@ class ConversationService:
                 minio_object_name = retrieve_result.metadata['source']
                 minio_file_url = minio_client.get_presigned_url(object_name=minio_object_name)
                 # 保存来源信息
-                source_list.append(SourceMsg(source="kb", title=retrieve_result.metadata['title'], url=minio_file_url))
+                source_list.append(SourceMsg(source=SourceMsgType.KB, title=retrieve_result.metadata['title'], url=minio_file_url))
                 # TODO 考虑是否抽象为配置项
                 # if retrieve_result.source == 'milvus' and float(retrieve_result.score) < 1:  # 较为宽松的召回
                 if retrieve_result.source == 'milvus' and float(retrieve_result.score) < 0.9:  # 较为严格的召回
@@ -625,7 +639,7 @@ class ConversationService:
         for search_item in search_results:
             search_content = search_tool.get_page_detail(search_item.url)
             if search_content is not None:
-                source_list.append(SourceMsg(source="web", title=search_item.name, url=search_item.url))
+                source_list.append(SourceMsg(source=SourceMsgType.WEB, title=search_item.name, url=search_item.url))
                 web_search_info += f"Title: {search_item.name}\nContent: {search_content}\n\n"
         if web_search_info:
             return f"""
