@@ -234,9 +234,9 @@ class ConversationService:
                             # 分类来源类型
                             if all(isinstance(item, SourceMsg) and item.source == SourceMsgType.KB for item in
                                    source_list):
-                                kb_source_list.extend(source_list)
+                                kb_source_list = source_list
                             else:
-                                web_source_list.extend(source_list)
+                                web_source_list = source_list
 
                         # 更新最终查询
                         final_query = f"{final_query}\n{add_context}"
@@ -607,7 +607,7 @@ class ConversationService:
                 minio_object_name = retrieve_result.metadata['source']
                 minio_file_url = minio_client.get_presigned_url(object_name=minio_object_name)
                 # 保存来源信息
-                source_list.append(SourceMsg(source=SourceMsgType.KB, title=retrieve_result.metadata['title'], url=minio_file_url))
+                source_list.append(SourceMsg(source=SourceMsgType.KB.value, title=retrieve_result.metadata['title'], url=minio_file_url))
                 # TODO 考虑是否抽象为配置项
                 # if retrieve_result.source == 'milvus' and float(retrieve_result.score) < 1:  # 较为宽松的召回
                 if retrieve_result.source == 'milvus' and float(retrieve_result.score) < 0.9:  # 较为严格的召回
@@ -639,7 +639,7 @@ class ConversationService:
         for search_item in search_results:
             search_content = search_tool.get_page_detail(search_item.url)
             if search_content is not None:
-                source_list.append(SourceMsg(source=SourceMsgType.WEB, title=search_item.name, url=search_item.url))
+                source_list.append(SourceMsg(source=SourceMsgType.WEB.value, title=search_item.name, url=search_item.url))
                 web_search_info += f"Title: {search_item.name}\nContent: {search_content}\n\n"
         if web_search_info:
             return f"""

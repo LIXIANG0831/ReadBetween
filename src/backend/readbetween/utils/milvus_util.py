@@ -94,7 +94,7 @@ class MilvusUtil:
 
     @classmethod
     def similarity_search(cls, query_vector, collection_names, search_params=None, top_k=5, expr=None,
-                       output_fields=None):
+                          output_fields=None):
         """
         根据向量进行相似性搜索。
 
@@ -118,13 +118,18 @@ class MilvusUtil:
                 # 如果用户没有指定输出字段，则默认返回所有字段（除了向量字段本身）
                 if output_fields is None:
                     output_fields = [field.name for field in collection.schema.fields if field.name != "vector"]
+                # TODO 需要修改 MilvusUtil 以支持异步
+                # search_kwargs = {
+                #     "_async": True  # 启用Milvus异步
+                # }
                 result: SearchResult = collection.search(
                     data=[query_vector],
                     anns_field="vector",
                     param=search_params,
                     limit=top_k,
                     expr=expr,  # 条件过滤表达式
-                    output_fields=output_fields  # 指定返回的字段
+                    output_fields=output_fields,  # 指定返回的字段
+                    # **search_kwargs
                 )
 
                 # 提取结果中的数据
