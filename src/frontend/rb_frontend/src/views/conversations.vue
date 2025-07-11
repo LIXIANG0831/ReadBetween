@@ -641,7 +641,7 @@ interface UploadFile {
 // 已上传的图片文件列表
 const uploadedImageFiles = ref<any[]>([]);
 // 图片上传配置
-const MAX_FILE_SIZE_KB = 5 * 1024;
+const MAX_FILE_SIZE_KB = 10 * 1024;
 const MAX_FILE_COUNT = 1;
 const imageUploadProps = ref({
   accept: 'image/*', // 接受所有图片类型
@@ -655,108 +655,68 @@ const attachmentUploadProps = ref({
 
 const handleFileUpload = async (params: { files: File[]; name }) => {
   if (params.name === 'uploadImage') {
-    console.log('图片上传逻辑', params)
-    
+    console.log('图片上传逻辑 (Base64)', params);
+
     // 1. 检查文件数量
     if (params.files.length > MAX_FILE_COUNT || uploadedImageFiles.value.length + params.files.length > MAX_FILE_COUNT) {
       MessagePlugin.error(`最多允许上传 ${MAX_FILE_COUNT} 张图片!`);
       return;
     }
 
-    // 检查所有文件类型和大小
+    // 2. 验证并处理每个文件
     for (const file of params.files) {
+      // 2.1 验证文件类型
       if (!file.type.startsWith('image/')) {
         MessagePlugin.error(`${file.name} 不是图片文件!`);
-        return;
+        continue; // 跳过非图片文件
       }
 
+      // 2.2 验证文件大小
       const isLtMaxSize = file.size / 1024 <= MAX_FILE_SIZE_KB;
       if (!isLtMaxSize) {
-        MessagePlugin.error(`${file.name} 大小不能超过 ${MAX_FILE_SIZE_KB}KB!`);
-        return;
+        MessagePlugin.error(`${file.name} 大小不能超过 ${MAX_FILE_SIZE_KB / 1024}MB!`);
+        continue; // 跳过超大文件
       }
-    }
 
-    // 为每个文件创建上传状态对象
-    const newFiles = params.files.map(file => ({
-      name: file.name,
-      status: 'progress' as const,
-      percent: 0,
-      uid: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      file: file,
-      preview: URL.createObjectURL(file)
-    }));
+      // 2.3 创建文件包装器并立即显示
+      const fileWrapper = {
+        name: file.name,
+        status: 'progress' as const,
+        uid: `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        file: file,
+        preview: URL.createObjectURL(file) // 用于即时预览
+      };
+      uploadedImageFiles.value.push(fileWrapper);
 
-    // 追加到 uploadedImageFiles
-    uploadedImageFiles.value = [...uploadedImageFiles.value, ...newFiles];
-
-    try {
-      // 上传所有文件
-      const uploadResults = await Promise.all(
-        params.files.map(async (file, index) => {
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const response = await fetch('https://picui.cn/api/v1/upload', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_IMAGE_BED_TOKEN}`,
-            },
-            body: formData
-          });
-          
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-          const result = await response.json();
-          console.log('上传结果:', result);
-
-          if (result && result.status === true) {
-            return result;
-          } else {
-            throw new Error(result?.message || '上传失败');
-          }
-        })
-      );
-
-      // 更新上传状态
-      uploadedImageFiles.value = uploadedImageFiles.value.map((file, index) => {
-        if (index >= uploadedImageFiles.value.length - params.files.length) {
-          const result = uploadResults[index - (uploadedImageFiles.value.length - params.files.length)];
-          if (result) {
-            MessagePlugin.success(`${file.name} 上传成功`);
-            return {
-              ...file,
-              status: 'success' as const,
-              response: result,
-              type: result.data.mimetype,
-              url: result.data.links.url,
-              markdown: result.data.links.markdown
-            };
-          }
+      // 2.4 异步转换为 Base64
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        // 找到对应的文件并更新
+        const targetFile = uploadedImageFiles.value.find(f => f.uid === fileWrapper.uid);
+        if (targetFile) {
+          targetFile.status = 'success';
+          targetFile.url = reader.result as string;
+          targetFile.type = file.type;
+          URL.revokeObjectURL(targetFile.preview); // 释放内存
+          targetFile.preview = null;
         }
-        return file;
-      });
-
-    } catch (error) {
-      console.error('上传错误:', error);
-      MessagePlugin.error(`部分文件上传失败: ${error.message}`);
-      
-      // 标记失败的文件
-      uploadedImageFiles.value = uploadedImageFiles.value.map(file => {
-        if (file.status === 'progress') {
-          return {
-            ...file,
-            status: 'fail' as const,
-            error: error.message
-          };
+        MessagePlugin.success(`${file.name} 加载成功`);
+      };
+      reader.onerror = (error) => {
+        console.error('Base64 conversion error:', error);
+        const targetFile = uploadedImageFiles.value.find(f => f.uid === fileWrapper.uid);
+        if (targetFile) {
+          targetFile.status = 'fail';
+          targetFile.error = '文件读取失败';
         }
-        return file;
-      });
+        MessagePlugin.error(`${file.name} 加载失败`);
+      };
     }
   } else if (params.name === 'uploadAttachment') {
-    console.log('附件上传逻辑', params)
+    console.log('附件上传逻辑', params);
   }
-}
+};
 // 获取图片预览
 const getImagePreview = (file) => {
   return file.url || file.preview;
