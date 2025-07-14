@@ -277,9 +277,25 @@ class ConversationService:
         # 添加当前消息（如果是非递归调用）
         if not is_recursion:
             current_message = [{'role': 'user', 'content': final_query}]
-            messages = system_prompt + history_messages + current_message
-            logger_util.debug(f"\n完整模型请求信息:\n{messages}")
-            logger_util.debug(f"\n本次模型请求信息:\n{current_message}")
+            # 实际请求模型的 messages
+            # history_messages[:-1] 去除本轮会话已保存的Q 防止重复输入
+            messages = system_prompt + history_messages[:-1] + current_message
+            # 优化打印日志
+            if isinstance(final_query, list):
+                sanitized_message = []
+                for item in final_query:
+                    if isinstance(item, dict) and item.get('type') == 'image_url' and 'image_url' in item:
+                        sanitized_item = item.copy()
+                        sanitized_item['image_url'] = {'url': '图片的Base64'}
+                        sanitized_message.append(sanitized_item)
+                    else:
+                        sanitized_message.append(item)
+
+                logger_util.debug(f"\n完整模型请求信息:\n{json.dumps(system_prompt + history_messages[:-1] + sanitized_message, indent=2, ensure_ascii=False)}")
+                logger_util.debug(f"\n本次模型请求信息:\n{json.dumps(sanitized_message, indent=2, ensure_ascii=False)}")
+            else:
+                logger_util.debug(f"\n完整模型请求信息:\n{json.dumps(messages, indent=2, ensure_ascii=False)}")
+                logger_util.debug(f"\n本次模型请求信息:\n{json.dumps(current_message, indent=2, ensure_ascii=False)}")
         else:
             messages = system_prompt + history_messages
             logger_util.debug(f"\n工具递归调用中...\n模型请求信息:\n{messages}")
