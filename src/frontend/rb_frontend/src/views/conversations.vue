@@ -1,36 +1,33 @@
 <template>
   <div class="common-layout">
     <a-layout style="height: 100vh;">
-      <a-layout-sider width="250px" class="aside" style="height: 100%;margin-bottom: 16px;">
-        <div style="padding: 16px;height: 100%;display: flex;flex-direction: column;">
-          <a-menu
-            v-model:selectedKeys="activeKey"
-            mode="inline"
-            @click="handleConversationClick"
-          >
-            <t-button theme="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
-              新建渠道
-            </t-button>
-            <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
-              <template #icon>
-                <t-icon name="chat" />
-              </template>
-              <span>{{ item.title || `会话 ${item.id}` }}</span>
-              <div class="action-icons">
-                <EditOutlined class="action-icon" @click.stop="handleEdit(item)" />
-                <DeleteOutlined class="action-icon" @click.stop="handleDelete(item.id)" />
-              </div>
-            </a-menu-item>
-          </a-menu>
-        </div>
+      <a-layout-sider width="250px" class="aside">
+        <a-menu
+          v-model:selectedKeys="activeKey"
+          mode="inline"
+          @click="handleConversationClick"
+        >
+          <t-button theme="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
+            新建渠道
+          </t-button>
+          <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
+            <template #icon>
+              <t-icon name="chat" />
+            </template>
+            <span>{{ item.title || `会话 ${item.id}` }}</span>
+            <div class="action-icons">
+              <EditOutlined class="action-icon" @click.stop="handleEdit(item)" />
+              <DeleteOutlined class="action-icon" @click.stop="handleDelete(item.id)" />
+            </div>
+          </a-menu-item>
+        </a-menu>
       </a-layout-sider>
       <a-layout>
         <a-layout-content class="main">
           <div class="chat-box" v-if="activeKey.length > 0" style="width: 100%;">
-            
             <t-chat
             ref="chatRef"
-            style="height: 700px"
+            style="height: 630px"
             :clear-history="showclearHistory"
             @clear="handleClearHistory"
             :reverse="false"
@@ -160,7 +157,6 @@
                 <ArrowDownIcon />
               </div>
             </t-button>
-
           </div>
           <div v-else class="read-between-placeholder">
             ReadBetween
@@ -1405,9 +1401,10 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 }
 
 .aside {
-  background-color: v-bind('token.colorBgContainer');
+  background-color: var(--td-bg-color-container);
   overflow: auto;
   height: 100%;
+  border-right: 1px solid var(--td-component-stroke);
 }
 
 .slider-container {

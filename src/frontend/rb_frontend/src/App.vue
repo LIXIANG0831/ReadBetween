@@ -9,6 +9,7 @@ import {
   RocketIcon
 } from 'tdesign-icons-vue-next'
 import { ConfigProvider as TConfigProvider } from 'tdesign-vue-next'
+import readbetween from '@/assets/readbetween.svg'
 
 const router = useRouter()
 const activeIndex = ref('')
@@ -33,37 +34,40 @@ const handleSelect = (value: string) => {
 <template>
   <TConfigProvider :theme="{ primaryColor: '#3875F6' }">
     <t-layout class="app-container">
-      <!-- 侧边栏 -->
-      <t-aside class="app-sidebar">
-        <div class="sidebar-header">
-          <h2>ReadBetween</h2>
+      <!-- 顶栏 -->
+      <t-header class="app-header">
+        <div class="header-content">
+          <div class="logo-section">
+            <!-- <h2>ReadBetween</h2> -->
+            <img height="28" :src="readbetween" alt="logo" />
+          </div>
+          <div class="menu-container">
+            <t-head-menu
+            v-model="activeIndex"
+            theme="light"
+            mode="horizontal"
+            @change="handleSelect"
+            class="header-menu"
+            >
+              <t-menu-item 
+                v-for="item in menuItems"
+                :key="item.value"
+                :value="item.value"
+              >
+                <template #icon>
+                  <component :is="item.icon" />
+                </template>
+                {{ item.label }}
+              </t-menu-item>
+            </t-head-menu>
+          </div>
         </div>
-        
-        <t-menu
-          v-model="activeIndex"
-          theme="light"
-          @change="handleSelect"
-          class="sidebar-menu"
-        >
-          <t-menu-item 
-            v-for="item in menuItems"
-            :key="item.value"
-            :value="item.value"
-          >
-            <template #icon>
-              <component :is="item.icon" />
-            </template>
-            {{ item.label }}
-          </t-menu-item>
-        </t-menu>
-      </t-aside>
+      </t-header>
 
       <!-- 主内容区 -->
-      <t-layout>
-        <t-content class="app-content">
-          <router-view />
-        </t-content>
-      </t-layout>
+      <t-content class="app-content">
+        <router-view />
+      </t-content>
     </t-layout>
   </TConfigProvider>
 </template>
@@ -71,7 +75,7 @@ const handleSelect = (value: string) => {
 <style lang="scss" scoped>
 // 全局变量定义
 :root {
-  --sidebar-width: 280px;
+  --header-height: 64px;
   --primary-color: #3875F6;  
   --primary-light-color: #EBF1FF; 
   --text-primary: #1d2129;
@@ -85,57 +89,56 @@ const handleSelect = (value: string) => {
 .app-container {
   height: 100vh;
   display: flex;
+  flex-direction: column;
   background-color: var(--bg-color);
 }
 
-// 侧边栏样式
-.app-sidebar {
-  width: var(--sidebar-width);
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
+// 顶栏样式
+.app-header {
+  height: var(--header-height);
   background: var(--white);
-  box-shadow: 1px 0 8px rgba(0, 0, 0, 0.05);
-  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
   z-index: 100;
-  border-right: 1px solid var(--border-color);
-  transition: width 0.2s ease;
+  border-bottom: 1px solid var(--border-color);
 
-  .sidebar-header {
-    padding: 20px;
-    color: var(--primary-color);
-    text-align: center;
-    
-    h2 {
-      margin-top: 20px;
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      color: var(--primary-color);
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+
+    .menu-container {
+      margin: 0 auto; // 水平居中关键代码
     }
+  }
+
+  .logo-section h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0;
   }
 }
 
 // 菜单样式
-.sidebar-menu {
-  flex: 1;
+.header-menu {
   background: transparent;
-  border-right: none;
-  padding: 8px 12px;
-  width: 100%;
+  border: none;
+  height: 100%;
 
   :deep(.t-menu__item) {
     color: var(--text-primary);
     border-radius: 6px;
-    margin: 16px 0;
+    margin: 0 8px;
     transition: all 0.2s ease;
-    height: 50px;
+    height: 40px;
     display: flex;
     align-items: center;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0 12px;
-    font-size: 18px;
+    padding: 0 16px;
+    font-size: 16px;
 
     &:hover {
       background-color: var(--primary-light-color);
@@ -144,30 +147,16 @@ const handleSelect = (value: string) => {
     &.t-is-active {
       background-color: var(--primary-light-color);
       color: var(--primary-color);
-      position: relative;
       font-weight: 500;
-      
-      &::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background-color: var(--primary-color);
-        border-radius: 0 3px 3px 0;
-      }
       
       .t-icon {
         color: var(--primary-color);
       }
-      
-      transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
     }
 
     .t-icon {
       font-size: 18px;
-      margin-right: 10px;
+      margin-right: 8px;
       color: var(--text-secondary);
     }
   }
@@ -175,12 +164,11 @@ const handleSelect = (value: string) => {
 
 // 主内容区
 .app-content {
+  flex: 1;
   padding: 20px;
   background-color: var(--white);
-  height: calc(100vh - 40px);
   overflow-y: auto;
-  border-radius: 8px 0 0 0;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
+  height: calc(100vh - var(--header-height) - 40px);
 }
 
 html, body {
