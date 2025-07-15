@@ -1,11 +1,11 @@
 <template>
   <div class="common-layout">
-    <h2>📚 知识库列表</h2>
+    <h3>📚 知识库列表</h3>
     <!-- 创建知识库按钮和搜索框 -->
     <div class="action-bar">
       <t-button theme="primary" @click="handleCreate" class="create-button">
         <template #icon><t-icon name="add" /></template>
-        创建知识库 📚
+        创建知识库
       </t-button>
       <t-input
         v-model="searchKeyword"

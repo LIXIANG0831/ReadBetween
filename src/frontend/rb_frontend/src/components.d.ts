@@ -19,6 +19,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SourceCard: typeof import('./components/SourceCard.vue')['default']
     ToolCallCard: typeof import('./components/ToolCallCard.vue')['default']
+    TopMenu: typeof import('./components/TopMenu.vue')['default']
     VoiceInteraction: typeof import('./components/VoiceInteraction.vue')['default']
     ZhReadme: typeof import('./components/ZhReadme.md')['default']
   }
