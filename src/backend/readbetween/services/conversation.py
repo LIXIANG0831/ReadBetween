@@ -506,11 +506,16 @@ class ConversationService:
                 tool_call_id = func_calling["id"]
                 tool_name = func_calling["function"]["name"]
                 tool_args = func_calling["function"]["arguments"]
+                try:
+                    tool_args_json = json.loads(tool_args)  # 先尝试解析
+                except json.JSONDecodeError:
+                    # 如果解析失败，尝试修复或记录原始参数
+                    raise Exception(f"无效的JSON参数: {tool_args}")
 
                 # Yield tool start information
                 tool_yield_msg = {
                     "tool": tool_name,
-                    "input": json.loads(tool_args),
+                    "input": tool_args_json,
                 }
 
                 logger_util.debug("开始执行MCP工具调用...")

@@ -1003,7 +1003,7 @@ const handleMessageSend = async (user_message: any) => {
       role: "assistant",
       name: roleConfig.value['assistant'].name,
       avatar: roleConfig.value['assistant'].avatar,
-      content: `正在调用工具：${toolNames}`,
+      content: `助手正在调用 ${toolNames} 工具`,
       timestamp: now_datetime,
       datetime: formatDateTime(now_datetime),
       tool_calls: toolStartData,
