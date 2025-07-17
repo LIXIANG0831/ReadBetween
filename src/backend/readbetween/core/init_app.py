@@ -10,6 +10,7 @@ from readbetween.config import settings
 from readbetween.services.constant import (MODEL_SAVE_PATH,
                                            BUILT_IN_EMBEDDING_NAME, BUILT_IN_STT_NAME, BUILT_IN_TTS_NAME,
                                            SYSTEM_MODEL_PROVIDER)
+from readbetween.utils.thread_pool_executor_util import ThreadPoolExecutorUtil
 
 
 def init_database():
@@ -48,20 +49,18 @@ def init_built_in_model():
 
     # 内置嵌入模型管理器
     lem = LocalEmbedManager()
-    lem.initialize(
-        model_name=embedding_model,
-        model_dir=model_dir
-    )
     # 内置TTS模型管理器
     ltm = LocalTTSManager()
-    ltm.initialize(
-        model_name=tts_model,
-        model_dir=model_dir
-    )
     # 内置STT模型管理器
     lsm = LocalTTSManager()
-    lsm.initialize(
-        model_name=stt_model,
-        model_dir=model_dir
-    )
+
+    # 初始化线程池
+    thread_pool = ThreadPoolExecutorUtil(max_workers=3)
+    # 提交任务
+    thread_pool.submit_task(lem.initialize, model_name=embedding_model, model_dir=model_dir)
+    thread_pool.submit_task(ltm.initialize, model_name=tts_model, model_dir=model_dir)
+    thread_pool.submit_task(lsm.initialize, model_name=stt_model, model_dir=model_dir)
+    thread_pool.wait_for_all()
+    # 关闭线程池
+    thread_pool.shutdown()
 
