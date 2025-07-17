@@ -4,15 +4,20 @@ from enum import Enum
 
 # 系统内置嵌入模型
 MODEL_SAVE_PATH = './static/models'
-SYSTEM_EMBEDDING_NAME = "iic/nlp_gte_sentence-embedding_chinese-large" # 1024维
+BUILT_IN_EMBEDDING_NAME = "iic/nlp_gte_sentence-embedding_chinese-large"  # 1024维
+BUILT_IN_TTS_NAME = "AI-ModelScope/Kokoro-82M-v1.1-zh"
+BUILT_IN_STT_NAME = "Systran/faster-whisper-base"
+
 
 # SourceMsgType 引用来源类型
 class SourceMsgType(Enum):
     WEB = "web"
     KB = "kb"
 
+
 # 系统内置供应商
-SYSTEM_MODEL_PROVIDER = [{"OpenAI-Compatible": "openai-compatible"},{"Qwen": "qwen"},{"OpenAI": "openai"},{"vLLM": "hosted_vllm"}]
+SYSTEM_MODEL_PROVIDER = [{"OpenAI-Compatible": "openai-compatible"}, {"Qwen": "qwen"}, {"OpenAI": "openai"},
+                         {"vLLM": "hosted_vllm"}]
 
 # 盐
 SALT = "readbetween"

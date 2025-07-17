@@ -2,11 +2,14 @@ from typing import List
 from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
+from readbetween.utils.local_tts_manager import LocalTTSManager
 from readbetween.utils.redis_util import RedisUtil
 from readbetween.utils.database_client import DatabaseClient
 from readbetween.utils.logger_util import logger_util
 from readbetween.config import settings
-from readbetween.services.constant import MODEL_SAVE_PATH, SYSTEM_EMBEDDING_NAME, SYSTEM_MODEL_PROVIDER
+from readbetween.services.constant import (MODEL_SAVE_PATH,
+                                           BUILT_IN_EMBEDDING_NAME, BUILT_IN_STT_NAME, BUILT_IN_TTS_NAME,
+                                           SYSTEM_MODEL_PROVIDER)
 
 
 def init_database():
@@ -37,12 +40,28 @@ def init_database():
             redis_client.delete('init_database')
 
 
-def init_embed_model():
-    embedding_model = SYSTEM_EMBEDDING_NAME
+def init_built_in_model():
     model_dir = MODEL_SAVE_PATH
+    embedding_model = BUILT_IN_EMBEDDING_NAME
+    tts_model = BUILT_IN_TTS_NAME
+    stt_model = BUILT_IN_STT_NAME
 
+    # 内置嵌入模型管理器
     lem = LocalEmbedManager()
     lem.initialize(
         model_name=embedding_model,
         model_dir=model_dir
     )
+    # 内置TTS模型管理器
+    ltm = LocalTTSManager()
+    ltm.initialize(
+        model_name=tts_model,
+        model_dir=model_dir
+    )
+    # 内置STT模型管理器
+    lsm = LocalTTSManager()
+    lsm.initialize(
+        model_name=stt_model,
+        model_dir=model_dir
+    )
+

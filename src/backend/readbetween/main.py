@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from contextlib import asynccontextmanager
-from core.init_app import init_database, init_embed_model
+from core.init_app import init_database, init_built_in_model
 from middleware import log_access
 import os
 
@@ -12,7 +12,7 @@ async def _LIFESPAN(app: FastAPI):
     # 初始化数据库
     init_database()
     # 加载本地嵌入模型
-    init_embed_model()
+    init_built_in_model()
 
     yield  # yield 前为程序启动前 后为程序关闭后
 

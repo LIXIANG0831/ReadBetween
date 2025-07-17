@@ -1,4 +1,3 @@
-# app/models/vectorizer.py
 import os
 from typing import List
 import torch
