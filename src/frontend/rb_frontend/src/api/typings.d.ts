@@ -187,6 +187,7 @@ type SendMessageParams = {
   temperature?: number | null;
   max_tokens?: number | null;
   search?: boolean;
+  thinking?: boolean;
 };
 
   /**

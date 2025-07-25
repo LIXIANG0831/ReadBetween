@@ -325,7 +325,7 @@ class ConversationService:
                 stream=True,
                 tools=openai_tools,
                 tool_choice="auto" if openai_tools else "none",
-                extra_body={"thinking_budget": 1024},
+                extra_body={"enable_thinking": message_data.thinking},
             )
 
             async for chunk in response:

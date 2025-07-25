@@ -116,8 +116,12 @@
                 @stop="onStop"> 
                   <template #prefix>
                     <div class="model-select">
-                      <t-button class="check-box" :class="{ 'is-active': isSearchEnabled }" variant="base" @click="toggleSearch">
+                      <t-button class="check-box" :class="{ 'is-active': isThinkingEnabled }" variant="base" @click="toggleThinking">
                         <SystemSumIcon />
+                        <span>深度思考</span>
+                      </t-button>
+                      <t-button class="check-box" :class="{ 'is-active': isSearchEnabled }" variant="base" @click="toggleSearch">
+                        <LogoDribbbleIcon />
                         <span>联网搜索</span>
                       </t-button>
                     </div>
@@ -291,6 +295,7 @@ import {
   SystemSumIcon, 
   ArrowDownIcon, 
   CheckCircleIcon, 
+  LogoDribbbleIcon,
   CloseIcon 
 } from 'tdesign-icons-vue-next';
 import { 
@@ -739,6 +744,13 @@ const toggleSearch = () => {
   console.log(isSearchEnabled.value)
 }
 
+// 深度思考
+const isThinkingEnabled = ref(false);
+const toggleThinking = () => {
+  isThinkingEnabled.value = !isThinkingEnabled.value;
+  console.log(isThinkingEnabled.value)
+}
+
 
 const handleMessageSend = async (user_message: any) => {
   if (!activeKey.value[0] || !user_message.trim()) return;
@@ -819,6 +831,7 @@ const handleMessageSend = async (user_message: any) => {
       conv_id: activeKey.value[0],
       message: JSON.stringify(user_message),        // 使用原始输入文本
       search: isSearchEnabled.value,
+      thinking: isThinkingEnabled.value,
       temperature: CreateConversationForm.value.temperature
     });
 
@@ -1362,6 +1375,7 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
   .model-select {
     display: flex;
     align-items: center;
+    gap: 10px;
     .t-select {
       width: 112px;
       height: var(--td-comp-size-m);

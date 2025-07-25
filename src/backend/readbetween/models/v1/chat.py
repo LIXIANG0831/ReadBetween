@@ -46,6 +46,7 @@ class ChatMessageSend(BaseModel):
     temperature: Optional[float] = Field(0.3, ge=0, le=2, description="控制生成文本的随机性")
     max_tokens: Optional[int] = Field(2000, ge=1, description="生成的最大 token 数量")
     search: bool = Field(default=False, description="是否开启网络搜索")
+    thinking: bool = Field(default=False, description="是否开启思考模式")
 
 
 class ConversationOut(BaseModel):
