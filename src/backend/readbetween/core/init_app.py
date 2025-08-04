@@ -46,7 +46,7 @@ def init_database():
             redis_client.delete('init_database')
 
 
-def init_built_in_model(settings: Settings = Depends(get_settings)):
+def init_built_in_model():
     model_dir = MODEL_SAVE_PATH
     embedding_model = BUILT_IN_EMBEDDING_NAME
     tts_model = BUILT_IN_TTS_NAME
