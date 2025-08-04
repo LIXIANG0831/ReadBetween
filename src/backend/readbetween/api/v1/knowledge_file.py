@@ -3,14 +3,15 @@ import tempfile
 from pathlib import Path
 from typing import List
 
-from fastapi import HTTPException, APIRouter, UploadFile, File, BackgroundTasks
+from fastapi import HTTPException, APIRouter, UploadFile, File, BackgroundTasks, Depends
 
+from readbetween.config import Settings
+from readbetween.core.dependencies import get_settings
 from readbetween.models.dao.knowledge import Knowledge
 from readbetween.models.dao.knowledge_file import KnowledgeFile
 from readbetween.models.v1.knowledge import KnowledgeInfo
 from readbetween.models.v1.knowledge_file import KnowledgeFileExecute, KnowledgeFileVectorizeTasks
 from readbetween.services.tasks import celery_text_vectorize #bg_text_vectorize
-from readbetween.settings import get_config
 from readbetween.utils.minio_util import MinioUtil
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.utils.logger_util import logger_util
@@ -27,9 +28,10 @@ thread_pool_util = ThreadPoolExecutorUtil()
 
 
 @router.post("/knowledge_file/upload")
-async def upload_knowledge_file(file: UploadFile = File(...)):
+async def upload_knowledge_file(file: UploadFile = File(...),
+                                settings: Settings = Depends(get_settings)):
     try:
-        default_bucket_name = get_config("storage.minio.default_bucket")
+        default_bucket_name = settings.storage.minio.default_bucket
         if minio_client.bucket_exists(default_bucket_name) is False:  # 检查桶存在
             minio_client.create_bucket(default_bucket_name)
 

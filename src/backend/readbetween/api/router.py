@@ -5,7 +5,6 @@ from readbetween.api.v1.knowledge import router as knowledge_router
 from readbetween.api.v1.knowledge_file import router as knowledge_file_router
 from readbetween.api.v1.model_setting_cfg import router as model_setting_cfg_router
 from readbetween.api.v1.model_available_cfg import router as model_available_cfg_router
-from readbetween.api.v1.voice import router as voice_router
 from readbetween.api.v1.memory import router as memory_router
 from readbetween.api.v1.mcp import router as mcp_router
 
@@ -15,7 +14,6 @@ v1_router = APIRouter(prefix='/api/v1')
 v1_router.include_router(chat_router)
 v1_router.include_router(knowledge_router)
 v1_router.include_router(knowledge_file_router)
-v1_router.include_router(voice_router)
 v1_router.include_router(memory_router)
 v1_router.include_router(mcp_router)
 

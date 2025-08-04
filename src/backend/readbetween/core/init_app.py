@@ -1,4 +1,9 @@
+import os
 from typing import List
+
+from fastapi import Depends
+
+from readbetween.core.dependencies import get_settings
 from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
@@ -6,7 +11,7 @@ from readbetween.utils.local_tts_manager import LocalTTSManager
 from readbetween.utils.redis_util import RedisUtil
 from readbetween.utils.database_client import DatabaseClient
 from readbetween.utils.logger_util import logger_util
-from readbetween.config import settings
+from readbetween.config import settings, Settings
 from readbetween.services.constant import (MODEL_SAVE_PATH,
                                            BUILT_IN_EMBEDDING_NAME, BUILT_IN_STT_NAME, BUILT_IN_TTS_NAME,
                                            SYSTEM_MODEL_PROVIDER)
@@ -41,26 +46,27 @@ def init_database():
             redis_client.delete('init_database')
 
 
-def init_built_in_model():
+def init_built_in_model(settings: Settings = Depends(get_settings)):
     model_dir = MODEL_SAVE_PATH
     embedding_model = BUILT_IN_EMBEDDING_NAME
     tts_model = BUILT_IN_TTS_NAME
     stt_model = BUILT_IN_STT_NAME
 
-    # 内置嵌入模型管理器
-    lem = LocalEmbedManager()
-    # 内置TTS模型管理器
-    ltm = LocalTTSManager()
-    # 内置STT模型管理器
-    lsm = LocalTTSManager()
-
     # 初始化线程池
     thread_pool = ThreadPoolExecutorUtil(max_workers=3)
-    # 提交任务
+
+    # 内置嵌入模型管理器
+    lem = LocalEmbedManager()
     thread_pool.submit_task(lem.initialize, model_name=embedding_model, model_dir=model_dir)
-    thread_pool.submit_task(ltm.initialize, model_name=tts_model, model_dir=model_dir)
-    thread_pool.submit_task(lsm.initialize, model_name=stt_model, model_dir=model_dir)
+    if os.getenv("APP__ENV", "dev") not in ['test', 'dev']:
+        # 内置TTS模型管理器
+        ltm = LocalTTSManager()
+        thread_pool.submit_task(ltm.initialize, model_name=tts_model, model_dir=model_dir)
+        # 内置STT模型管理器
+        lsm = LocalTTSManager()
+        thread_pool.submit_task(lsm.initialize, model_name=stt_model, model_dir=model_dir)
+
+    # 提交任务
     thread_pool.wait_for_all()
     # 关闭线程池
     thread_pool.shutdown()
-

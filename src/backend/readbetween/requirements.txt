@@ -244,7 +244,7 @@ proto-plus==1.24.0
 protobuf>=5.26.1,<6.0.0
 prov==2.0.1
 psutil==5.9.8
-psycopg2==2.9.10
+psycopg2-binary== 2.9.10
 ptyprocess==0.7.0
 pure_eval==0.2.3
 pyarrow==17.0.0
