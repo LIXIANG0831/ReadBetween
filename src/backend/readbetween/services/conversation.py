@@ -429,37 +429,63 @@ class ConversationService:
     async def _build_openai_messages(cls, conv_id: str):
         """构建 OpenAI 需要的消息格式"""
         messages = await MessageDao.get_conversation_messages(conv_id)
-        openai_messages = []
-        for msg in messages:
+        optimized_messages = []
+
+        # 状态跟踪变量 (状态流转示意如下:)
+        # 用户消息 -> 设置 last_user_msg_idx
+        # 工具调用 -> pending_tool_calls = True
+        # 工具响应 -> 保持 pending_tool_calls
+        # 最终回复 -> final_response_found = True
+        last_user_msg_idx = -1
+        pending_tool_calls = False
+        final_response_found = False
+
+        for idx, msg in enumerate(messages):
             if msg.role == "user":
+                # 处理用户消息（始终保留）
                 content = json.loads(msg.content)
                 # 'message': 'At most 1 image(s) may be provided in one request.
                 # 清洗历史多模态交互信息
                 # 多模态image_url在使用后, 应无需再组装到 messages 中.
-                if isinstance(content, list) and len(content) > 0 and isinstance(content[0], dict):
+                if isinstance(content, list) and content and isinstance(content[0], dict):
                     content = content[0].get('text', '')
-                openai_messages.append({
+
+                optimized_messages.append({
                     "role": msg.role,
                     "content": content
                 })
-            elif msg.role == "tool":
-                openai_messages.append({
-                    "role": msg.role,
-                    "tool_call_id": msg.tool_call_id,
-                    "content": json.loads(msg.content)
-                })
-            elif msg.role == "assistant":
-                assistant_msg = {
-                    "role": msg.role,
-                }
-                if msg.content is not None:
-                    assistant_msg["content"] = json.loads(msg.content)
-                if msg.tool_calls is not None:
-                    assistant_msg["tool_calls"] = json.loads(msg.tool_calls)
-                openai_messages.append(assistant_msg)
-            else:
-                pass
-        return openai_messages
+                last_user_msg_idx = len(optimized_messages) - 1
+                pending_tool_calls = False
+
+            elif not final_response_found:
+                if msg.role == "assistant":
+                    if msg.content:
+                        # 发现最终回复，准备清理之前的工具调用
+                        final_response_found = True
+                        # 回退到最后一个用户消息
+                        optimized_messages = optimized_messages[:last_user_msg_idx + 1]
+
+                        optimized_messages.append({
+                            "role": msg.role,
+                            "content": json.loads(msg.content)
+                        })
+                    elif msg.tool_calls:
+                        # 处理工具调用请求
+                        optimized_messages.append({
+                            "role": msg.role,
+                            "tool_calls": json.loads(msg.tool_calls)
+                        })
+                        pending_tool_calls = True
+
+                elif msg.role == "tool" and pending_tool_calls:
+                    # 处理工具响应
+                    optimized_messages.append({
+                        "role": msg.role,
+                        "tool_call_id": msg.tool_call_id,
+                        "content": json.loads(msg.content)
+                    })
+
+        return optimized_messages
 
     @classmethod
     async def _stream_second_model_response(
