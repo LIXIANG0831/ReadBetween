@@ -427,7 +427,15 @@ class ConversationService:
 
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
-        """构建 OpenAI 需要的消息格式"""
+        """
+        优化后的消息构建方法
+
+        特性：
+        1. 自动过滤中间工具调用过程，当存在最终文本回复时
+        2. 保留必要的用户消息上下文
+        3. 更高效的状态管理机制
+
+        """
         messages = await MessageDao.get_conversation_messages(conv_id)
         optimized_messages = []
 
@@ -486,6 +494,49 @@ class ConversationService:
                     })
 
         return optimized_messages
+
+    @classmethod
+    async def _build_openai_messages_deprecated(cls, conv_id: str):
+        """
+        旧版消息构建方法（已弃用）
+
+        特征：
+        1. 无条件保留所有消息（包括中间工具调用过程）
+        2. 上下文管理简单，工具调用和最终回复混合存在
+
+        """
+        messages = await MessageDao.get_conversation_messages(conv_id)
+        openai_messages = []
+        for msg in messages:
+            if msg.role == "user":
+                content = json.loads(msg.content)
+                # 'message': 'At most 1 image(s) may be provided in one request.
+                # 清洗历史多模态交互信息
+                # 多模态image_url在使用后, 应无需再组装到 messages 中.
+                if isinstance(content, list) and len(content) > 0 and isinstance(content[0], dict):
+                    content = content[0].get('text', '')
+                openai_messages.append({
+                    "role": msg.role,
+                    "content": content
+                })
+            elif msg.role == "tool":
+                openai_messages.append({
+                    "role": msg.role,
+                    "tool_call_id": msg.tool_call_id,
+                    "content": json.loads(msg.content)
+                })
+            elif msg.role == "assistant":
+                assistant_msg = {
+                    "role": msg.role,
+                }
+                if msg.content is not None:
+                    assistant_msg["content"] = json.loads(msg.content)
+                if msg.tool_calls is not None:
+                    assistant_msg["tool_calls"] = json.loads(msg.tool_calls)
+                openai_messages.append(assistant_msg)
+            else:
+                pass
+        return openai_messages
 
     @classmethod
     async def _stream_second_model_response(
