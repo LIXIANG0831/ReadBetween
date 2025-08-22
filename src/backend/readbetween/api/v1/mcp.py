@@ -1,11 +1,11 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.models.v1.mcp import McpServersData, CreateMcpServerResponse
 from readbetween.services.constant import RedisMCPServerKey, RedisMCPServerDetailKey
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.redis_util import RedisUtil
-from readbetween.utils.mcp_client import MCPClient
+from readbetween.utils.mcp_client import mcp_client_manager
 
 router = APIRouter(tags=["MCP管理"])
 redis_client = RedisUtil()
@@ -19,10 +19,15 @@ async def create_mcp_server(data: McpServersData):
         redis_client.delete(RedisMCPServerKey)
         redis_client.delete(RedisMCPServerDetailKey)
 
-        mcp_client = MCPClient(data.dict().get("mcpServers", {}))
-        await mcp_client.initialize_sessions()
+        # 使用单例管理器初始化 MCP 客户端
+        mcp_client = await mcp_client_manager.initialize_client(data.dict().get("mcpServers", {}))
         tools = await mcp_client.get_all_tools()
-        await mcp_client.cleanup()
+
+        # 重命名 tools 的 key
+        tools = {
+            mcp_client.server_id_to_name.get(server_id, server_id): tool_list
+            for server_id, tool_list in tools.items()
+        }
 
         redis_client.set(RedisMCPServerKey, data_json)
         redis_client.set(RedisMCPServerDetailKey, json.dumps(tools, ensure_ascii=False))

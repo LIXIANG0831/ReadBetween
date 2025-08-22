@@ -1,4 +1,3 @@
-import asyncio
 import json
 from datetime import datetime
 
@@ -25,7 +24,7 @@ from readbetween.services.knowledge import KnowledgeService
 from readbetween.services.retriever import RetrieverService
 from readbetween.services.tasks import celery_add_memory
 from readbetween.utils.logger_util import logger_util
-from readbetween.utils.mcp_client import MCPClient
+from readbetween.utils.mcp_client import MCPClient, mcp_client_manager
 from readbetween.utils.memory_util import MemoryUtil
 from readbetween.utils.minio_util import MinioUtil
 from readbetween.utils.model_factory import ModelFactory
@@ -170,7 +169,6 @@ class ConversationService:
         source_msg_list: List[SourceMsg] = []  # 来源信息返回列表
         kb_source_list = None  # RAG知识库来源信息
         web_source_list = None  # 网络来源信息
-        should_cleanup = False  # 标记是否需要清理 MCP Client
 
         conversation_info: ConversationInfo = message_data.conversation_info
         if not conversation_info:
@@ -261,12 +259,9 @@ class ConversationService:
 
         # 准备MCP Client 获取MCP Tool列表
         openai_tools = []
-        if not is_recursion and conversation_info.conversation.mcp_server_configs:  # 只在第一次调用时创建MCP Client
-            mcp_client = MCPClient(conversation_info.conversation.mcp_server_configs)
-            await mcp_client.initialize_sessions()
-            should_cleanup = True
+        mcp_client = mcp_client_manager.get_client()
         if mcp_client:
-            tools = await mcp_client.get_all_tools()  # 获取 MCP Tool列表
+            tools = await mcp_client.get_all_tools_by_config(conversation_info.conversation.mcp_server_configs)  # 获取 MCP Tool列表
             for k, v in tools.items():
                 for inner_k, inner_v in v.items():
                     inner_v["name"] = inner_v["prefixed_name"]
@@ -274,6 +269,8 @@ class ConversationService:
                         'type': 'function',
                         'function': inner_v
                     })
+        else:
+            pass
 
         # 构建消息历史
         system_prompt = [{'role': 'system', 'content': conversation_info.conversation.system_prompt}]
@@ -419,11 +416,7 @@ class ConversationService:
                     logger_util.error(f"消息回滚失败: {delete_error}")
             yield cls._format_stream_response(event="ERROR", text=str(e))
         finally:
-            if should_cleanup and mcp_client:
-                try:
-                    await mcp_client.cleanup()
-                except Exception as cleanup_error:
-                    logger_util.error(f"清理MCP客户端时出错: {cleanup_error}")
+            pass
 
     @classmethod
     async def _build_openai_messages(cls, conv_id: str):
@@ -439,22 +432,17 @@ class ConversationService:
         messages = await MessageDao.get_conversation_messages(conv_id)
         optimized_messages = []
 
-        # 状态跟踪变量 (状态流转示意如下:)
-        # 用户消息 -> 设置 last_user_msg_idx
-        # 工具调用 -> pending_tool_calls = True
-        # 工具响应 -> 保持 pending_tool_calls
-        # 最终回复 -> final_response_found = True
+        # 状态跟踪变量
         last_user_msg_idx = -1
         pending_tool_calls = False
-        final_response_found = False
+        tool_call_chain_complete = False
+        has_final_response = False
 
         for idx, msg in enumerate(messages):
             if msg.role == "user":
                 # 处理用户消息（始终保留）
                 content = json.loads(msg.content)
-                # 'message': 'At most 1 image(s) may be provided in one request.
                 # 清洗历史多模态交互信息
-                # 多模态image_url在使用后, 应无需再组装到 messages 中.
                 if isinstance(content, list) and content and isinstance(content[0], dict):
                     content = content[0].get('text', '')
 
@@ -464,34 +452,48 @@ class ConversationService:
                 })
                 last_user_msg_idx = len(optimized_messages) - 1
                 pending_tool_calls = False
+                tool_call_chain_complete = False
+                has_final_response = False
 
-            elif not final_response_found:
-                if msg.role == "assistant":
-                    if msg.content:
-                        # 发现最终回复，准备清理之前的工具调用
-                        final_response_found = True
+            elif msg.role == "assistant":
+                if msg.content:
+                    # 这是最终回复，不是工具调用
+                    has_final_response = True
+                    # 如果之前有工具调用链但未完成，清理掉
+                    if pending_tool_calls and not tool_call_chain_complete:
                         # 回退到最后一个用户消息
                         optimized_messages = optimized_messages[:last_user_msg_idx + 1]
 
-                        optimized_messages.append({
-                            "role": msg.role,
-                            "content": json.loads(msg.content)
-                        })
-                    elif msg.tool_calls:
-                        # 处理工具调用请求
-                        optimized_messages.append({
-                            "role": msg.role,
-                            "tool_calls": json.loads(msg.tool_calls)
-                        })
-                        pending_tool_calls = True
-
-                elif msg.role == "tool" and pending_tool_calls:
-                    # 处理工具响应
                     optimized_messages.append({
                         "role": msg.role,
-                        "tool_call_id": msg.tool_call_id,
                         "content": json.loads(msg.content)
                     })
+                    pending_tool_calls = False
+                    tool_call_chain_complete = False
+
+                elif msg.tool_calls:
+                    # 处理工具调用请求
+                    optimized_messages.append({
+                        "role": msg.role,
+                        "tool_calls": json.loads(msg.tool_calls)
+                    })
+                    pending_tool_calls = True
+                    tool_call_chain_complete = False
+
+            elif msg.role == "tool" and pending_tool_calls:
+                # 处理工具响应
+                optimized_messages.append({
+                    "role": msg.role,
+                    "tool_call_id": msg.tool_call_id,
+                    "content": json.loads(msg.content)
+                })
+                # 标记工具调用链完成（等待最终回复）
+                tool_call_chain_complete = True
+
+        # 如果没有最终回复但有工具调用链，保留完整的工具调用过程
+        if pending_tool_calls and not has_final_response:
+            # 这种情况下，工具调用还在进行中，需要保留所有消息
+            pass
 
         return optimized_messages
 

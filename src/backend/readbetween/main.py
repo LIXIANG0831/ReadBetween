@@ -6,6 +6,8 @@ from core.init_app import init_database, init_built_in_model
 from middleware import log_access
 import os
 
+from readbetween.utils.mcp_client import mcp_client_manager
+
 
 @asynccontextmanager
 async def _LIFESPAN(app: FastAPI):
@@ -15,6 +17,9 @@ async def _LIFESPAN(app: FastAPI):
     init_built_in_model()
 
     yield  # yield 前为程序启动前 后为程序关闭后
+
+    # 清理MCP客户端
+    await mcp_client_manager.cleanup()
 
 
 
