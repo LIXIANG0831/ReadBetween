@@ -161,7 +161,6 @@ class ConversationService:
     async def stream_chat_response(
             cls,
             message_data: ChatMessageSendPlus,
-            mcp_client: MCPClient = None,
             is_recursion: bool = False
     ) -> Generator:
         """流式聊天处理"""
@@ -377,7 +376,7 @@ class ConversationService:
 
                 # 递归调用处理工具响应
                 message_data.conversation_info = await cls.get_conversation_info(message_data.conv_id)
-                async for content in cls.stream_chat_response(message_data, mcp_client, True):
+                async for content in cls.stream_chat_response(message_data, True):
                     yield content
 
             # 收集来源信息

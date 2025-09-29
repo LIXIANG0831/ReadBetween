@@ -1,3 +1,4 @@
+import json
 import os
 from typing import List
 
@@ -8,13 +9,14 @@ from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
 from readbetween.utils.local_tts_manager import LocalTTSManager
+from readbetween.utils.mcp_client import mcp_client_manager
 from readbetween.utils.redis_util import RedisUtil
 from readbetween.utils.database_client import DatabaseClient
 from readbetween.utils.logger_util import logger_util
 from readbetween.config import settings, Settings
 from readbetween.services.constant import (MODEL_SAVE_PATH,
                                            BUILT_IN_EMBEDDING_NAME, BUILT_IN_STT_NAME, BUILT_IN_TTS_NAME,
-                                           SYSTEM_MODEL_PROVIDER)
+                                           SYSTEM_MODEL_PROVIDER, RedisMCPServerKey)
 from readbetween.utils.thread_pool_executor_util import ThreadPoolExecutorUtil
 
 
@@ -70,3 +72,11 @@ def init_built_in_model():
     thread_pool.wait_for_all()
     # 关闭线程池
     thread_pool.shutdown()
+
+
+async def init_mcp_servers():
+    redis_client = RedisUtil()
+    mcp_servers_config = redis_client.get(RedisMCPServerKey)
+    mcp_server_dict = json.loads(mcp_servers_config if mcp_servers_config else "{}")
+    logger_util.debug(f"MCP Severs Config Init :: {mcp_server_dict}")
+    await mcp_client_manager.initialize_client(mcp_server_dict.get("mcpServers", {}))

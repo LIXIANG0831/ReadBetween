@@ -218,8 +218,7 @@ class MCPClientManager:
         async with self._lock:
             if self._mcp_client is not None:
                 # 如果已有客户端，先清理
-                await self.cleanup()
-
+                await self._mcp_client.cleanup()
             self._mcp_client = MCPClient(server_configs)
             await self._mcp_client.initialize_mcp_sessions()
             logger_util.info("MCPClient 初始化完成")
