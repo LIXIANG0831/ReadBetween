@@ -21,6 +21,7 @@ from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation
     SourceMsgType
 from readbetween.services.conversation_knowledge_link import ConversationKnowledgeLinkService
 from readbetween.services.knowledge import KnowledgeService
+from readbetween.services.prompt import DEFAULT_PROMPT, KB_RECALL_PROMPT, WEB_SEARCH_PROMPT, MEMORY_PROMPT
 from readbetween.services.retriever import RetrieverService
 from readbetween.services.tasks import celery_add_memory
 from readbetween.utils.logger_util import logger_util
@@ -180,7 +181,9 @@ class ConversationService:
             is_multimodal = isinstance(content, list)
 
             # 初始化最终查询和原始查询
-            final_query, first_query = cls._init_user_query(content, is_multimodal)
+            # Desperate -- 弃用用户提示词 添加到至默认系统提示词
+            # final_query, first_query = cls._init_user_query(content, is_multimodal)
+            final_query, first_query = f"**User Question:** {content}", content
 
             # 多模态问答 默认不启用
             if not is_multimodal:
@@ -259,7 +262,7 @@ class ConversationService:
         # 准备MCP Client 获取MCP Tool列表
         openai_tools = []
         mcp_client = mcp_client_manager.get_client()
-        if mcp_client:
+        if mcp_client and conversation_info.conversation.mcp_server_configs:
             tools = await mcp_client.get_all_tools_by_config(conversation_info.conversation.mcp_server_configs)  # 获取 MCP Tool列表
             for k, v in tools.items():
                 for inner_k, inner_v in v.items():
@@ -269,10 +272,11 @@ class ConversationService:
                         'function': inner_v
                     })
         else:
+            # 当前会话未挂载MCP工具
             pass
 
         # 构建消息历史
-        system_prompt = [{'role': 'system', 'content': conversation_info.conversation.system_prompt}]
+        system_prompt = [{'role': 'system', 'content': f"{conversation_info.conversation.system_prompt}\n{DEFAULT_PROMPT}"}]
         history_messages = await cls._build_openai_messages(message_data.conv_id)
 
         # 添加当前消息（如果是非递归调用）
@@ -724,10 +728,9 @@ class ConversationService:
                     logger_util.debug(f"ES Score: {float(retrieve_result.score)}")
 
         if recall_chunk:
-            return f"""
-**RAG Retrieval Information:** This is relevant information retrieved from a knowledge base, which may contain the answer to the question or related background knowledge.
-{recall_chunk.strip()}
-            """, source_list
+            # 拼接RAG提示词模板
+            kb_recall_prompt = KB_RECALL_PROMPT.format(kb_recall_content=recall_chunk.strip())
+            return kb_recall_prompt, source_list
         else:
             return "", None
 
@@ -748,10 +751,9 @@ class ConversationService:
                     SourceMsg(source=SourceMsgType.WEB.value, title=search_item.name, url=search_item.url))
                 web_search_info += f"Title: {search_item.name}\nContent: {search_content}\n\n"
         if web_search_info:
-            return f"""
-**Web Search Information:** This is relevant information gathered from internet searches, which may contain the latest information or different perspectives.
-{web_search_info}
-            """, source_list
+            # 拼接网络检索提示词模板
+            web_search_prompt = WEB_SEARCH_PROMPT.format(web_search_content=web_search_info)
+            return web_search_prompt, source_list
         else:
             return "", None
 
@@ -775,10 +777,9 @@ class ConversationService:
         if len(graph_entities) == 0 and len(original_memories) == 0:
             return ""
         else:
-            return f"""
-**User Memory Information:** This is information about the user's past conversations and preferences, which can help you better understand the user's needs.
-{memory_str}
-            """
+            # 拼接Memory提示词模板
+            memory_prompt = MEMORY_PROMPT.format(memory_recall_content=memory_str)
+            return memory_prompt
 
     @classmethod
     def _format_stream_response(cls, event: str, text: str, extra=None):
