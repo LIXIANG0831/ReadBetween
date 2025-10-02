@@ -10,6 +10,7 @@ from readbetween.models.dao.conversation import ConversationDao, Conversation
 from readbetween.models.dao.knowledge import KnowledgeDao, Knowledge
 from readbetween.models.dao.messages import MessageDao
 from readbetween.models.schemas.response import PageModel
+from readbetween.models.schemas.sse_response import StreamResponseTemplate
 from readbetween.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend, ChatMessageSendPlus
 from fastapi import HTTPException
 from typing import Generator, List, Dict
@@ -316,7 +317,8 @@ class ConversationService:
             thinking_opened = False
 
             # 开始流式响应
-            yield cls._format_stream_response(event="START", text="")
+            # yield cls._format_stream_response(event="START", text="")
+            yield StreamResponseTemplate.start_event()
 
             response = await client.generate_text(
                 messages=messages,
@@ -348,13 +350,15 @@ class ConversationService:
 
                     if content:
                         full_response.append(content)
-                        yield cls._format_stream_response(event="MESSAGE", text=content)
+                        # yield cls._format_stream_response(event="MESSAGE", text=content)
+                        yield StreamResponseTemplate.message_event(content)
 
                 # 处理普通消息内容
                 if hasattr(delta, 'content') and delta.content and not thinking_opened:
                     content = delta.content
                     full_response.append(content)
-                    yield cls._format_stream_response(event="MESSAGE", text=content)
+                    # yield cls._format_stream_response(event="MESSAGE", text=content)
+                    yield StreamResponseTemplate.message_event(content)
 
                 # 处理工具调用
                 if hasattr(delta, 'tool_calls') and delta.tool_calls:
@@ -402,13 +406,15 @@ class ConversationService:
 
             # 返回来源信息
             if not is_recursion and (len(source_msg_list) != 0):
-                yield cls._format_stream_response(
-                    event="SOURCE",
-                    text="",
-                    extra=[source_msg.to_dict() for source_msg in list(set(source_msg_list))]
-                )
+                # yield cls._format_stream_response(
+                #     event="SOURCE",
+                #     text="",
+                #     extra=[source_msg.to_dict() for source_msg in list(set(source_msg_list))]
+                # )
+                yield StreamResponseTemplate.source_event(sources=[source_msg.to_dict() for source_msg in list(set(source_msg_list))])
 
-            yield cls._format_stream_response(event="END", text="")
+            # yield cls._format_stream_response(event="END", text="")
+            yield StreamResponseTemplate.end_event()
 
         except Exception as e:
             logger_util.error(f"模型调用失败: {str(e)}")
@@ -417,7 +423,8 @@ class ConversationService:
                     await MessageDao.delete_message(user_msg_id)
                 except Exception as delete_error:
                     logger_util.error(f"消息回滚失败: {delete_error}")
-            yield cls._format_stream_response(event="ERROR", text=str(e))
+            # yield cls._format_stream_response(event="ERROR", text=str(e))
+            yield StreamResponseTemplate.error_event(str(e))
         finally:
             pass
 
@@ -588,7 +595,8 @@ class ConversationService:
 
         tool_calls_msg = None
         try:
-            yield cls._format_stream_response(event="TOOL_START", text="", extra=func_call_list)
+            # yield cls._format_stream_response(event="TOOL_START", text="", extra=func_call_list)
+            yield StreamResponseTemplate.tool_start_event(func_call_list)
             for func_calling in func_call_list:
                 tool_call_id = func_calling["id"]
                 tool_name = func_calling["function"]["name"]
@@ -635,8 +643,10 @@ class ConversationService:
 
                 # Yield tool end information
                 tool_yield_msg["output"] = call_tool_result_content_msg.get("content", "工具调用结果异常")
-                yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
-                yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
+                # yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
+                yield StreamResponseTemplate.tool_end_event(call_tool_result_content_msg)
+                # yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
+                yield StreamResponseTemplate.tool_finish_event(tool_yield_msg)
 
                 # 保存工具调用信息
                 tool_calls_msg = await MessageDao.create_message(
@@ -782,6 +792,7 @@ class ConversationService:
             return memory_prompt
 
     @classmethod
+    # Desperate -- 替换为统一的模板类 ```sse_response```
     def _format_stream_response(cls, event: str, text: str, extra=None):
         data = {"event": event, "text": text}
         if extra is not None:
