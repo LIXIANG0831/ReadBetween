@@ -1,10 +1,13 @@
+import asyncio
 import base64
 import binascii
 import time
 from typing import List, Dict, Optional
+import re
+import aiohttp
 from DrissionPage._pages.session_page import SessionPage
 
-from readbetween.services.constant import SALT
+from readbetween.services.constant import SALT, JINA_BASE_URL
 from cryptography.fernet import Fernet, InvalidToken
 import hashlib
 import copy
@@ -24,6 +27,32 @@ class BaseTool:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
+
+    @staticmethod
+    def extract_urls(text):
+        """从文本中提取URL"""
+        # 正则表达式模式
+        pattern = r'https?://[^\s\u4e00-\u9fff]+?(?=[\s\u4e00-\u9fff]|$)'
+        # 查找所有匹配的URL
+        urls = list(dict.fromkeys(re.findall(pattern, text)))
+        return urls, len(urls)
+
+    @staticmethod
+    async def fetch_webpage_text_async(url):
+        """从URL获取MD文本内容"""
+        full_url = f"{JINA_BASE_URL}/{url}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(full_url) as resp:
+                    if resp.status == 200:
+                        return await resp.text()
+                    else:
+                        text = await resp.text()
+                        logger_util.error(f"Jina fetch error for {url}: {resp.status} - {text}")
+                        return ""
+        except Exception as e:
+            logger_util.error("Error fetching webpage text with Jina:", e)
+            return ""
 
 
 class PdfExtractTool(BaseTool):
@@ -258,6 +287,23 @@ if __name__ == "__main__":
     # 解密密码
     decrypted = encryption_tool.decrypt(encrypted)
     print(f"Decrypted: {decrypted}")
+
+    text = """
+    帮我识别下面的网页内容，并进行总结：
+    https://news.sina.com.cn/w/2025-10-02/doc-infsncvw0643322.shtml今天是个好日子啊
+    http://www.sdzk.cn/NewsInfo呵呵你能识别吗.aspx?NewsID=7029
+    https://example.com/path/to/page?param=value&another=param
+    ftp://files.example.com/download.zip
+    http://www.sdzk.cn/NewsInfo呵呵你能识别吗.aspx?NewsID=7029 https://example.com/path/to/page?param=value&another=param
+    还有普通文本。
+    """
+    text2 = "xxxaa"
+
+    urls, cnt = BaseTool.extract_urls(text2)
+    print(cnt)
+    for url in urls:
+        print(url)
+        # print(asyncio.run(BaseTool.fetch_webpage_text_async(url)))
 
     # PDF 解析
     # pdf_file_path = '/Users/lixiang/Documents/Test_Material/普通.pdf'

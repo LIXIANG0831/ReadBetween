@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime
 
@@ -22,7 +23,8 @@ from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation
     SourceMsgType
 from readbetween.services.conversation_knowledge_link import ConversationKnowledgeLinkService
 from readbetween.services.knowledge import KnowledgeService
-from readbetween.services.prompt import DEFAULT_PROMPT, KB_RECALL_PROMPT, WEB_SEARCH_PROMPT, MEMORY_PROMPT
+from readbetween.services.prompt import DEFAULT_PROMPT, KB_RECALL_PROMPT, WEB_SEARCH_PROMPT, MEMORY_PROMPT, \
+    WEB_LINK_PROMPT
 from readbetween.services.retriever import RetrieverService
 from readbetween.services.tasks import celery_add_memory
 from readbetween.utils.logger_util import logger_util
@@ -31,7 +33,7 @@ from readbetween.utils.memory_util import MemoryUtil
 from readbetween.utils.minio_util import MinioUtil
 from readbetween.utils.model_factory import ModelFactory
 from readbetween.utils.thread_pool_executor_util import ThreadPoolExecutorUtil
-from readbetween.utils.tools import WebSearchTool
+from readbetween.utils.tools import WebSearchTool, BaseTool
 from readbetween.utils.redis_util import RedisUtil
 
 minio_client = MinioUtil()
@@ -190,11 +192,12 @@ class ConversationService:
             if not is_multimodal:
                 # 并发执行任务
                 task_results = {
-                    'kb_recall': None,
-                    'web_search': None,
-                    'memory_recall': None
+                    'kb_recall': None,  # RAG检索结果
+                    'web_search': None,  # 网页搜索结果
+                    'memory_recall': None,  # 记忆召回结果
+                    'webpage_text': None  # 直链内容获取结果
                 }
-                thread_pool = ThreadPoolExecutorUtil(max_workers=2, async_max_workers=1)
+                thread_pool = ThreadPoolExecutorUtil(max_workers=5, async_max_workers=5)
 
                 # 处理知识库检索
                 knowledge_bases = await ConversationKnowledgeLinkService.get_attached_knowledge(
@@ -224,6 +227,11 @@ class ConversationService:
                         cls._append_memory_msg, content, message_data.conv_id, 3
                     )
 
+                # 处理网页直链
+                urls, url_cnt = BaseTool.extract_urls(first_query)
+                if url_cnt > 0:
+                    task_results['webpage_text'] = await cls._append_webpage_text(urls)
+
                 # 并发执行所有任务
                 thread_pool.wait_for_all()
                 await thread_pool.wait_for_all_async()
@@ -251,6 +259,14 @@ class ConversationService:
                             final_query = f"{final_query}\n{memory_info}"
                     except Exception as e:
                         logger_util.error(f"记忆召回失败: {str(e)}")
+
+                if task_results['webpage_text']:
+                    try:
+                        webpage_info = task_results['webpage_text']
+                        if webpage_info:
+                            final_query = f"{final_query}\n{webpage_info}"
+                    except Exception as e:
+                        logger_util.error(f"网页直链获取文本失败: {str(e)}")
 
             # 保存用户消息
             user_msg = await MessageDao.create_message(
@@ -620,29 +636,35 @@ class ConversationService:
                 }])
                 logger_util.debug("完成执行MCP工具调用...")
 
-                call_tool_result: CallToolResult = mcp_tool_call_resp[tool_name]['result']
-                call_tool_result_content_list: List[
-                    TextContent | ImageContent | EmbeddedResource] = call_tool_result.content
-
                 # 处理工具响应内容
                 call_tool_result_content_msg = {
                     "role": "tool",
                     "tool_call_id": tool_call_id,
                     "content": "工具调用结果异常"
                 }
+                is_mcp_executed: bool = mcp_tool_call_resp[tool_name]["success"]
+                if is_mcp_executed:
+                    # MCP执行成功
+                    call_tool_result: CallToolResult = mcp_tool_call_resp[tool_name]['result']
 
-                for content in call_tool_result_content_list:
-                    if isinstance(content, TextContent):
-                        call_tool_result_content_msg["content"] = content.text
-                    elif isinstance(content, ImageContent):
-                        # TODO: Handle image content
-                        pass
-                    elif isinstance(content, EmbeddedResource):
-                        # TODO: Handle embedded resource
-                        pass
+                    call_tool_result_content_list: List[
+                        TextContent | ImageContent | EmbeddedResource] = call_tool_result.content
+
+                    for content in call_tool_result_content_list:
+                        if isinstance(content, TextContent):
+                            call_tool_result_content_msg["content"] = content.text
+                        elif isinstance(content, ImageContent):
+                            # TODO: Handle image content
+                            pass
+                        elif isinstance(content, EmbeddedResource):
+                            # TODO: Handle embedded resource
+                            pass
+                else:
+                    # MCP执行失败
+                    call_tool_result_content_msg["content"] = mcp_tool_call_resp[tool_name]['error']
 
                 # Yield tool end information
-                tool_yield_msg["output"] = call_tool_result_content_msg.get("content", "工具调用结果异常")
+                tool_yield_msg["output"] = call_tool_result_content_msg.get("content", "ReadBetween程序执行异常")
                 # yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
                 yield StreamResponseTemplate.tool_end_event(call_tool_result_content_msg)
                 # yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
@@ -790,6 +812,22 @@ class ConversationService:
             # 拼接Memory提示词模板
             memory_prompt = MEMORY_PROMPT.format(memory_recall_content=memory_str)
             return memory_prompt
+
+    @classmethod
+    async def _append_webpage_text(cls, urls: List[str]):
+        # 创建异步任务列表
+        fetch_tasks = []
+        for url in urls:
+            # 将每个URL的获取任务添加到任务列表
+            task = BaseTool.fetch_webpage_text_async(url)
+            fetch_tasks.append(task)
+
+        # 并发执行所有URL获取任务
+        fetched_contents = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+        successful_contents = []
+        for url, content in zip(urls, fetched_contents):
+            successful_contents.append(WEB_LINK_PROMPT.format(web_link=url, web_link_content=content))
+        return "\n".join(successful_contents)
 
     @classmethod
     # Desperate -- 替换为统一的模板类 ```sse_response```

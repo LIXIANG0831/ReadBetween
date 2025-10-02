@@ -1,6 +1,8 @@
 from pymilvus import FieldSchema, DataType
 from readbetween.config import settings
 from enum import Enum
+# JINA 地址
+JINA_BASE_URL = "https://r.jina.ai"
 
 # 系统内置嵌入模型
 MODEL_SAVE_PATH = './static/models'

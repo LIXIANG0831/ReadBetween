@@ -41,3 +41,9 @@ MEMORY_PROMPT = """
 **用户记忆信息**：以下基于历史对话和用户偏好，有助于更好理解用户需求：
 {memory_recall_content}
 """
+
+# 以下是
+WEB_LINK_PROMPT = """
+**网页链接**: [{web_link}]，包含的文本内容如下：
+{web_link_content}
+"""
