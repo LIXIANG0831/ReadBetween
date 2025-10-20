@@ -186,7 +186,7 @@ class ConversationService:
             # 初始化最终查询和原始查询
             # Desperate -- 弃用用户提示词 添加到至默认系统提示词
             # final_query, first_query = cls._init_user_query(content, is_multimodal)
-            final_query, first_query = f"**User Question:** {content}", content
+            final_query, first_query = f"**用户问题:** {content}", content
 
             # 多模态问答 默认不启用
             if not is_multimodal:
