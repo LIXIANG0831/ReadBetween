@@ -666,9 +666,9 @@ class ConversationService:
                 # Yield tool end information
                 tool_yield_msg["output"] = call_tool_result_content_msg.get("content", "ReadBetween程序执行异常")
                 # yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
-                yield StreamResponseTemplate.tool_end_event(call_tool_result_content_msg)
+                yield StreamResponseTemplate.tool_process_event(call_tool_result_content_msg)
                 # yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
-                yield StreamResponseTemplate.tool_finish_event(tool_yield_msg)
+                yield StreamResponseTemplate.tool_end_event(tool_yield_msg)
 
                 # 保存工具调用信息
                 tool_calls_msg = await MessageDao.create_message(

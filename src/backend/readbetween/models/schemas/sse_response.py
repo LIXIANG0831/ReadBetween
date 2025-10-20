@@ -8,8 +8,8 @@ class StreamEventType(Enum):
     START = "START"  # 开始事件
     MESSAGE = "MESSAGE"  # 消息内容
     TOOL_START = "TOOL_START"  # 工具调用开始
-    TOOL_END = "TOOL_END"  # 工具调用结束
-    TOOL_FINISH = "TOOL_FINISH"  # 工具调用完成
+    TOOL_PROCESS = "TOOL_PROCESS"  # 工具调用结束
+    TOOL_END = "TOOL_END"  # 工具调用完成
     SOURCE = "SOURCE"  # 来源信息
     ERROR = "ERROR"  # 错误信息
     END = "END"  # 结束事件
@@ -64,18 +64,18 @@ class StreamResponseTemplate:
         )
 
     @staticmethod
-    def tool_end_event(tool_response: dict) -> str:
-        """工具调用结束事件"""
+    def tool_process_event(tool_response: dict) -> str:
+        """工具调用执行事件"""
         return StreamResponseTemplate.format_response(
-            StreamEventType.TOOL_END,
+            StreamEventType.TOOL_PROCESS,
             extra=tool_response
         )
 
     @staticmethod
-    def tool_finish_event(tool_result: dict) -> str:
+    def tool_end_event(tool_result: dict) -> str:
         """工具调用完成事件"""
         return StreamResponseTemplate.format_response(
-            StreamEventType.TOOL_FINISH,
+            StreamEventType.TOOL_END,
             extra=tool_result
         )
 

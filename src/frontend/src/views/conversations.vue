@@ -355,7 +355,7 @@ interface ExtendedChatMessage {
 }
 
 interface StreamMessage {
-  event: 'START' | 'MESSAGE' | 'SOURCE' | 'END' | 'ERROR' | 'TOOL_START' | 'TOOL_END';
+  event: 'START' | 'MESSAGE' | 'SOURCE' | 'END' | 'ERROR' | 'TOOL_START' | 'TOOL_PROCESS';
   text?: string;
   [key: string]: any;
 }
@@ -919,7 +919,7 @@ const handleMessageSend = async (user_message: any) => {
           handleToolStart(toolStartData);
           break;
         
-        case 'TOOL_END':
+        case 'TOOL_PROCESS':
           const toolEndData = data.extra;
           handleToolEnd(toolEndData);
           break;
