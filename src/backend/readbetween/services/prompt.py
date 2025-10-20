@@ -42,8 +42,11 @@ MEMORY_PROMPT = """
 {memory_recall_content}
 """
 
-# 以下是
+# 网页直链文本获取
 WEB_LINK_PROMPT = """
 **网页链接**: [{web_link}]，包含的文本内容如下：
 {web_link_content}
+"""
+WEB_LINK_ERROR_PROMPT = """
+**网页链接**: [{web_link}]，可能受反扒机制或权限问题等影响，无法获取有效内容。
 """

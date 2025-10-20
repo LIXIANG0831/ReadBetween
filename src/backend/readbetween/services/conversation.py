@@ -24,7 +24,7 @@ from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation
 from readbetween.services.conversation_knowledge_link import ConversationKnowledgeLinkService
 from readbetween.services.knowledge import KnowledgeService
 from readbetween.services.prompt import DEFAULT_PROMPT, KB_RECALL_PROMPT, WEB_SEARCH_PROMPT, MEMORY_PROMPT, \
-    WEB_LINK_PROMPT
+    WEB_LINK_PROMPT, WEB_LINK_ERROR_PROMPT
 from readbetween.services.retriever import RetrieverService
 from readbetween.services.tasks import celery_add_memory
 from readbetween.utils.logger_util import logger_util
@@ -263,7 +263,7 @@ class ConversationService:
                 if task_results['webpage_text']:
                     try:
                         webpage_info = task_results['webpage_text']
-                        if webpage_info:
+                        if webpage_info and webpage_info != "":
                             final_query = f"{final_query}\n{webpage_info}"
                     except Exception as e:
                         logger_util.error(f"网页直链获取文本失败: {str(e)}")
@@ -826,7 +826,10 @@ class ConversationService:
         fetched_contents = await asyncio.gather(*fetch_tasks, return_exceptions=True)
         successful_contents = []
         for url, content in zip(urls, fetched_contents):
-            successful_contents.append(WEB_LINK_PROMPT.format(web_link=url, web_link_content=content))
+            if content is not None and content != '':
+                successful_contents.append(WEB_LINK_PROMPT.format(web_link=url, web_link_content=content))
+            else:
+                successful_contents.append(WEB_LINK_ERROR_PROMPT.format(web_link=url))
         return "\n".join(successful_contents)
 
     @classmethod
