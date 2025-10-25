@@ -60,6 +60,8 @@ def init_built_in_model():
     # 内置嵌入模型管理器
     lem = LocalEmbedManager()
     thread_pool.submit_task(lem.initialize, model_name=embedding_model, model_dir=model_dir)
+
+    # 测试环境不自动下载TTS/STT
     if os.getenv("APP__ENV", "dev") not in ['test', 'dev']:
         # 内置TTS模型管理器
         ltm = LocalTTSManager()
