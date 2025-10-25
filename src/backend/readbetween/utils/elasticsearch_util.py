@@ -25,7 +25,7 @@ class ElasticSearchUtil:
             connections.create_connection(
                 hosts=es_hosts,  # 指定主机和端口
                 timeout=es_timeout,  # 超时时间
-                http_auth=es_http_auth  # 校验
+                http_auth=('elastic', es_http_auth)  # 校验
             )
             logger_util.info("Elasticsearch连接已建立。")
         except Exception as e:

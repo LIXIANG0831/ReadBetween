@@ -11,92 +11,6 @@ x-defaults: &defaults
       max-file: 3
 
 services:
-  # 前端服务
-  frontend:
-    <<: *defaults
-    container_name: readbetween-app-frontend
-    image: readbetween/frontend:v0.0.1
-    ports:
-      - "18080:80"
-    environment:
-      - VITE_BACKEND_URL=http://backend:8080
-    depends_on:
-      backend:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-  # 后端服务
-  backend:
-    <<: *defaults
-    container_name: readbetween-app-backend
-    image: readbetween/backend:v0.0.1
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    environment:
-
-      PYTHONPATH: /app/readbetween
-      # 应用配置
-      APP__ENV: ${APP_ENV}
-
-      # 日志配置
-      LOGGER__BASE_LOG_PATH: "/app/logs"
-
-      # 存储配置
-      STORAGE__MYSQL__URI: "mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@mysql:3306/${MYSQL_DATABASE}?charset=utf8mb4"
-      STORAGE__REDIS__URI: "redis://:${REDIS_PASSWORD}@redis:6379"
-      STORAGE__MINIO__ENDPOINT: "minio:9000"
-      STORAGE__MINIO__ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      STORAGE__MINIO__SECRET_KEY: ${MINIO_SECRET_KEY}
-      STORAGE__MINIO__DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKET}
-      STORAGE__MILVUS__URI: "http://standalone:19530"
-      STORAGE__ES__HOSTS: '["http://es:9200"]'
-      STORAGE__ES__TIMEOUT: "200"
-
-      # Neo4j 配置
-      MEMORY__NEO4J__URL: "bolt://neo4j:7687"
-      MEMORY__NEO4J__USERNAME: "neo4j"
-      MEMORY__NEO4J__PASSWORD: ${NEO4J_PASSWORD}
-
-      # LLM 配置
-      MEMORY__LLM__BASE_URL: ${LLM_BASE_URL}
-      MEMORY__LLM__API_KEY: ${LLM_API_KEY}
-      MEMORY__LLM__LLM_NAME: ${LLM_MODEL_NAME}
-
-      # 嵌入配置
-      MEMORY__EMBEDDING__BASE_URL: ${EMBEDDING_BASE_URL}
-      MEMORY__EMBEDDING__API_KEY: ${EMBEDDING_API_KEY}
-      MEMORY__EMBEDDING__EMBEDDING_NAME: ${EMBEDDING_MODEL_NAME}
-      MEMORY__EMBEDDING__DIMENSION: ${EMBEDDING_DIMENSION}
-      MEMORY__MILVUS_MEMORY_NAME: ${MILVUS_MEMORY_NAME}
-
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/readbetween/logs:/app/logs
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
-      standalone:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 1G
-
   # MySQL 服务
   mysql:
     <<: *defaults
@@ -189,7 +103,7 @@ services:
       ETCD_SNAPSHOT_COUNT: 50000
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/milvus/etcd:/etcd
-    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    command: etcd -advertise-client-urls=http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ["CMD", "etcdctl", "endpoint", "health"]
       interval: 30s
@@ -273,32 +187,6 @@ services:
         limits:
           cpus: '1.5'
           memory: 2G
-
-#  # (可选) Kibana - ES可观测
-#  kibana:
-#    <<: *defaults
-#    container_name: readbetween-kibana
-#    image: kibana:8.12.0
-#    environment:
-#      - ELASTICSEARCH_HOSTS=http://es:9200
-#    ports:
-#      - "5601:5601"
-#    depends_on:
-#      es:
-#        condition: service_healthy
-
-#  # (可选) Attu - Milvus可观测
-#  attu:
-#    <<: *defaults
-#    container_name: readbetween-milvus-attu
-#    image: zilliz/attu:v2.4
-#    environment:
-#      MILVUS_URL: standalone:19530
-#    ports:
-#      - "8000:3000"
-#    depends_on:
-#      standalone:
-#        condition: service_healthy
 
 # 网络定义
 networks:
