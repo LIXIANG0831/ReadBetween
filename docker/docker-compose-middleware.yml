@@ -34,8 +34,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.5'
-          memory: 1G
+          cpus: '0.5'
+          memory: 512M
 
   # Redis 服务
   redis:
@@ -58,7 +58,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 256M
 
   # Neo4j 服务
   neo4j:
@@ -88,8 +88,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1G
+          cpus: '0.5'
+          memory: 512M
 
   # Milvus 相关服务
   etcd:
@@ -165,7 +165,7 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=true
       - xpack.security.http.ssl.enabled=false  # 禁用 HTTPS（可选，简化配置）
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m  # 减小JVM堆内存
       - bootstrap.memory_lock=true
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
     ulimits:
@@ -185,8 +185,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.5'
-          memory: 2G
+          cpus: '1'
+          memory: 1G
 
 # 网络定义
 networks:
