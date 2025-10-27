@@ -185,8 +185,7 @@ class ConversationService:
 
             # 初始化最终查询和原始查询
             # Desperate -- 弃用用户提示词 添加到至默认系统提示词
-            # final_query, first_query = cls._init_user_query(content, is_multimodal)
-            final_query, first_query = f"**用户问题:** {content}", content
+            final_query, first_query = cls._init_user_query(content, is_multimodal)
 
             # 多模态问答 默认不启用
             if not is_multimodal:
@@ -845,33 +844,7 @@ class ConversationService:
         if is_vl_query is True:
             return message, message
         else:
-            return f"""
-**User Question:** {message}
-
-**Your task is to:**
-
-1. **Task Execution:**  
-   - Carefully read and fully comprehend all provided information.  
-   - Cross-reference all available sources to determine relevance, accuracy, and reliability.  
-
-2. **Response Requirements:**  
-   - Generate a clear, concise, and helpful response that directly addresses the user’s query.  
-   - If conflicts exist between sources, reconcile differing viewpoints or explicitly note the discrepancy.  
-   - Exclude all irrelevant information.  
-
-3. **Language Preference:**  
-   - Respond in **Chinese** unless otherwise specified.  
-
-4. **Function Calling Protocol:**  
-   - When a user request necessitates **Function Calling** (e.g., real-time data, APIs, or external tools), **automatically invoke the required function without seeking user confirmation**.  
-   - Prioritize tool-based results for accuracy and immediacy.  
-   - Process the returned data and deliver a finalized answer seamlessly.  
-
-**Example Workflow:**  
-   - User asks for weather → Auto-call weather API → Parse data → Return structured response.  
-   - No intermediate steps (e.g., "Should I check the weather for you?").  
-
-            """, message
+            return f"**用户问题:** {message}", message
 
     @classmethod
     async def get_conversation_info(cls, conv_id):
