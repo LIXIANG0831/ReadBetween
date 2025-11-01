@@ -7,10 +7,6 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    ElButton: typeof import('element-plus/es')['ElButton']
-    ElCol: typeof import('element-plus/es')['ElCol']
-    ElResult: typeof import('element-plus/es')['ElResult']
-    ElRow: typeof import('element-plus/es')['ElRow']
     EnReadme: typeof import('./components/EnReadme.md')['default']
     Header: typeof import('./components/Header.vue')['default']
     KnowledgeGraph: typeof import('./components/KnowledgeGraph.vue')['default']

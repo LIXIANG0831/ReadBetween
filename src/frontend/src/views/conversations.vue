@@ -1,16 +1,20 @@
 <template>
   <div class="common-layout">
-    <a-layout style="height: 100vh;">
-      <a-layout-sider width="250px" class="aside">
-        <a-menu
-          v-model:selectedKeys="activeKey"
-          mode="inline"
-          @click="handleConversationClick"
+    <t-layout style="height: 100vh;">
+      <t-aside width="250px" class="aside">
+        <t-menu
+          v-model="activeKey"
+          theme="light"
+          :collapsed="false"
+          :expand-mutex="false"
+          :expand-duration="0"
+          :expanded="[]"
+          @change="handleConversationClick"
         >
           <t-button theme="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
             新建渠道
           </t-button>
-          <a-menu-item v-for="item in conversation_items" :key="item.id" class="menu-item">
+          <t-menu-item v-for="item in conversation_items" :key="item.id" :value="item.id" class="menu-item">
             <template #icon>
               <t-icon name="chat" />
             </template>
@@ -19,11 +23,11 @@
               <EditOutlined class="action-icon" @click.stop="handleEdit(item)" />
               <DeleteOutlined class="action-icon" @click.stop="handleDelete(item.id)" />
             </div>
-          </a-menu-item>
-        </a-menu>
-      </a-layout-sider>
-      <a-layout>
-        <a-layout-content class="main">
+          </t-menu-item>
+        </t-menu>
+      </t-aside>
+      <t-layout>
+        <t-content class="main">
           <div class="chat-box" v-if="activeKey.length > 0" style="width: 100%;">
             <t-chat
             ref="chatRef"
@@ -167,40 +171,40 @@
           <div v-else class="read-between-placeholder">
             ReadBetween
           </div>
-        </a-layout-content>
-      </a-layout>
-    </a-layout>
+        </t-content>
+      </t-layout>
+    </t-layout>
 
     <!-- 新建会话弹窗 -->
-    <a-modal
+    <t-dialog
       class="modal-size-xl"
-      v-model:open="isCreateDialogVisible"
-      :title="isEditing ? '编辑渠道' : '新建渠道'"
-      @cancel="handleModalClose"
+      v-model:visible="isCreateDialogVisible"
+      :header="isEditing ? '编辑渠道' : '新建渠道'"
+      @close="handleModalClose"
+      width="600px"
     >
-      <a-form :model="CreateConversationForm" :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
-        <a-form-item label="渠道标题" name="title">
-          <a-input v-model:value="CreateConversationForm.title" placeholder="请输入渠道标题" />
-        </a-form-item>
-        <a-form-item label="模型" name="model" required>
-          <a-select
-            v-model:value="CreateConversationForm.model"
+      <t-form :data="CreateConversationForm" label-width="100px">
+        <t-form-item label="渠道标题" name="title">
+          <t-input v-model="CreateConversationForm.title" placeholder="请输入渠道标题" />
+        </t-form-item>
+        <t-form-item label="模型" name="model" required>
+          <t-select
+            v-model="CreateConversationForm.model"
             placeholder="请选择模型"
           >
-            <a-select-option
+            <t-option
               v-for="model in availableModelStore.llmAvailableModelCfg"
               :key="model.id"
               :value="model.id"
-            >
-              {{ model.name }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="系统提示" name="system_prompt">
-          <!-- <a-textarea v-model:value="CreateConversationForm.system_prompt" :rows="4" /> -->
+              :label="model.name"
+            />
+          </t-select>
+        </t-form-item>
+        <t-form-item label="系统提示" name="system_prompt">
+          <!-- <t-textarea v-model="CreateConversationForm.system_prompt" :rows="4" /> -->
           <MonacoEditor
             v-model:modelValue="CreateConversationForm.system_prompt"
-            language="markdown"
+            language="``"
             style="height: 100px;"
             :editorOptions="{
               theme: 'vs',
@@ -215,66 +219,62 @@
               autoIndent: 'keep'
             }"
           />
-        </a-form-item>
-        <a-form-item label="温度">
+        </t-form-item>
+        <t-form-item label="温度">
           <div class="slider-container">
-            <a-slider
-              v-model:value="CreateConversationForm.temperature"
+            <t-slider
+              v-model="CreateConversationForm.temperature"
               :min="0.1"
               :max="2"
               :step="0.1"
-              :tooltip-formatter="value => `${value.toFixed(1)}`"
               style="flex: 1;"
             />
             <div class="value-display">
               {{ CreateConversationForm.temperature !== undefined ? CreateConversationForm.temperature.toFixed(1) : '0.0' }}
             </div>
           </div>
-        </a-form-item>
-        <a-form-item label="知识库">
-          <a-select
-            v-model:value="CreateConversationForm.knowledge_base_ids"
-            mode="multiple"
+        </t-form-item>
+        <t-form-item label="知识库">
+          <t-select
+            v-model="CreateConversationForm.knowledge_base_ids"
+            multiple
             placeholder="请选择知识库"
           >
-            <a-select-option
+            <t-option
               v-for="knowledge in knowledgeList"
               :key="knowledge.id"
               :value="knowledge.id"
-            >
-              {{ knowledge.name }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
+              :label="knowledge.name"
+            />
+          </t-select>
+        </t-form-item>
         <!-- 新增 MCP 集成 -->
-        <a-form-item label="MCP服务">
-          <a-select
-            v-model:value="CreateConversationForm.selectedMcpServices"
-            mode="multiple"
+        <t-form-item label="MCP服务">
+          <t-select
+            v-model="CreateConversationForm.selectedMcpServices"
+            multiple
             placeholder="请选择MCP服务"
-            option-label-prop="label"
           >
-            <a-select-option
+            <t-option
               v-for="option in mcpServerOptions"
               :key="option.key"
               :value="option.key"
-            >
-              {{ option.name }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
+              :label="option.name"
+            />
+          </t-select>
+        </t-form-item>
         <!-- 新增 use_memory 开关 -->
-        <a-form-item label="启用记忆" name="use_memory">
+        <t-form-item label="启用记忆" name="use_memory">
           <t-switch size="large" v-model="CreateConversationForm.use_memory" />
-        </a-form-item>
-      </a-form>
+        </t-form-item>
+      </t-form>
       <template #footer>
         <t-button theme="default" @click="handleModalClose" style="margin-right: 10px">取消</t-button>
         <t-button theme="primary" @click="handleConversationSubmit">
           {{ isEditing ? '更新' : '创建' }}
         </t-button>
       </template>
-    </a-modal>
+    </t-dialog>
   </div>
 </template>
 
@@ -302,21 +302,20 @@ import {
 } from 'tdesign-icons-vue-next';
 import { 
   Button as TButton, 
-  MessagePlugin 
+  MessagePlugin,
+  Dialog as TDialog,
+  Form as TForm,
+  Input as TInput,
+  Select as TSelect,
+  Option as TOption,
+  Slider as TSlider,
+  Menu as TMenu,
+  MenuItem as TMenuItem,
+  Aside as TAside,
+  Layout as TLayout,
+  Content as TContent
 } from 'tdesign-vue-next';
 
-import {
-  message,
-  Modal as AModal,
-  Form as AForm,
-  Input as AInput,
-  Select as ASelect,
-  Slider as ASlider,
-  Menu as AMenu,
-  Spin as ASpin,
-  Switch as ASwitch, // 引入 Switch 组件
-  theme
-} from 'ant-design-vue';
 import {
   DeleteOutlined,
   EditOutlined,
@@ -393,7 +392,6 @@ const query = ref('');
 
 const availableModelStore = useAvailableModelStore();
 const mcpStore = useMcpStore()
-const { token } = theme.useToken();
 // MCP
 // 新增计算属性 - MCP服务选项
 const mcpServerOptions = computed(() => {
@@ -489,7 +487,7 @@ const fetchConversations = async () => {
       conversation_items.value = res.data.data.data;
     }
   } catch (error) {
-    message.error('获取会话列表失败');
+    MessagePlugin.error('获取会话列表失败');
   }
 };
 
@@ -540,7 +538,6 @@ const fetchMessageHistory = async (convId: string) => {
         timestamp: new Date(msg.timestamp).getTime(),
         datetime: formatDateTime(new Date(msg.timestamp))
       }));
-
 
       chatsList.value = res.data.data
       .filter(msg => {  // 过滤掉助手tool_calls不为空，且content为空的消息
@@ -626,7 +623,7 @@ const fetchKnowledgeList = async () => {
       knowledgeList.value = res.data.data.data;
     }
   } catch (error) {
-    message.error('获取知识库失败');
+    MessagePlugin.error('获取知识库失败');
   }
 };
 
@@ -1110,7 +1107,7 @@ const handleMessageSend = async (user_message: any) => {
     // ================= 错误处理 =================
     const handleStreamError = (error: any) => {
       console.error('Stream error:', error);
-      message.error('消息处理失败');
+      MessagePlugin.error('消息处理失败');
       isNewMsgLoading.value = false
       isStreamLoading.value = false
 
@@ -1136,7 +1133,7 @@ const handleMessageSend = async (user_message: any) => {
     console.error('Message send error:', error);
     isStreamLoading.value = false
     isNewMsgLoading.value = false
-    message.error('消息发送失败');
+    MessagePlugin.error('消息发送失败');
   } finally {
     // 确保清空输入框（需要Chat组件配合）
     if (document.activeElement instanceof HTMLElement) {
@@ -1153,9 +1150,9 @@ const handleClearHistory = async () => {
   try {
     await clearMessageHistory({ conv_id: activeKey.value[0] });
     chatsList.value = [];
-    message.success('历史记录已清除');
+    MessagePlugin.success('历史记录已清除');
   } catch (error) {
-    message.error('清除历史记录失败');
+    MessagePlugin.error('清除历史记录失败');
   }
 };
 
@@ -1163,14 +1160,14 @@ const handleClearHistory = async () => {
 const handleDelete = async (convId: string) => {
   try {
     await deleteConversation({ conv_id: convId });
-    message.success('会话已删除');
+    MessagePlugin.success('会话已删除');
     await fetchConversations();
     if (activeKey.value[0] === convId) {
       activeKey.value = [];
       chatsList.value = [];
     }
   } catch (error) {
-    message.error('删除会话失败');
+    MessagePlugin.error('删除会话失败');
   }
 };
 
@@ -1208,7 +1205,7 @@ const handleEdit = (item) => {
 const handleConversationSubmit = async () => {
   try {
     if (!CreateConversationForm.value.model) {
-      message.error('请选择模型'); // 提示用户选择模型
+      MessagePlugin.error('请选择模型'); // 提示用户选择模型
       return;
     }
 
@@ -1235,15 +1232,15 @@ const handleConversationSubmit = async () => {
 
     if (isEditing.value) {
       await updateConversation(submitForm as Api.UpdateConversationParams); // 强制类型转换
-      message.success('会话更新成功');
+      MessagePlugin.success('会话更新成功');
     } else {
       await createConversation(submitForm as Api.CreateConversationParams);
-      message.success('会话创建成功');
+      MessagePlugin.success('会话创建成功');
     }
     await fetchConversations();
     handleModalClose();
   } catch (error) {
-    message.error(isEditing.value ? '更新会话失败' : '创建会话失败');
+    MessagePlugin.error(isEditing.value ? '更新会话失败' : '创建会话失败');
   }
 };
 
@@ -1266,10 +1263,10 @@ const handleModalClose = () => {
 
 
 // 会话点击处理
-const handleConversationClick = async (info: { key: Key }) => {
-  activeKey.value = [info.key.toString()]; // 确保转换为字符串
-  console.log('Selected:', info.key);
-  await fetchMessageHistory(info.key.toString());
+const handleConversationClick = async (info: string) => {
+  activeKey.value = [info]; // 确保转换为字符串
+  console.log('Selected:', info);
+  await fetchMessageHistory(info);
 };
 
 // 初始化
@@ -1335,7 +1332,8 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 /* 悬停效果 */
 .chat-image:hover {
   transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0px 8px 10px -5px rgba(0, 0, 0, 0.08), 0px 16px 24px 2px rgba(0, 0, 0, 0.04),
+      0px 6px 30px 5px rgba(0, 0, 0, 0.05);
 }
 ::-webkit-scrollbar-thumb {
   background-color: var(--td-scrollbar-color);
@@ -1452,13 +1450,13 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
   width: 50px;
   text-align: center;
   padding: 0 8px;
-  background: v-bind('token.colorFillAlter');
+  background: var(--td-bg-color-component);
   border-radius: 4px;
   margin-left: 12px;
 }
 
 .main {
-  background-color: v-bind('token.colorBgElevated');
+  background-color: var(--td-bg-color-container);
   padding: 16px;
   flex: 1;
   overflow: auto;
@@ -1467,6 +1465,30 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 
 .menu-item {
   position: relative;
+  transition: none;
+}
+
+/* 禁用菜单项的动画效果，防止视觉上的"扩张" */
+.t-menu:not(.t-menu--dark) .t-menu-item {
+  transition: none;
+  transform: none;
+}
+
+.t-menu:not(.t-menu--dark) .t-menu-item:hover,
+.t-menu:not(.t-menu--dark) .t-menu-item:focus {
+  transform: none;
+  transition: none;
+}
+
+.t-menu:not(.t-menu--dark) .t-menu-item.t-is-active {
+  transform: none;
+  transition: none;
+}
+
+/* 禁用菜单的整体动画 */
+.t-menu {
+  transition: none;
+  transform: none;
 }
 
 .action-icons {
@@ -1486,7 +1508,7 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
   cursor: pointer;
 }
 
-.a-layout, .a-layout-sider, .a-layout-content {
+.t-layout, .t-aside, .t-content {
   height: 100%;
 }
 
@@ -1588,7 +1610,7 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 :deep(.t-chat__text__assistant) p,
 :deep(.t-chat__text__assistant) ul,
 :deep(.t-chat__text__assistant) ol {
-    margin: 0;
-    line-height: 1.5;
+      margin: 0;
+      line-height: 1.5;
 }
 </style>

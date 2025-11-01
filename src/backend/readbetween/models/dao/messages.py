@@ -7,7 +7,8 @@ from typing import Optional
 from sqlalchemy.orm import Mapped, relationship
 from sqlmodel import Field, Relationship
 from datetime import datetime
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, text, select, update, JSON, BigInteger
+from sqlalchemy import Column, String, Text, ForeignKey, select, update, JSON, BigInteger
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
 from readbetween.core.context import async_session_getter
 from readbetween.models.dao.base import AwsomeDBModel
@@ -33,7 +34,7 @@ class MessageBase(AwsomeDBModel):
         description="角色（system/user/assistant/tool）"
     )
     content: str = Field(
-        sa_column=Column(Text, nullable=True),
+        sa_column=Column(MEDIUMTEXT, nullable=True),
         description="消息内容"
     )
     source: str = Field(
