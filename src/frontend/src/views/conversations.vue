@@ -355,7 +355,7 @@ interface ExtendedChatMessage {
 }
 
 interface StreamMessage {
-  event: 'START' | 'MESSAGE' | 'SOURCE' | 'END' | 'ERROR' | 'TOOL_START' | 'TOOL_PROCESS';
+  event: 'START' | 'MESSAGE' | 'SOURCE' | 'END' | 'ERROR' | 'TOOL_INIT' | 'TOOL_EXECUTE';
   text?: string;
   [key: string]: any;
 }
@@ -914,14 +914,14 @@ const handleMessageSend = async (user_message: any) => {
           handleStreamError(data.text);
           break;
         
-        case 'TOOL_START':
-          const toolStartData = data.extra;
-          handleToolStart(toolStartData);
+        case 'TOOL_INIT':
+          const toolInitData = data.extra;
+          handleToolInit(toolInitData);
           break;
         
-        case 'TOOL_PROCESS':
-          const toolEndData = data.extra;
-          handleToolEnd(toolEndData);
+        case 'TOOL_EXECUTE':
+          const toolExecuteData = data.extra;
+          handleToolExecute(toolExecuteData);
           break;
       }
     };
@@ -1007,7 +1007,7 @@ const handleMessageSend = async (user_message: any) => {
       }
     };
   // ================= 处理工具开始调用事件 =================
-  const handleToolStart = (toolStartData: any) =>  {
+  const handleToolInit = (toolStartData: any) =>  {
     // 向 chats 列表中插入一条新消息
     // 获取所有的工具名称
     const toolNames = toolStartData.map(tool => tool.function.name).join('，') || '未知工具';
@@ -1016,7 +1016,9 @@ const handleMessageSend = async (user_message: any) => {
       role: "assistant",
       name: roleConfig.value['assistant'].name,
       avatar: roleConfig.value['assistant'].avatar,
-      content: `助手正在调用 ${toolNames} 工具`,
+      // 保障显示工具名去除前9个UUID字符
+      content: `助手正在调用 ${toolNames.slice(9)} 工具。`,
+      // content: `助手正在调用 ${toolNames} 工具`,
       timestamp: now_datetime,
       datetime: formatDateTime(now_datetime),
       tool_calls: toolStartData,
@@ -1042,7 +1044,7 @@ const handleMessageSend = async (user_message: any) => {
 
   }
   // ================= 处理工具调用结束时间 =================   
-  const handleToolEnd = (toolEndData: any) =>  {
+  const handleToolExecute = (toolEndData: any) =>  {
     // 向 chats 列表中插入一条新消息
     let now_datetime = Date.now()
     const newToolMessage: ExtendedChatMessage = {
@@ -1303,11 +1305,28 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
   transition: transform 0.2s ease;
 }
 
+/* 增加 ToolCallCard 宽度 */
+:deep(.t-chat__content-item) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+:deep(.tool-card-wrapper) {
+  width: 100%;
+  max-width: 1000px;
+  min-width: 600px;
+}
+
 /* 移动端适配 */
 @media (max-width: 768px) {
   .chat-image {
     max-width: 100%;
     max-height: 300px;
+  }
+  :deep(.tool-card-wrapper) {
+    min-width: unset;
+    width: 100%;
   }
 }
 

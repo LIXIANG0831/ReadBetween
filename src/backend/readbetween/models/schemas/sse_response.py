@@ -7,9 +7,9 @@ class StreamEventType(Enum):
     """流式事件类型枚举"""
     START = "START"  # 开始事件
     MESSAGE = "MESSAGE"  # 消息内容
-    TOOL_START = "TOOL_START"  # 工具调用开始
-    TOOL_PROCESS = "TOOL_PROCESS"  # 工具调用结束
-    TOOL_END = "TOOL_END"  # 工具调用完成
+    TOOL_INIT = "TOOL_INIT"  # 工具调用开始
+    TOOL_EXECUTE = "TOOL_EXECUTE"  # 工具执行
+    TOOL_EXECUTE_INFO = "TOOL_EXECUTE_INFO"  # 工具调用完成
     SOURCE = "SOURCE"  # 来源信息
     ERROR = "ERROR"  # 错误信息
     END = "END"  # 结束事件
@@ -56,26 +56,26 @@ class StreamResponseTemplate:
         return StreamResponseTemplate.format_response(StreamEventType.MESSAGE, text)
 
     @staticmethod
-    def tool_start_event(tool_calls: list) -> str:
+    def tool_init_event(tool_calls: list) -> str:
         """工具调用开始事件"""
         return StreamResponseTemplate.format_response(
-            StreamEventType.TOOL_START,
+            StreamEventType.TOOL_INIT,
             extra=tool_calls
         )
 
     @staticmethod
-    def tool_process_event(tool_response: dict) -> str:
+    def tool_execute_event(tool_response: dict) -> str:
         """工具调用执行事件"""
         return StreamResponseTemplate.format_response(
-            StreamEventType.TOOL_PROCESS,
+            StreamEventType.TOOL_EXECUTE,
             extra=tool_response
         )
 
     @staticmethod
-    def tool_end_event(tool_result: dict) -> str:
+    def tool_execute_info_event(tool_result: dict) -> str:
         """工具调用完成事件"""
         return StreamResponseTemplate.format_response(
-            StreamEventType.TOOL_END,
+            StreamEventType.TOOL_EXECUTE_INFO,
             extra=tool_result
         )
 

@@ -611,7 +611,7 @@ class ConversationService:
         tool_calls_msg = None
         try:
             # yield cls._format_stream_response(event="TOOL_START", text="", extra=func_call_list)
-            yield StreamResponseTemplate.tool_start_event(func_call_list)
+            yield StreamResponseTemplate.tool_init_event(func_call_list)
             for func_calling in func_call_list:
                 tool_call_id = func_calling["id"]
                 tool_name = func_calling["function"]["name"]
@@ -628,18 +628,18 @@ class ConversationService:
                     "input": tool_args_json,
                 }
 
-                logger_util.debug("开始执行MCP工具调用...")
+                logger_util.debug(f"开始执行MCP工具【{tool_name}】调用...")
                 mcp_tool_call_resp = await mcp_client.execute_tools([{
                     "name": tool_name,
                     "arguments": json.loads(tool_args)
                 }])
-                logger_util.debug("完成执行MCP工具调用...")
+                logger_util.debug(f"完成执行MCP工具【{tool_name}】调用...")
 
                 # 处理工具响应内容
                 call_tool_result_content_msg = {
                     "role": "tool",
                     "tool_call_id": tool_call_id,
-                    "content": "工具调用结果异常"
+                    "content": "当前工具调用未获取到有效信息。"
                 }
                 is_mcp_executed: bool = mcp_tool_call_resp[tool_name]["success"]
                 if is_mcp_executed:
@@ -663,19 +663,19 @@ class ConversationService:
                     call_tool_result_content_msg["content"] = mcp_tool_call_resp[tool_name]['error']
 
                 # Yield tool end information
-                tool_yield_msg["output"] = call_tool_result_content_msg.get("content", "ReadBetween程序执行异常")
+                # print(mcp_tool_call_resp[tool_name])  # 当前工具执行详情
+                tool_yield_msg["output"] = call_tool_result_content_msg["content"]
                 # yield cls._format_stream_response(event="TOOL_END", text="", extra=call_tool_result_content_msg)
-                yield StreamResponseTemplate.tool_process_event(call_tool_result_content_msg)
                 # yield cls._format_stream_response(event="TOOL_FINISH", text="", extra=tool_yield_msg)
-                yield StreamResponseTemplate.tool_end_event(tool_yield_msg)
+                yield StreamResponseTemplate.tool_execute_event(call_tool_result_content_msg)
+                yield StreamResponseTemplate.tool_execute_info_event(tool_yield_msg)
 
                 # 保存工具调用信息
                 tool_calls_msg = await MessageDao.create_message(
                     conv_id=conv_id,
-                    role=call_tool_result_content_msg.get("role", "tool"),
-                    tool_call_id=call_tool_result_content_msg.get("tool_call_id", tool_call_id),
-                    content=json.dumps(call_tool_result_content_msg.get("content", "工具调用结果异常"),
-                                       ensure_ascii=False)
+                    role=call_tool_result_content_msg["role"],
+                    tool_call_id=call_tool_result_content_msg["tool_call_id"],
+                    content=json.dumps(call_tool_result_content_msg["content"], ensure_ascii=False)
                 )
 
         except Exception as e:

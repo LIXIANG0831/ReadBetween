@@ -8,7 +8,9 @@
             <icon name="tools" />
           </div>
           <div class="text-content">
-            <div class="title">{{ toolCall.function.name }}</div>
+            <!-- 保障显示工具名去除前9个UUID字符 -->
+            <div class="title">{{ toolCall.function.name.slice(9) }}</div>
+            <!-- <div class="title">{{ toolCall.function.name }}</div> -->
             <div class="subtitle" v-if="!isExpanded">{{ briefContent }}</div>
           </div>
         </div>
@@ -89,6 +91,7 @@ const briefContent = computed(() => {
   margin: 12px 0;
   width: 100%; /* 默认100%宽度 */
   max-width: 1000px; /* 设置最大宽度 */
+  min-width: 600px; /* 设置最小宽度 */
 }
 
 

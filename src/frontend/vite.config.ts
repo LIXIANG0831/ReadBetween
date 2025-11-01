@@ -105,7 +105,7 @@ export default defineConfig({
     preprocessorOptions: {
       // 全局引入了 scss 的文件
       scss: {
-        javascriptEnabled: true,
+        api: 'modern',
       },
     },
     postcss: {
