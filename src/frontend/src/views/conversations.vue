@@ -35,7 +35,7 @@
             :is-stream-load="isStreamLoading"
             :textLoading="isNewMsgLoading"
             @scroll="handleChatScroll"
-            animation="moving"
+            animation="gradient"
             >
 
               <template #content="{ item, index }">
@@ -74,7 +74,9 @@
               </template>
               
               <template #actions="{ item, index }">
+                <!-- Loading时不显示ToolTips -->
                 <t-chat-action
+                  v-if="item.status !== 'loading'" 
                   :content="item.content"
                   :operation-btn="['good', 'bad', 'replay', 'copy']"
                   @operation="handleOperation"
