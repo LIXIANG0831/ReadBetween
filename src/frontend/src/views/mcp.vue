@@ -108,15 +108,19 @@
         </t-collapse>
       </div>
     </t-card>
+
+    <!-- 页面加载蒙版 -->
+    <t-loading :loading="isLoading" size="small" :fullscreen="true" :text="'  MCP Servers 保存中...'" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { MessagePlugin } from 'tdesign-vue-next';
 import { useMcpStore } from '@/store/mcpStore';
 
 const mcpStore = useMcpStore();
+const isLoading = ref(false);
 
 // 定义表格列
 const mcpArgsColumns = [
@@ -191,11 +195,18 @@ const saveMcpConfig = async () => {
     return;
   }
 
-  const result = await mcpStore.saveMcpConfig();
-  if (result.success) {
-    MessagePlugin.success(result.message);
-  } else {
-    MessagePlugin.error(result.message);
+  isLoading.value = true;
+  try {
+    const result = await mcpStore.saveMcpConfig();
+    if (result.success) {
+      MessagePlugin.success(result.message);
+    } else {
+      MessagePlugin.error(result.message);
+    }
+  } catch (error) {
+    MessagePlugin.error('保存配置失败');
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>

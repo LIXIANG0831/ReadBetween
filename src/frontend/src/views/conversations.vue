@@ -31,7 +31,7 @@
           <div class="chat-box" v-if="activeKey.length > 0" style="width: 100%;">
             <t-chat
             ref="chatRef"
-            style="height: 630px"
+            style="height: 630px;width: 1000px;"
             :clear-history="showclearHistory"
             @clear="handleClearHistory"
             :reverse="false"
@@ -1008,15 +1008,14 @@ const handleMessageSend = async (user_message: any) => {
   // ================= 处理工具开始调用事件 =================
   const handleToolInit = (toolStartData: any) =>  {
     // 向 chats 列表中插入一条新消息
-    // 获取所有的工具名称
-    const toolNames = toolStartData.map(tool => tool.function.name).join('，') || '未知工具';
+    // 获取所有的工具名称 // 保障显示工具名去除前9个UUID字符
+    const toolNames = toolStartData.map(tool => tool.function.name.slice(9)).join('，') || '未知工具';
     let now_datetime = Date.now()
     const newAssistantCallToolMessage: ExtendedChatMessage = {
       role: "assistant",
       name: roleConfig.value['assistant'].name,
       avatar: roleConfig.value['assistant'].avatar,
-      // 保障显示工具名去除前9个UUID字符
-      content: `助手正在调用 ${toolNames.slice(9)} 工具。`,
+      content: `助手正在调用 ${toolNames} 工具。`,
       // content: `助手正在调用 ${toolNames} 工具`,
       timestamp: now_datetime,
       datetime: formatDateTime(now_datetime),
