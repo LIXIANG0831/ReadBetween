@@ -14,7 +14,7 @@ class ResponseModel(BaseModel, Generic[T]):
 class PageModel(BaseModel, Generic[T]):
     """统一分页返回模型"""
     total: int
-    data: List[T]
+    data: T
 
 
 def resp_200(data: Union[list, dict, str, Any] = None) -> ResponseModel:

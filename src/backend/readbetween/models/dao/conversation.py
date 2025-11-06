@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import List, Optional, TYPE_CHECKING
 
+from .conversation_tool_link import ConversationToolLink
 
 if TYPE_CHECKING:
     from .messages import Message
     from .conversation_knowledge_link import ConversationKnowledgeLink, ConversationKnowledgeLinkDao
+    from .conversation_tool_link import ConversationToolLink
 
 import uuid
 
@@ -73,12 +75,23 @@ class Conversation(ConversationBase, table=True):
         )
     )
 
+    # 添加知识库关联关系
     knowledge_links: Mapped[List["ConversationKnowledgeLink"]] = Relationship(
         back_populates="conversation",
         sa_relationship=relationship(
             "ConversationKnowledgeLink",
             back_populates="conversation",
             lazy="selectin",
+            cascade="all, delete-orphan"
+        )
+    )
+
+    # 添加工具关联关系
+    tool_links: Mapped[List["ConversationToolLink"]] = Relationship(
+        back_populates="conversation",
+        sa_relationship=relationship(
+            "ConversationToolLink",
+            back_populates="conversation",
             cascade="all, delete-orphan"
         )
     )

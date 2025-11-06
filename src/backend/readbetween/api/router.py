@@ -7,6 +7,7 @@ from readbetween.api.v1.model_setting_cfg import router as model_setting_cfg_rou
 from readbetween.api.v1.model_available_cfg import router as model_available_cfg_router
 from readbetween.api.v1.memory import router as memory_router
 from readbetween.api.v1.mcp import router as mcp_router
+from readbetween.api.v1.openapi_configs import router as openapi_configs_router
 
 
 # v1 路由
@@ -16,6 +17,7 @@ v1_router.include_router(knowledge_router)
 v1_router.include_router(knowledge_file_router)
 v1_router.include_router(memory_router)
 v1_router.include_router(mcp_router)
+v1_router.include_router(openapi_configs_router)
 
 # sys 路由
 sys_router = APIRouter(prefix='/sys')

@@ -90,3 +90,4 @@ unstructured.pytesseract==0.3.13
 xlrd==2.0.1
 zhconv==1.4.3
 transformers==4.45.2
+openapi-llm==0.4.3

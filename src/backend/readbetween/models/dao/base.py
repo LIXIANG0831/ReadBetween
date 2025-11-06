@@ -1,7 +1,7 @@
-from typing import Optional
-from datetime import datetime
-from sqlmodel import SQLModel, Field, Column, DateTime, text
+from sqlmodel import SQLModel
 
 
 class AwsomeDBModel(SQLModel):
-    pass
+    # 确保模型被注册到 metadata
+    class Config:
+        arbitrary_types_allowed = True
