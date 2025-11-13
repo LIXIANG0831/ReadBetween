@@ -57,6 +57,15 @@ const asyncRoutes: Array<RouteRecordRaw> = [
     component: () => import('../views/memory.vue'),
   },
   {
+    path: '/tools',
+    name: 'Tools',
+    meta: {
+      title: '工具管理',
+      icon: '',
+    },
+    component: () => import('../views/tools.vue'),
+  },
+  {
     path: '/mcp',
     name: 'Mcp',
     meta: {
@@ -66,14 +75,14 @@ const asyncRoutes: Array<RouteRecordRaw> = [
     component: () => import('../views/mcp.vue'),
   },
   {
-    path: '/voice',
-    name: 'voice',
+    path: '/openapi',
+    name: 'OpenAPI',
     meta: {
-      title: '语音管理',
+      title: 'OpenAPI管理',
       icon: '',
     },
-    component: () => import('../views/voice.vue'),
-  },
+    component: () => import('../views/openapi.vue'),
+  }
 ];
 
 export default asyncRoutes;

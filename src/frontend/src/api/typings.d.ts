@@ -417,4 +417,158 @@ type SendMessageParams = {
     /** Error Type */
     type: string;
   };
+  
+  /**
+   * OpenAPI 配置列表项
+   */
+  type OpenApiConfig = {
+    /** 配置ID */
+    id: string;
+    /** 配置名称 */
+    name: string;
+    /** 配置描述 */
+    description: string;
+    /** 基础URL */
+    base_url: string;
+    /** 工具数量 */
+    tools_count: number;
+    /** 是否有凭证 */
+    has_credentials: boolean;
+    /** 创建时间 */
+    created_at: string;
+    /** 更新时间 */
+    updated_at: string;
+  };
+
+  /**
+   * OpenAPI 工具信息
+   */
+  type OpenApiTool = {
+    /** 工具ID */
+    id: string;
+    /** 工具名称 */
+    name: string;
+    /** 工具描述 */
+    description: string;
+    /** 请求方法 */
+    method: string;
+    /** 请求路径 */
+    path: string;
+    /** 创建时间 */
+    created_at: string;
+  };
+
+  /**
+   * OpenAPI 配置详情
+   */
+  type OpenApiConfigDetail = {
+    /** 配置ID */
+    id: string;
+    /** 配置名称 */
+    name: string;
+    /** 配置描述 */
+    description: string;
+    /** 基础URL */
+    base_url: string;
+    /** 是否有凭证 */
+    has_credentials: boolean;
+    /** 创建时间 */
+    created_at: string;
+    /** 更新时间 */
+    updated_at: string;
+    /** 工具列表 */
+    tools: OpenApiTool[];
+  };
+
+  /**
+   * OpenAPI 配置列表响应
+   */
+  type OpenApiConfigsList = {
+    /** 总数 */
+    total: number;
+    /** 数据列表 */
+    data: OpenApiConfig[];
+  };
+
+  /**
+   * OpenAPI 配置工具列表响应
+   */
+  type OpenApiConfigToolsList = {
+    /** 总数 */
+    total: number;
+    /** 数据详情 */
+    data: OpenApiConfigDetail;
+  };
+
+  /**
+   * 删除OpenAPI配置响应
+   */
+  type DeleteOpenApiConfigResponse = {
+    /** 状态码 */
+    status_code: number;
+    /** 状态消息 */
+    status_message: string;
+    /** 数据 */
+    data: {
+      /** 配置ID */
+      config_id: string;
+      /** 消息 */
+      message: string;
+    };
+  };
+  
+  /**
+   * 创建OpenAPI配置请求数据
+   */
+  type CreateOpenApiConfigData = {
+    /** 配置名称 */
+    name: string;
+    /** OpenAPI规范 */
+    openapi_spec: Record<string, any>;
+    /** 凭证 */
+    credentials: string;
+    /** 描述 */
+    description: string;
+  };
+  
+  /**
+   * 创建OpenAPI配置响应数据中的工具信息
+   */
+  type CreatedOpenApiTool = {
+    /** 工具ID */
+    id: string;
+    /** 工具名称 */
+    name: string;
+    /** 工具描述 */
+    description: string;
+    /** 请求方法 */
+    method: string;
+    /** 请求路径 */
+    path: string;
+    /** 创建时间 */
+    created_at: string;
+  };
+  
+  /**
+   * 创建OpenAPI配置响应
+   */
+  type CreateOpenApiConfigResponse = {
+    /** 状态码 */
+    status_code: number;
+    /** 状态消息 */
+    status_message: string;
+    /** 数据 */
+    data: {
+      /** 配置ID */
+      config_id: string;
+      /** 配置名称 */
+      config_name: string;
+      /** 基础URL */
+      base_url: string;
+      /** 工具数量 */
+      tools_count: number;
+      /** 工具列表 */
+      tools: CreatedOpenApiTool[];
+    };
+  };
 }

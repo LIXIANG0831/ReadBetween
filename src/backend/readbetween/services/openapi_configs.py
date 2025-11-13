@@ -24,6 +24,10 @@ class OpenAPIConfigService:
         try:
             # 验证OpenAPI规范
             validate(openapi_spec)
+        except Exception as e:
+            logger_util.error(f"OpenAPI Schema 异常: {e}")
+            raise ValueError(f"OpenAPI Schema 异常: {str(e)}")
+        try:
 
             # 从 spec 中提取 base_url
             base_url = OpenAPIConfigService._extract_base_url(openapi_spec)
@@ -267,7 +271,6 @@ class OpenAPIConfigService:
 
             tools = paginated_result["tools"]
             total = paginated_result["total"]
-            print(total)
 
             # 获取配置的所有工具
             tools_info = [

@@ -13,13 +13,12 @@ router = APIRouter(prefix="/openapi/configs", tags=["OpenAPI配置管理"])
 
 @router.post(
     "/create",
-    response_model=ResponseModel[OpenAPIConfigCreateResponse],
     summary="创建OpenAPI配置",
     description="上传OpenAPI规范JSON，系统会自动解析并创建对应的API工具"
 )
 async def create_openapi_config(
         request: OpenAPIConfigCreateRequest
-) -> ResponseModel[OpenAPIConfigCreateResponse]:
+):
     """创建OpenAPI配置并解析工具"""
     try:
         logger_util.info(f"开始创建OpenAPI配置: {request.name}")
@@ -135,11 +134,10 @@ async def get_openapi_config(
 
 @router.post(
     "/delete",
-    response_model=ResponseModel[dict],
     summary="删除OpenAPI配置",
     description="删除OpenAPI配置及其所有相关工具"
 )
-async def delete_openapi_config(config_id: str) -> ResponseModel[dict]:
+async def delete_openapi_config(config_id: str):
     """删除OpenAPI配置"""
     try:
         success = await OpenAPIConfigService.delete_config(config_id)
