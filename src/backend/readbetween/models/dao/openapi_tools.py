@@ -78,7 +78,8 @@ class OpenAPITool(OpenAPIToolBase, table=True):
         back_populates="tools",
         sa_relationship=relationship(
             "OpenAPIConfig",
-            back_populates="tools"
+            back_populates="tools",
+            lazy="selectin"
         )
     )
 
@@ -87,7 +88,8 @@ class OpenAPITool(OpenAPIToolBase, table=True):
         sa_relationship=relationship(
             "ConversationToolLink",
             back_populates="openapi_tool",
-            cascade="all, delete-orphan"
+            cascade="all, delete-orphan",
+            lazy="selectin"
         )
     )
 

@@ -42,6 +42,22 @@ export async function getOpenApiConfigToolsList(
 }
 
 /**
+ * 获取指定OpenAPI配置下的工具列表
+ * @param config_id - 配置ID
+ * @param options - 可选的请求配置
+ * @returns Promise
+ */
+export async function getOpenApiToolsByConfigId(
+  config_id: string,
+  options?: { [key: string]: any },
+) {
+  return request<Api.OpenApiConfigToolsList>(`/api/v1/openapi/configs/${config_id}/tools`, {
+    method: 'GET',
+    ...(options || {}),
+  });
+}
+
+/**
  * 删除OpenAPI配置
  * @param config_id - 配置ID
  * @param options - 可选的请求配置

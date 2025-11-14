@@ -305,8 +305,8 @@ const showConfigDetail = async (configId: string) => {
 const handleDelete = async (configId: string) => {
   try {
     const response = await deleteOpenApiConfig(configId);
-    if (response.status_code === 200) {
-      MessagePlugin.success(response.data.message);
+    if (response.data.status_code === 200) {
+      MessagePlugin.success(response.data.data.message);
       // 从store中移除已删除的配置
       if (openapiStore.configs) {
         openapiStore.configs.data = openapiStore.configs.data.filter(config => config.id !== configId);
@@ -371,7 +371,7 @@ const handleCreateConfig = async () => {
 
     // 调用创建接口
     const response = await createOpenApiConfig(requestData);
-    if (response.status_code === 200) {
+    if (response.data.status_code === 200) {
       MessagePlugin.success('配置创建成功');
       closeCreateDialog();
       // 重新加载数据

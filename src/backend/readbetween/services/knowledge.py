@@ -98,7 +98,10 @@ class KnowledgeService(BaseService):
     @classmethod
     async def list_knowledge_by_page(cls, page, size):
         total = await KnowledgeDao.cnt_knowledge_total()
-        page_data = await KnowledgeDao.select(page=page, page_size=size)
+        if page is not None and size is not None:
+            page_data = await KnowledgeDao.select(page=page, page_size=size)
+        else:
+            page_data = await KnowledgeDao.select()
         return PageModel(total=total, data=page_data)
 
     @classmethod

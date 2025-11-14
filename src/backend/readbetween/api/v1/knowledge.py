@@ -52,7 +52,7 @@ async def get_knowledge_by_id(kb_id: str):
 
 
 @router.get("/knowledge/list")
-async def list_knowledge_by_page(page: int = 1, size: int = 10):
+async def list_knowledge_by_page(page: int = None, size: int = None):
     try:
         return resp_200(await KnowledgeService.list_knowledge_by_page(page, size))
     except Exception as e:

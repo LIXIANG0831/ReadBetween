@@ -185,9 +185,25 @@ class OpenAPIConfigService:
         return await OpenAPIConfigDao.get_config(config_id)
 
     @staticmethod
-    async def get_all_configs() -> List[OpenAPIConfig]:
+    async def get_all_configs() -> tuple[Any, List[OpenAPIConfig]]:
         """获取所有OpenAPI配置"""
-        return await OpenAPIConfigDao.get_all_configs()
+        total = await OpenAPIConfigDao.get_all_configs_total()
+        all_openapi_configs = await OpenAPIConfigDao.get_all_configs()
+        result = [
+            OpenAPIConfigInfo(
+                id=openapi_config.id,
+                name=openapi_config.name,
+                description=openapi_config.description,
+                # base_url=openapi_config.
+                tools_count=len(openapi_config.tools),
+                has_credentials=bool(openapi_config.credentials),
+                created_at=openapi_config.created_at,
+                updated_at=openapi_config.updated_at
+            )
+            for openapi_config in all_openapi_configs
+        ]
+        OpenAPIConfigInfo
+        return total, result
 
     @staticmethod
     async def update_config(
@@ -216,8 +232,8 @@ class OpenAPIConfigService:
 
     @staticmethod
     async def get_all_configs_with_base_url_paginated(
-            page: int = 1,
-            size: int = 20
+            page: int,
+            size: int
     ) -> tuple[Any, list[OpenAPIConfigInfo]]:
         """获取分页的OpenAPI配置及其base_url"""
         try:

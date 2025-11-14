@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional, TYPE_CHECKING
 
-from .conversation_tool_link import ConversationToolLink
+from .conversation_tool_link import ConversationToolLink, ConversationToolLinkDao
 
 if TYPE_CHECKING:
     from .messages import Message
@@ -19,6 +19,7 @@ from sqlalchemy import Column, String, Text, DateTime, text, select, func, Forei
 from readbetween.core.context import async_session_getter
 from readbetween.models.dao.base import AwsomeDBModel
 from readbetween.models.dao.knowledge import Knowledge
+from readbetween.models.dao.openapi_tools import OpenAPITool
 from readbetween.utils.logger_util import logger_util
 
 from .conversation_knowledge_link import ConversationKnowledgeLink, ConversationKnowledgeLinkDao
@@ -92,6 +93,7 @@ class Conversation(ConversationBase, table=True):
         sa_relationship=relationship(
             "ConversationToolLink",
             back_populates="conversation",
+            lazy="selectin",
             cascade="all, delete-orphan"
         )
     )
@@ -102,6 +104,13 @@ class Conversation(ConversationBase, table=True):
             link.knowledge
             for link in self.knowledge_links
             if link.knowledge.delete == 0
+        ]
+
+    @property
+    def openapi_tools(self) -> List["OpenAPITool"]:
+        return [
+            link.openapi_tool
+            for link in self.tool_links
         ]
 
 
@@ -178,7 +187,7 @@ class ConversationDao:
     async def update(conv_id: str, title: Optional[str] = None, system_prompt: Optional[str] = None,
                      temperature: Optional[float] = None, knowledge_base_ids: Optional[List[str]] = None,
                      use_memory: Optional[int] = None, available_model_id: Optional[str] = None,
-                     mcp_server_configs: Optional[dict] = None):
+                     mcp_server_configs: Optional[dict] = None, openapi_tool_ids: Optional[List[str]] = None,):
 
         async with async_session_getter() as session:
             stmt = select(Conversation).where(
@@ -212,6 +221,14 @@ class ConversationDao:
                 # 创建新关联
                 for kb_id in knowledge_base_ids:
                     await ConversationKnowledgeLinkDao.create(conv_id, kb_id)
+
+            if openapi_tool_ids is not None:
+                # 先删除所有旧关联（硬删除）
+                await ConversationToolLinkDao.delete_all_conversation_links(conv_id)
+
+                # 创建新关联
+                for openapi_tool_id in openapi_tool_ids:
+                    await ConversationToolLinkDao.create_link(conv_id, openapi_tool_id)
 
             logger_util.info(f"Updated conversation: {conv_id}")
 

@@ -27,6 +27,7 @@ class ChatCreate(BaseModel):
     knowledge_base_ids: Optional[List[str]] = Field(default=[], description="绑定的知识库ID列表")
     use_memory: int = Field(default=0, description="是否使用记忆")
     mcp_server_configs: Optional[Dict] = Field(None, description="绑定所使用的MCPServer")
+    openapi_tool_ids: Optional[List[str]] = Field(default=[], description="绑定所使用的OpenAPI工具")
 
 
 class ChatUpdate(BaseModel):
@@ -38,6 +39,7 @@ class ChatUpdate(BaseModel):
     use_memory: Optional[int] = Field(default=None, description="是否使用记忆")
     available_model_id: Optional[str] = Field("xxxx-xxxx-xxxx-xxxx", description="所使用的可用模型配置ID")
     mcp_server_configs: Optional[Dict] = Field(None, description="绑定所使用的MCPServer")
+    openapi_tool_ids: Optional[List[str]] = Field(default=[], description="绑定所使用的OpenAPI工具")
 
 
 class ChatMessageSend(BaseModel):

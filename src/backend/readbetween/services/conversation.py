@@ -4,6 +4,7 @@ from datetime import datetime
 
 from mcp.types import CallToolResult, TextContent, ImageContent, EmbeddedResource
 
+from readbetween.models.dao.conversation_tool_link import ConversationToolLinkDao
 from readbetween.models.dao.model_available_cfg import ModelAvailableCfgDao
 from readbetween.models.schemas.source import SourceMsg
 from readbetween.models.dao.conversation_knowledge_link import ConversationKnowledgeLinkDao
@@ -23,6 +24,7 @@ from readbetween.services.constant import ModelType_LLM, PrefixRedisConversation
     SourceMsgType
 from readbetween.services.conversation_knowledge_link import ConversationKnowledgeLinkService
 from readbetween.services.knowledge import KnowledgeService
+from readbetween.services.openapi_tools import OpenAPIToolService
 from readbetween.services.prompt import DEFAULT_PROMPT, KB_RECALL_PROMPT, WEB_SEARCH_PROMPT, MEMORY_PROMPT, \
     WEB_LINK_PROMPT, WEB_LINK_ERROR_PROMPT
 from readbetween.services.retriever import RetrieverService
@@ -45,6 +47,13 @@ class ConversationService:
     @classmethod
     async def create_conversation(cls, create_data: ChatCreate):
         """创建新对话"""
+        # 验证所挂载OpenAPI是否存在
+        if len(create_data.openapi_tool_ids) > 0:
+            for openapi_tool_id in create_data.openapi_tool_ids:
+                is_valid_tool_id = await OpenAPIToolService.get_tool(openapi_tool_id) or False
+                if is_valid_tool_id is False:
+                    raise HTTPException(status_code=404,
+                                        detail=f"工具{openapi_tool_id}不存在")
         # 验证所用知识库是否存在
         if create_data.knowledge_base_ids:
             existing_kbs = await KnowledgeDao.get_many(create_data.knowledge_base_ids)
@@ -70,11 +79,17 @@ class ConversationService:
             mcp_server_configs=create_data.mcp_server_configs
         )
 
-        # 创建关联关系
+        # 创建知识库关联关系
         if create_data.knowledge_base_ids:
             for knowledge_base_id in create_data.knowledge_base_ids:
                 logger_util.debug(f"当前会话管理知识库ID: {knowledge_base_id}")
                 await ConversationKnowledgeLinkDao.create(conversation_id=conv.id, knowledge_id=knowledge_base_id)
+
+        # 创建工具关联关系
+        if create_data.openapi_tool_ids:
+            for openapi_tool_id in create_data.openapi_tool_ids:
+                logger_util.debug(f"当前挂载工具ID: {openapi_tool_id}")
+                await ConversationToolLinkDao.create_link(conversation_id=conv.id, openapi_tool_id=openapi_tool_id)
 
         return await cls._format_conversation_response(
             await ConversationDao.one_with_kb(conv.id)
@@ -87,6 +102,8 @@ class ConversationService:
         await MessageDao.delete_conversation_messages(conv_id)
         # 再删除会话-知识库关联关系
         await ConversationKnowledgeLinkDao.delete(conv_id)
+        # 再删除会话-工具关联关系
+        await ConversationToolLinkDao.delete_all_conversation_links(conv_id)
         # 再删除记忆
         conversation: Conversation = await ConversationDao.get(conv_id)
         if conversation.use_memory == 1:
@@ -110,7 +127,8 @@ class ConversationService:
             knowledge_base_ids=update_data.knowledge_base_ids,
             use_memory=update_data.use_memory,
             available_model_id=update_data.available_model_id,
-            mcp_server_configs=update_data.mcp_server_configs
+            mcp_server_configs=update_data.mcp_server_configs,
+            openapi_tool_ids=update_data.openapi_tool_ids
         )
 
         # 更新模型 则删除配置缓存
@@ -143,6 +161,10 @@ class ConversationService:
                     "index_name": kb.index_name,
                 }
                 for kb in conv.knowledge_bases
+            ],
+            "openapi_tools": [
+                openapi_tool
+                for openapi_tool in conv.openapi_tools
             ],
             "selected_mcp_servers": conv.mcp_server_configs,
             "updated_at": conv.updated_at.isoformat()
@@ -707,6 +729,7 @@ class ConversationService:
                 }
                 for kb in conv.knowledge_bases
             ],
+            "openapi_tools": conv.openapi_tools,
             "created_at": conv.created_at.isoformat(),
             "updated_at": conv.updated_at.isoformat()
         }

@@ -59,6 +59,7 @@ class OpenAPIConfig(OpenAPIConfigBase, table=True):
         sa_relationship=relationship(
             "OpenAPITool",
             back_populates="openapi_config",
+            lazy="selectin",
             cascade="all, delete-orphan"
         )
     )
@@ -107,6 +108,19 @@ class OpenAPIConfigDao:
             stmt = select(OpenAPIConfig).order_by(OpenAPIConfig.created_at.desc())
             result = await session.execute(stmt)
             return result.scalars().all()
+
+    @staticmethod
+    async def get_all_configs_total() -> List[OpenAPIConfig]:
+
+        async with async_session_getter() as session:
+            stmt = select(func.count()).select_from(OpenAPIConfig)
+
+            # 执行查询并获取结果
+            result = await session.execute(stmt)
+            total_count = result.scalar()  # 获取总数
+
+            logger_util.info(f"Total count of OpenAPIConfig entries: {total_count}")
+            return total_count
 
     @staticmethod
     async def update_config(

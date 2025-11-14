@@ -61,15 +61,12 @@ export async function getKnowledgeById(
 /** 分页获取知识库列表 List Knowledge By Page GET /api/v1/knowledge/list */
 export async function listKnowledge(
   // 查询参数
-  params: Api.KnowledgeListParams,
+  params?: Api.KnowledgeListParams,
   options?: { [key: string]: any },
 ) {
   return request<any>('/api/v1/knowledge/list', {
     method: 'GET',
     params: {
-      // page 和 size 有默认值
-      page: '1',
-      size: '10',
       ...params,
     },
     ...(options || {}),

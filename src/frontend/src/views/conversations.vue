@@ -263,6 +263,20 @@
             />
           </t-select>
         </t-form-item>
+        
+        <!-- 新增 OpenAPI 工具选择 -->
+        <t-form-item label="OpenAPI工具">
+          <t-cascader
+            v-model="CreateConversationForm.openapi_tool_ids"
+            :options="openapiCascaderOptions"
+            clearable
+            multiple
+            placeholder="请选择OpenAPI工具"
+            :keys="{ value: 'id', label: 'name', children: 'children' }"
+            :show-all-levels="false"
+          />
+        </t-form-item>
+
         <!-- 新增 use_memory 开关 -->
         <t-form-item label="启用记忆" name="use_memory">
           <t-switch size="large" v-model="CreateConversationForm.use_memory" />
@@ -313,7 +327,8 @@ import {
   MenuItem as TMenuItem,
   Aside as TAside,
   Layout as TLayout,
-  Content as TContent
+  Content as TContent,
+  Cascader as TCascader
 } from 'tdesign-vue-next';
 
 import {
@@ -334,6 +349,7 @@ import { listKnowledge } from '@/api/knowledge';
 import { useAvailableModelStore } from '@/store/useAvailableModelStore';
 import SourceCard from '@/components/SourceCard.vue';
 import ToolCallCard from '@/components/ToolCallCard.vue'
+import { getOpenApiConfigsList, getOpenApiToolsByConfigId } from '@/api/openapi'
 
 
 import type { Key } from 'ant-design-vue/es/_util/type';
@@ -368,6 +384,9 @@ interface CreateConversationParams extends Api.BaseConversationParams {
   model: any;
   selectedMcpServices: []; // 用于表单绑定的选中项
   mcp_server_configs: null; // 用于API提交的配置
+  openapi_tool_ids: string[]; // 用于OpenAPI工具绑定的选中项
+
+
 }
 
 
@@ -402,6 +421,21 @@ const mcpServerOptions = computed(() => {
   }))
 })
 
+// 新增计算属性 - OpenAPI工具选项
+const openapiCascaderOptions = computed(() => {
+  return openapiConfigs.value.map(config => {
+    const tools = openapiToolsMap.value[config.id] || [];
+    return {
+      id: config.id,
+      name: config.name,
+      children: tools.map(tool => ({
+        id: tool.id,
+        name: tool.name
+      }))
+    };
+  });
+});
+
 // 表单数据
 const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展后的接口
   title: '新渠道',
@@ -413,7 +447,94 @@ const CreateConversationForm = ref<CreateConversationParams>({ // 使用扩展�
   conv_id: "",
   selectedMcpServices: [], // 用于MCP表单绑定的选中项
   mcp_server_configs: null, // 用于MCP-API提交的配置
+  openapi_tool_ids: [] // 用于OpenAPI工具绑定的选中项
 });
+
+// OpenAPI相关状态
+const openapiConfigs = ref<Api.OpenApiConfig[]>([]);
+const openapiToolsMap = ref<Record<string, Api.OpenApiTool[]>>({});
+const loadedConfigIds = ref<Set<string>>(new Set()); // 记录已经加载过工具的配置ID
+
+// 获取指定配置下的工具列表
+const fetchOpenApiTools = async (configId: string) => {
+  try {
+    // 使用新的API接口获取该配置下的全部工具
+    const res = await getOpenApiToolsByConfigId(configId);
+    if (res.data && res.data.data) {
+      // 注意这里返回的数据结构是直接的工具数组，而不是 { tools: [...] } 的形式
+      openapiToolsMap.value[configId] = res.data.data;
+      loadedConfigIds.value.add(configId);
+    }
+  } catch (error) {
+    console.error(`获取OpenAPI配置${configId}的工具列表失败:`, error);
+  }
+};
+
+// 在获取OpenAPI配置列表后，自动加载所有配置下的工具
+const fetchAllOpenApiTools = async () => {
+  for (const config of openapiConfigs.value) {
+    if (!loadedConfigIds.value.has(config.id)) {
+      await fetchOpenApiTools(config.id);
+    }
+  }
+};
+
+// 获取OpenAPI配置列表
+const fetchOpenApiConfigs = async () => {
+  try {
+    // 不传page和size参数获取全部配置
+    const res = await getOpenApiConfigsList({} as any);
+    if (res.data) {
+      openapiConfigs.value = res.data.data;
+      // 自动加载所有配置下的工具
+      await fetchAllOpenApiTools();
+    }
+  } catch (error) {
+    console.error('获取OpenAPI配置列表失败:', error);
+    MessagePlugin.error('获取OpenAPI配置列表失败');
+  }
+};
+
+// 点击配置名称加载工具
+const loadToolsForConfig = async (configId: string, configName: string) => {
+  if (loadedConfigIds.value.has(configId)) {
+    // 即使已加载也重新加载，确保获取最新数据
+    try {
+      await fetchOpenApiTools(configId);
+      MessagePlugin.success(`${configName} 的工具已重新加载`);
+    } catch (error) {
+      MessagePlugin.error(`${configName} 的工具重新加载失败`);
+    }
+    return;
+  }
+  
+  try {
+    await fetchOpenApiTools(configId);
+    MessagePlugin.success(`${configName} 的工具加载成功`);
+  } catch (error) {
+    MessagePlugin.error(`${configName} 的工具加载失败`);
+  }
+};
+
+// 处理OpenAPI选择框焦点事件
+const handleOpenApiSelectFocus = async () => {
+  // 当用户第一次打开下拉框时，自动加载第一个配置的工具
+  if (openapiConfigs.value.length > 0 && loadedConfigIds.value.size === 0) {
+    const firstConfig = openapiConfigs.value[0];
+    await loadToolsForConfig(firstConfig.id, firstConfig.name);
+  }
+};
+
+// 处理OpenAPI工具选择变化
+const handleOpenApiToolChange = (value: string[]) => {
+  // 过滤掉配置ID，只保留工具ID
+  const toolIds = value.filter(id => {
+    // 检查是否是配置ID（而不是工具ID）
+    return !openapiConfigs.value.some(config => config.id === id);
+  });
+  CreateConversationForm.value.openapi_tool_ids = toolIds;
+};
+
 // 状态管理
 const activeKey = ref<string[]>([]);
 const conversation_items = ref([]);
@@ -488,6 +609,33 @@ const fetchConversations = async () => {
     }
   } catch (error) {
     MessagePlugin.error('获取会话列表失败');
+  }
+};
+
+// 预加载所有配置的工具
+const preloadAllConfigTools = async (conversations: any[]) => {
+  // 收集所有需要预加载的配置ID
+  const configIdsToLoad = new Set<string>();
+  
+  conversations.forEach(conv => {
+    if (conv.openapi_tools && conv.openapi_tools.length > 0) {
+      conv.openapi_tools.forEach(tool => {
+        if (tool.config_id) {
+          configIdsToLoad.add(tool.config_id);
+        }
+      });
+    }
+  });
+  
+  // 加载这些配置的工具
+  for (const configId of Array.from(configIdsToLoad)) {
+    if (!loadedConfigIds.value.has(configId)) {
+      try {
+        await fetchOpenApiTools(configId);
+      } catch (error) {
+        console.warn(`预加载配置${configId}的工具失败:`, error);
+      }
+    }
   }
 };
 
@@ -597,17 +745,15 @@ const fetchMessageHistory = async (convId: string) => {
             datetime: formatDateTime(new Date(msg.timestamp))
           };
         });
-      console.log(chatsList.value)
-      console.log(toolCallsList.value)
     }
     else {
       console.error('获取消息历史失败:', res.data); // 打印错误信息
-      message.error('获取消息历史失败');
+      MessagePlugin.error('获取消息历史失败');
       chatsList.value = []; // 出错时，确保 chats.value 仍然是空数组或数组
     }
   } catch (error) {
     console.error('获取消息历史异常:', error); // 打印异常信息
-    message.error('获取消息历史失败');
+    MessagePlugin.error('获取消息历史失败');
     chatsList.value = []; // 异常时，确保 chats.value 仍然是空数组或数组
   }
 };
@@ -615,10 +761,7 @@ const fetchMessageHistory = async (convId: string) => {
 // 获取知识库列表
 const fetchKnowledgeList = async () => {
   try {
-    const res = await listKnowledge({
-      page: 1,
-      size: 1000 // 随便给一个大的值 以后再增加全量接口
-    });
+    const res = await listKnowledge();
     if (res.data.status_code === 200) {
       knowledgeList.value = res.data.data.data;
     }
@@ -1171,7 +1314,7 @@ const handleDelete = async (convId: string) => {
 };
 
 // 编辑会话
-const handleEdit = (item) => {
+const handleEdit = async (item) => {
   isEditing.value = true;
   isCreateDialogVisible.value = true;
 
@@ -1186,6 +1329,11 @@ const handleEdit = (item) => {
     : [];
   // 处理MCP服务配置 - 保留原始配置
   const mcpServerConfigs = item.selected_mcp_servers || null;
+  
+  // 处理OpenAPI工具回显 - 只需要工具ID即可
+  const openapiToolIds = item.openapi_tools 
+    ? item.openapi_tools.map((tool: any) => tool.id)
+    : [];
 
   CreateConversationForm.value = {
     title: item.title,
@@ -1196,7 +1344,8 @@ const handleEdit = (item) => {
     conv_id: item.id,
     use_memory: !!item.use_memory, // 同步 use_memory 字段
     selectedMcpServices: selectedMcpKeys, // 用于回显选中的key
-    mcp_server_configs: mcpServerConfigs // 保留原始配置
+    mcp_server_configs: mcpServerConfigs, // 保留原始配置
+    openapi_tool_ids: openapiToolIds // OpenAPI工具选中项（只包含工具ID）
   } as CreateConversationParams; // 强制类型转换
 };
 
@@ -1217,16 +1366,27 @@ const handleConversationSubmit = async () => {
       }
     });
 
+    // 处理OpenAPI工具选择，从级联选择器格式转换为工具ID数组
+    let openapiToolIds: string[] = [];
+    if (CreateConversationForm.value.openapi_tool_ids && CreateConversationForm.value.openapi_tool_ids.length > 0) {
+      // 级联选择器返回的是二维数组 [[configId, toolId], ...] 的格式
+      openapiToolIds = CreateConversationForm.value.openapi_tool_ids.map((item: string[]) => {
+        // 确保返回的是工具ID而不是整个数组
+        return Array.isArray(item) ? item[1] : item;
+      });
+    }
+
     // 使用对象解构排除 model 字段
     const { model, ...rest } = CreateConversationForm.value;
-    console.log(CreateConversationForm.value)
+    console.log("提交的表单数据:", CreateConversationForm.value);
     const submitForm = {
       ...rest,
       available_model_id: model,  // 直接使用 model 值，因为它已经是 id
       use_memory: CreateConversationForm.value.use_memory ? 1 : 0, // Convert boolean to 1 or 0
       mcp_server_configs: Object.keys(selectedMcpConfigs).length > 0 
         ? selectedMcpConfigs 
-        : null
+        : null,
+      openapi_tool_ids: openapiToolIds // 使用处理后的工具ID数组
     };
 
     if (isEditing.value) {
@@ -1239,6 +1399,7 @@ const handleConversationSubmit = async () => {
     await fetchConversations();
     handleModalClose();
   } catch (error) {
+    console.error("提交表单时出错:", error);
     MessagePlugin.error(isEditing.value ? '更新会话失败' : '创建会话失败');
   }
 };
@@ -1256,7 +1417,8 @@ const handleModalClose = () => {
     use_memory: true, // 初始化 use_memory 为 true
     conv_id: "",
     mcp_server_configs: null, // 重置MCP服务配置
-    selectedMcpServices: [] // 重置选中项
+    selectedMcpServices: [], // 重置选中项
+    openapi_tool_ids: [] // 重置OpenAPI工具选中项
   };
 };
 
@@ -1274,6 +1436,7 @@ onMounted(async () => {
   await fetchKnowledgeList();
   await mcpStore.fetchData()
   await availableModelStore.loadAvailableModelCfg();
+  await fetchOpenApiConfigs(); // 获取OpenAPI配置
 });
 
 // 监听模型配置变化

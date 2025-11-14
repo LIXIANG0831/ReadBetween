@@ -60,7 +60,8 @@ class ConversationToolLink(ConversationToolLinkBase, table=True):
         back_populates="tool_links",
         sa_relationship=relationship(
             "Conversation",
-            back_populates="tool_links"
+            back_populates="tool_links",
+            lazy="selectin"
         )
     )
 
@@ -68,7 +69,8 @@ class ConversationToolLink(ConversationToolLinkBase, table=True):
         back_populates="conversation_links",
         sa_relationship=relationship(
             "OpenAPITool",
-            back_populates="conversation_links"
+            back_populates="conversation_links",
+            lazy="selectin"
         )
     )
 

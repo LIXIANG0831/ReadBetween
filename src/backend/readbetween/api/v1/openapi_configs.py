@@ -72,20 +72,21 @@ async def create_openapi_config(
 
 @router.get(
     "/list",
-    response_model=PageModel,
     summary="获取所有OpenAPI配置",
     description="获取系统中所有的OpenAPI配置列表"
 )
 async def get_all_openapi_configs(
-    page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(10, ge=1, le=100, description="每页大小")
+    page: int = None,
+    size: int = None
 ) -> PageModel | ResponseModel:
     """获取所有OpenAPI配置"""
     try:
-        total, result = await OpenAPIConfigService.get_all_configs_with_base_url_paginated(page, size)
+        if page is not None and size is not None:
+            total, result = await OpenAPIConfigService.get_all_configs_with_base_url_paginated(page, size)
+        else:
+            total, result = await OpenAPIConfigService.get_all_configs()
 
         return PageModel(total=total, data=result)
-
     except Exception as e:
         logger_util.error(f"获取OpenAPI配置列表失败: {str(e)}")
         return resp_500(500, f"获取配置列表失败: {str(e)}")

@@ -16,8 +16,8 @@ const route = useRoute()
 const menuItems = [
   { value: '/conversations', icon: HomeIcon, label: '渠道管理' },
   { value: '/knowledge', icon: BookIcon, label: '知识库管理' },
-  { value: '/memory', icon: TreeRoundDotVerticalIcon, label: '记忆管理' },
   { value: '/tools', icon: ToolsIcon, label: '工具管理' },
+  { value: '/memory', icon: TreeRoundDotVerticalIcon, label: '记忆管理' },
   { value: '/model_cfg', icon: RocketIcon, label: '模型管理' }
 ]
 
