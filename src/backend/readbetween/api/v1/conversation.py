@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, HTTPException
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.models.v1.chat import ChatRequest, ChatMessageSendPlus
-from readbetween.services.stream_chat_handler import StreamingChatEngine
+from readbetween.services.streaming_chat_engine import StreamingChatEngine
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.model_factory import ModelFactory
 from readbetween.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
