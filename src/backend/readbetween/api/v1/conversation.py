@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, HTTPException
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.models.v1.chat import ChatRequest, ChatMessageSendPlus
+from readbetween.services.stream_chat_handler import StreamingChatEngine
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.model_factory import ModelFactory
 from readbetween.models.v1.chat import ChatCreate, ChatUpdate, ChatMessageSend
@@ -54,12 +55,20 @@ async def send_message(message_data: ChatMessageSend):
         conversation_info = await ConversationService.get_conversation_info(message_data.conv_id)
         # 返回StreamingResponse包装的生成器
         return StreamingResponse(
-            ConversationService.stream_chat_response(
+            # 新版 generate_chat_stream 统一管理
+            StreamingChatEngine.generate_chat_stream(
                 ChatMessageSendPlus(
                     **message_data.dict(),  # 解包ChatMessageSend
                     conversation_info=conversation_info,
                 )
             ),
+            # Deprecated -- 旧版 stream_chat_response
+            # ConversationService.stream_chat_response(
+            #     ChatMessageSendPlus(
+            #         **message_data.dict(),  # 解包ChatMessageSend
+            #         conversation_info=conversation_info,
+            #     )
+            # ),
             media_type="text/event-stream",  # 设置正确的媒体类型
             headers={
                 "Transfer-Encoding": "chunked",  # 强制设置类型
