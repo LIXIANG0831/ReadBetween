@@ -5,6 +5,7 @@ from typing import List
 from fastapi import Depends
 
 from readbetween.core.dependencies import get_settings
+from readbetween.utils.function_calling_manager import function_calling_manager
 from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
@@ -76,9 +77,24 @@ def init_built_in_model():
     thread_pool.shutdown()
 
 
-async def init_mcp_servers():
+async def init_function_calling_manager():
     redis_client = RedisUtil()
+
+    # MCP Config
     mcp_servers_config = redis_client.get(RedisMCPServerKey)
     mcp_server_dict = json.loads(mcp_servers_config if mcp_servers_config else "{}")
     logger_util.debug(f"MCP Severs Config Init :: {mcp_server_dict}")
+
+    # TODO OpenAPI Config
+
+    # Deprecated 弃用MCP客户端
     await mcp_client_manager.initialize_client(mcp_server_dict.get("mcpServers", {}))
+
+    await function_calling_manager.initialize(
+        mcp_server_configs=mcp_server_dict.get('mcpServers', {}),
+        openapi_service_configs={}
+    )
+
+
+async def clean_up_function_calling_manager():
+    await mcp_client_manager.cleanup()

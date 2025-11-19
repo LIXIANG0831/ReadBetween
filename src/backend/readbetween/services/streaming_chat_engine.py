@@ -15,6 +15,7 @@ from readbetween.services.knowledge import KnowledgeService
 from readbetween.services.prompt import DEFAULT_PROMPT, KB_RECALL_PROMPT, WEB_SEARCH_PROMPT, MEMORY_PROMPT, \
     WEB_LINK_PROMPT, WEB_LINK_ERROR_PROMPT
 from readbetween.services.retriever import RetrieverService
+from readbetween.utils.function_calling_manager import function_calling_manager
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.mcp_client import MCPClient, mcp_client_manager
 from readbetween.utils.memory_util import MemoryUtil
@@ -231,20 +232,28 @@ class StreamingChatEngine:
     async def _prepare_tools(cls, conversation_info: ConversationInfo):
         """准备工具列表"""
         openai_tools = []
-        mcp_client = mcp_client_manager.get_client()
 
-        if mcp_client and conversation_info.conversation.mcp_server_configs:
-            tools = await mcp_client.get_all_tools_by_config(
-                conversation_info.conversation.mcp_server_configs
-            )
+        # 获取 MCP Tool Definitions
+        mcp_server_tools = []
+        tool_manager = function_calling_manager.get_tool_manager()
+        for server_name, server_config in conversation_info.conversation.mcp_server_configs.items():
+            # 获取该服务器对应的工具
+            mcp_server_tools = tool_manager.get_tools_by_sources({server_name: server_config})
 
-            for server_tools in tools.values():
-                for tool_name, tool_config in server_tools.items():
-                    tool_config["name"] = tool_config["prefixed_name"]
-                    openai_tools.append({
-                        'type': 'function',
-                        'function': tool_config
-                    })
+        openai_tools.extend(mcp_server_tools)
+        # mcp_client = mcp_client_manager.get_client()
+        # if mcp_client and conversation_info.conversation.mcp_server_configs:
+        #     tools = await mcp_client.get_all_tools_by_config(
+        #         conversation_info.conversation.mcp_server_configs
+        #     )
+        #
+        #     for server_tools in tools.values():
+        #         for tool_name, tool_config in server_tools.items():
+        #             tool_config["name"] = tool_config["prefixed_name"]
+        #             openai_tools.append({
+        #                 'type': 'function',
+        #                 'function': tool_config
+        #             })
 
         return openai_tools
 
@@ -337,9 +346,10 @@ class StreamingChatEngine:
                     yield response_chunk
 
             # 处理工具调用
+            print(func_call_list)
             if func_call_list:
                 async for tool_response in cls._handle_tool_calls_and_recursion(
-                        message_data, func_call_list, source_msg_list
+                        message_data, func_call_list
                 ):
                     yield tool_response
 
@@ -418,7 +428,6 @@ class StreamingChatEngine:
             cls,
             message_data: ChatMessageSendPlus,
             func_call_list: List[Dict],
-            source_msg_list: List[SourceMsg]
     ) -> Generator:
         """处理工具调用和递归调用"""
         mcp_client = mcp_client_manager.get_client()
@@ -583,6 +592,21 @@ class StreamingChatEngine:
                         func_calling, mcp_client, conv_id
                 ):
                     yield tool_response
+
+            # TODO 核心修改
+            # TODO 核心修改
+            # TODO 核心修改
+            # TODO 核心修改
+            # TODO 核心修改
+            # TODO 核心修改
+
+
+
+
+
+
+
+
 
         except Exception as e:
             # Clean up messages if error occurs
