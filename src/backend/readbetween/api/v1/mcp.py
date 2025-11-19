@@ -6,7 +6,6 @@ from readbetween.services.constant import RedisMCPServerKey, RedisMCPServerDetai
 from readbetween.utils.function_calling_manager import function_calling_manager
 from readbetween.utils.logger_util import logger_util
 from readbetween.utils.redis_util import RedisUtil
-from readbetween.utils.mcp_client import mcp_client_manager
 
 router = APIRouter(tags=["MCP管理"])
 redis_client = RedisUtil()
@@ -22,7 +21,7 @@ async def create_mcp_server(data: McpServersData):
 
         # Deprecated 启用MCP客户端 启用统一FC客户端
         # 使用单例管理器初始化 MCP 客户端
-        mcp_client = await mcp_client_manager.initialize_client(data.dict().get("mcpServers", {}))
+        # mcp_client = await mcp_client_manager.initialize_client(data.dict().get("mcpServers", {}))
         # tools = await mcp_client.get_all_tools()
         # 重命名 tools 的 key
         # tools = {

@@ -2,15 +2,11 @@ import json
 import os
 from typing import List
 
-from fastapi import Depends
-
-from readbetween.core.dependencies import get_settings
 from readbetween.utils.function_calling_manager import function_calling_manager
 from readbetween.utils.local_embedding_manager import LocalEmbedManager
 from readbetween.models.dao.model_provider_cfg import ModelProviderCfg
 from readbetween.services.model_provider_cfg import ModelProviderCfgService
 from readbetween.utils.local_tts_manager import LocalTTSManager
-from readbetween.utils.mcp_client import mcp_client_manager
 from readbetween.utils.redis_util import RedisUtil
 from readbetween.utils.database_client import DatabaseClient
 from readbetween.utils.logger_util import logger_util
@@ -88,7 +84,7 @@ async def init_function_calling_manager():
     # TODO OpenAPI Config
 
     # Deprecated 弃用MCP客户端
-    await mcp_client_manager.initialize_client(mcp_server_dict.get("mcpServers", {}))
+    # await mcp_client_manager.initialize_client(mcp_server_dict.get("mcpServers", {}))
 
     await function_calling_manager.initialize(
         mcp_server_configs=mcp_server_dict.get('mcpServers', {}),
@@ -97,4 +93,4 @@ async def init_function_calling_manager():
 
 
 async def clean_up_function_calling_manager():
-    await mcp_client_manager.cleanup()
+    await function_calling_manager.cleanup()
