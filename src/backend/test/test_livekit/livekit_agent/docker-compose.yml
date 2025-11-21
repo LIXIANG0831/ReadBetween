@@ -1,7 +1,0 @@
-services:
-  livekit_agent:
-    image: livekit_agent
-    container_name: livekit_agent
-    build: 
-      context: .
-      dockerfile: Dockerfile
