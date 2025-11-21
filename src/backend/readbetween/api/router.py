@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from readbetween.api.health import router as health_router
+from readbetween.api.livekit import router as voice_router
 from readbetween.api.v1.conversation import router as chat_router
 from readbetween.api.v1.knowledge import router as knowledge_router
 from readbetween.api.v1.knowledge_file import router as knowledge_file_router
@@ -24,6 +25,7 @@ sys_router = APIRouter(prefix='/sys')
 sys_router.include_router(model_setting_cfg_router)
 sys_router.include_router(model_available_cfg_router)
 sys_router.include_router(health_router)
+sys_router.include_router(voice_router)
 
 # 根路由
 root_router = APIRouter(prefix='')

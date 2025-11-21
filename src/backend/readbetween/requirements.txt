@@ -33,10 +33,6 @@ langchain-community==0.3.3
 langextract==1.0.9
 librosa==0.11.0
 litellm==1.53.1
-livekit-plugins-cartesia==0.4.3
-livekit-plugins-deepgram==0.6.11
-livekit-plugins-openai==0.10.7
-livekit-plugins-silero==0.7.3
 loguru==0.7.2
 markdown==3.7
 mcp==1.8.1

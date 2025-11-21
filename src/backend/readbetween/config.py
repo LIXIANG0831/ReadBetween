@@ -83,6 +83,12 @@ class LoggerConfig(BaseModel):
     base_log_path: str = "./readbetween_log"
 
 
+class LiveKitConfig(BaseModel):
+    url: str = "ws://localhost:7880"
+    api_key: str = "devkey"
+    api_secret: str = "secret"
+
+
 # Deprecated
 class SystemConfig(BaseModel):
     class ModelsConfig(BaseModel):
@@ -103,6 +109,7 @@ class Settings(BaseConfig):
     storage: StorageConfig = StorageConfig()
     memory: MemoryConfig = MemoryConfig()
     logger: LoggerConfig = LoggerConfig()
+    livekit: LiveKitConfig = LiveKitConfig()
     # system: SystemConfig = SystemConfig()
 
     model_config = SettingsConfigDict(

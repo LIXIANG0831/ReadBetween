@@ -1,16 +1,16 @@
 <template>
     <div>
-      <VoiceInteraction />
+      <VoiceAssistant />
     </div>
 </template>
   
   <script>
-  import VoiceInteraction from '@/components/VoiceInteraction.vue'
+  import VoiceAssistant from '@/components/VoiceAssistant.vue'
   
   export default {
     name: 'App',
     components: {
-      VoiceInteraction
+      VoiceAssistant
     }
   }
   </script>

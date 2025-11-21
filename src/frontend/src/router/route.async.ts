@@ -83,6 +83,16 @@ const asyncRoutes: Array<RouteRecordRaw> = [
     },
     component: () => import('../views/openapi.vue'),
   }
+  ,
+  {
+    path: '/voice',
+    name: 'Voice',
+    meta: {
+      title: 'Voice Agent',
+      icon: '',
+    },
+    component: () => import('../views/voice.vue'),
+  }
 ];
 
 export default asyncRoutes;
