@@ -8,9 +8,7 @@
             <icon name="tools" />
           </div>
           <div class="text-content">
-            <!-- 保障显示工具名去除前9个UUID字符 -->
-            <div class="title">{{ toolCall.function.name.slice(9) }}</div>
-            <!-- <div class="title">{{ toolCall.function.name }}</div> -->
+            <div class="title">{{ toolCall.function.name }}</div>
             <div class="subtitle" v-if="!isExpanded">{{ briefContent }}</div>
           </div>
         </div>
