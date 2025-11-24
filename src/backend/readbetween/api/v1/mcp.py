@@ -29,6 +29,7 @@ async def create_mcp_server(data: McpServersData):
         #     for server_id, tool_list in tools.items()
         # }
 
+        # 更新FC统一工具调用器
         await function_calling_manager.update_mcp_servers(data.dict().get("mcpServers", {}))
         tool_manager = function_calling_manager.get_tool_manager()
         if tool_manager:

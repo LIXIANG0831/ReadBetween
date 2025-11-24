@@ -1,12 +1,15 @@
+import json
 from typing import List
 
 from fastapi import APIRouter, Query
 
+from readbetween.models.dao.openapi_configs import OpenAPIConfigDao, OpenAPIConfig
 from readbetween.models.schemas.response import ResponseModel, resp_200, resp_500, PageModel
 from readbetween.models.v1.openapi import OpenAPIConfigCreateResponse, OpenAPIConfigCreateRequest, ToolInfo, \
     OpenAPIConfigInfo, OpenAPIConfigDetail
 from readbetween.services.openapi_configs import OpenAPIConfigService
 from readbetween.services.tasks import logger_util
+from readbetween.utils.function_calling_manager import function_calling_manager
 
 router = APIRouter(prefix="/openapi/configs", tags=["OpenAPI配置管理"])
 
@@ -34,6 +37,15 @@ async def create_openapi_config(
         config = result["config"]
         base_url = result["base_url"]
         tools_count = result["tools_count"]
+
+        # 更新FC统一工具调用器
+        openapi_service_configs = {}
+        all_openapi_configs: List[OpenAPIConfig] = await OpenAPIConfigDao.get_all_configs()
+        for openapi_config in all_openapi_configs:
+            openapi_service_configs[openapi_config.name] = {
+                "openapi_spec": json.dumps(openapi_config.openapi_spec, ensure_ascii=False)
+            }
+        await function_calling_manager.update_openapi_services(openapi_service_configs)
 
         # 获取配置的所有工具信息
         tools = await OpenAPIConfigService.get_config_tools(config.id)

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import traceback
 from contextlib import AsyncExitStack
 from datetime import timedelta
 from typing import Dict, Any, List, Optional
@@ -291,7 +292,7 @@ class UnifiedToolManager:
                     })
         return tools
 
-    async def execute_tools(self, tool_calls: list[ChatCompletionMessageFunctionToolCall | ChatCompletionMessageCustomToolCall] | None) -> Dict[str, Any]:
+    async def execute_tools(self, tool_calls: list[ChatCompletionMessageFunctionToolCall | ChatCompletionMessageCustomToolCall | dict] | None) -> Dict[str, Any]:
         """
         执行工具调用
 
@@ -301,8 +302,24 @@ class UnifiedToolManager:
         results = {}
 
         for i, tool_call in enumerate(tool_calls):
-            mapped_tool_name = tool_call.function.name
-            tool_args = json.loads(tool_call.function.arguments)
+            # 统一处理不同格式的工具调用
+            if isinstance(tool_call, dict):
+                # 处理字典格式
+                tool_call_id = tool_call.get("id", f"tool_call_{i}")
+                function_data = tool_call.get("function", {})
+                mapped_tool_name = function_data.get("name", "")
+                tool_args_str = function_data.get("arguments", "{}")
+            else:
+                # 处理 OpenAI 对象格式
+                tool_call_id = tool_call.id
+                mapped_tool_name = tool_call.function.name
+                tool_args_str = tool_call.function.arguments
+
+            # 解析参数
+            try:
+                tool_args = json.loads(tool_args_str)
+            except json.JSONDecodeError:
+                tool_args = {}
 
             # 为每个工具调用生成唯一的结果键
             result_key = f"{mapped_tool_name}_{i}"
@@ -313,7 +330,7 @@ class UnifiedToolManager:
                     "result": None,
                     "error": f"工具 {mapped_tool_name} 未找到",
                     "source_type": None,
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id": tool_call_id,
                     "original_tool_name": mapped_tool_name,
                     "arguments": tool_args
                 }
@@ -328,7 +345,7 @@ class UnifiedToolManager:
                     "result": None,
                     "error": f"工具源 {source_id} 未找到",
                     "source_type": None,
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id": tool_call_id,
                     "original_tool_name": original_tool_name,
                     "arguments": tool_args
                 }
@@ -346,7 +363,7 @@ class UnifiedToolManager:
                         "result": result,
                         "error": None,
                         "source_type": ToolType.MCP.value,
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call_id,
                         "original_tool_name": original_tool_name,
                         "arguments": tool_args
                     }
@@ -364,27 +381,37 @@ class UnifiedToolManager:
                     # 使用 OpenAPI 客户端执行工具
                     async with openapi_source.api_client as api:
                         service_response = await api.invoke(function_payload)
+                        logger_util.debug(f"OpenAPI 工具执行结果: {service_response=}")
                         results[result_key] = {
                             "success": True,
                             "result": service_response,
                             "error": None,
                             "source_type": ToolType.OPENAPI.value,
-                            "tool_call_id": tool_call.id,
+                            "tool_call_id": tool_call_id,
                             "original_tool_name": original_tool_name,
                             "arguments": tool_args
                         }
 
             except Exception as e:
+                # 获取完整的堆栈跟踪
+                stack_trace = traceback.format_exc()
+
+                # 记录详细错误
+                logger_util.error(f"工具 {mapped_tool_name} 执行失败:\n"
+                                  f"错误: {str(e)}\n"
+                                  f"堆栈跟踪:\n{stack_trace}\n"
+                                  f"参数: {tool_args}\n"
+                                  f"工具类型: {tool_source.source_type.value if tool_source else 'Unknown'}")
+
                 results[result_key] = {
                     "success": False,
                     "result": None,
                     "error": str(e),
                     "source_type": tool_source.source_type.value if tool_source else None,
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id": tool_call_id,
                     "original_tool_name": original_tool_name,
                     "arguments": tool_args
                 }
-                logger_util.error(f"工具 {mapped_tool_name} 执行失败: {e}")
 
         return results
 

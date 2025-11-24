@@ -1,10 +1,7 @@
-import json
-from typing import List, Optional, Dict, Any, Union, Tuple
-from zipfile import Path
-
+from typing import List, Optional, Dict, Any
 from readbetween.models.dao.openapi_configs import OpenAPIConfig, OpenAPIConfigDao
 from readbetween.models.dao.openapi_tools import OpenAPITool, OpenAPIToolDao
-from readbetween.models.v1.openapi import OpenAPIConfigInfo, ToolInfo, OpenAPIConfigDetail
+from readbetween.models.v1.openapi import OpenAPIConfigInfo, ToolInfo
 from readbetween.utils.logger_util import logger_util
 from openapi_spec_validator import validate
 from openapi_llm.client.config import create_client_config

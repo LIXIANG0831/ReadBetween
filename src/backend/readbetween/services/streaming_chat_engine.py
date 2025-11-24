@@ -1,10 +1,14 @@
 import asyncio
 import json
 from datetime import datetime
-from typing import Generator, List, Dict
+from typing import Generator, List, Dict, Optional
 
 from fastapi import HTTPException
+from mcp.types import CallToolResult
+from openai.types.chat import ChatCompletionMessageToolCallUnion
 
+from readbetween.models.dao import Conversation
+from readbetween.models.dao.conversation import ConversationDao
 from readbetween.models.dao.messages import MessageDao
 from readbetween.models.schemas.source import SourceMsg
 from readbetween.models.schemas.sse_response import StreamResponseTemplate
@@ -54,14 +58,14 @@ class StreamingChatEngine:
                 final_query, user_msg_id = None, None
 
             # 准备工具和消息历史
-            openai_tools = await cls._prepare_tools(conversation_info)
+            tool_definitions = await cls._prepare_tools(conversation_info)
             messages = await cls._build_openai_request_messages(
                 conversation_info, message_data, final_query, is_recursion
             )
 
             # 执行流式聊天
             async for response in cls._execute_stream_chat(
-                    conversation_info, message_data, messages, openai_tools,
+                    conversation_info, message_data, messages, tool_definitions,
                     source_msg_list, user_msg_id, is_recursion
             ):
                 yield response
@@ -231,16 +235,30 @@ class StreamingChatEngine:
     @classmethod
     async def _prepare_tools(cls, conversation_info: ConversationInfo):
         """准备工具列表"""
-        openai_tools = []
+        tool_definitions = []
+        tool_manager = function_calling_manager.get_tool_manager()
 
         # 获取 MCP Tool Definitions
         mcp_server_tools = []
-        tool_manager = function_calling_manager.get_tool_manager()
-        for server_name, server_config in conversation_info.conversation.mcp_server_configs.items():
-            # 获取该服务器对应的工具
-            mcp_server_tools = tool_manager.get_tools_by_sources({server_name: server_config})
+        if conversation_info.conversation.mcp_server_configs:
+            for server_name, server_config in conversation_info.conversation.mcp_server_configs.items():
+                # 获取该服务器对应的工具
+                mcp_server_tools = tool_manager.get_tools_by_sources({server_name: server_config})
 
-        openai_tools.extend(mcp_server_tools)
+            tool_definitions.extend(mcp_server_tools)
+
+        # 获取 OpenAPI Tool Definitions
+        openapi_tools = []
+        # 从DB中获取 conversation_info 解决缓存丢失关联信息
+        conversation: Conversation = \
+            await ConversationDao.get(conversation_info.conversation.id)
+        if conversation.openapi_tools:
+            for openapi_tool in conversation.openapi_tools:
+                openapi_tools.append(openapi_tool.tool_definition)
+
+            tool_definitions.extend(openapi_tools)
+
+        # Deprecated 弃用 修改为最新实现
         # mcp_client = mcp_client_manager.get_client()
         # if mcp_client and conversation_info.conversation.mcp_server_configs:
         #     tools = await mcp_client.get_all_tools_by_config(
@@ -255,7 +273,7 @@ class StreamingChatEngine:
         #                 'function': tool_config
         #             })
 
-        return openai_tools
+        return tool_definitions
 
     @classmethod
     async def _build_openai_request_messages(
@@ -310,7 +328,7 @@ class StreamingChatEngine:
             conversation_info: ConversationInfo,
             message_data: ChatMessageSendPlus,
             messages: List[Dict],
-            openai_tools: List[Dict],
+            tool_definitions: List[Dict],
             source_msg_list: List[SourceMsg],
             user_msg_id: str,
             is_recursion: bool
@@ -333,8 +351,8 @@ class StreamingChatEngine:
                 temperature=message_data.temperature or conversation_info.conversation.temperature,
                 max_tokens=message_data.max_tokens,
                 stream=True,
-                tools=openai_tools,
-                tool_choice="auto" if openai_tools else "none",
+                tools=tool_definitions,
+                tool_choice="auto" if tool_definitions else "none",
                 extra_body={"enable_thinking": message_data.thinking},
             )
 
@@ -346,7 +364,6 @@ class StreamingChatEngine:
                     yield response_chunk
 
             # 处理工具调用
-            print(func_call_list)
             if func_call_list:
                 async for tool_response in cls._handle_tool_calls_and_recursion(
                         message_data, func_call_list
@@ -427,14 +444,13 @@ class StreamingChatEngine:
     async def _handle_tool_calls_and_recursion(
             cls,
             message_data: ChatMessageSendPlus,
-            func_call_list: List[Dict],
+            func_call_list: Optional[List[ChatCompletionMessageToolCallUnion]]
     ) -> Generator:
         """处理工具调用和递归调用"""
-        mcp_client = mcp_client_manager.get_client()
 
         # 处理工具调用
         async for tool_response in cls._handle_tool_calls(
-                message_data.conv_id, func_call_list, mcp_client
+                message_data.conv_id, func_call_list
         ):
             yield tool_response
 
@@ -556,7 +572,7 @@ class StreamingChatEngine:
                 optimized_messages.append({
                     "role": msg.role,
                     "tool_call_id": msg.tool_call_id,
-                    "content": json.loads(msg.content)
+                    "content": msg.content
                 })
                 # 标记工具调用链完成（等待最终回复）
                 tool_call_chain_complete = True
@@ -572,8 +588,7 @@ class StreamingChatEngine:
     async def _handle_tool_calls(
             cls,
             conv_id: str,
-            func_call_list: List[Dict],
-            mcp_client: MCPClient
+            func_call_list: Optional[List[ChatCompletionMessageToolCallUnion]]
     ) -> Generator:
         """处理工具调用并返回响应"""
         # 保存助手调用信息
@@ -587,26 +602,56 @@ class StreamingChatEngine:
         try:
             yield StreamResponseTemplate.tool_init_event(func_call_list)
 
-            for func_calling in func_call_list:
-                async for tool_response in cls._execute_single_tool_call(
-                        func_calling, mcp_client, conv_id
-                ):
-                    yield tool_response
+            # Deprecated 弃用
+            # for func_calling in func_call_list:
+            #     async for tool_response in cls._execute_single_tool_call(
+            #             func_calling, mcp_client, conv_id
+            #     ):
+            #         yield tool_response
 
-            # TODO 核心修改
-            # TODO 核心修改
-            # TODO 核心修改
-            # TODO 核心修改
-            # TODO 核心修改
-            # TODO 核心修改
+            # 获取统一FC工具执行器
+            tool_manager = function_calling_manager.get_tool_manager()
 
+            # 执行工具调用
+            execute_results = await tool_manager.execute_tools(func_call_list)
 
+            for key, value in execute_results.items():
 
+                tool_call_id = value.get('tool_call_id', '')
+                tool_name = value.get('original_tool_name', '')
+                tool_args_json = value.get('arguments', '')
 
+                if value.get('result') is not None:
+                    if isinstance(value.get('result'), CallToolResult):
+                        tool_result: CallToolResult = value.get('result')
+                        tool_execute_result = tool_result.content[0].text
+                    else:
+                        tool_execute_result = value.get('result')
+                else:
+                    tool_execute_result = value.get('error')
 
+                call_tool_result_content_msg = {  # LLM 二次调用信息
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": tool_execute_result or "当前工具调用未获取到有效信息。"
+                }
 
+                tool_execute_msg = {  # 仅作为FC记录
+                    "tool": tool_name,
+                    "input": tool_args_json,
+                    "output": call_tool_result_content_msg.get("content"),
+                }
 
+                yield StreamResponseTemplate.tool_execute_event(call_tool_result_content_msg)
+                yield StreamResponseTemplate.tool_execute_info_event(tool_execute_msg)
 
+                # 保存工具调用信息
+                await MessageDao.create_message(
+                    conv_id=conv_id,
+                    role=call_tool_result_content_msg["role"],
+                    tool_call_id=call_tool_result_content_msg["tool_call_id"],
+                    content=json.dumps(call_tool_result_content_msg["content"], ensure_ascii=False)
+                )
 
         except Exception as e:
             # Clean up messages if error occurs
