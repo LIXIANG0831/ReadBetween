@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, BackgroundTasks
 
 from readbetween.models.dao.openapi_configs import OpenAPIConfigDao, OpenAPIConfig
 from readbetween.models.schemas.response import ResponseModel, resp_200, resp_500, PageModel
@@ -14,13 +14,30 @@ from readbetween.utils.function_calling_manager import function_calling_manager
 router = APIRouter(prefix="/openapi/configs", tags=["OpenAPI配置管理"])
 
 
+async def update_openapi_services_to_function_calling_manager():
+    """更新OpenAPI服务到函数调用管理器"""
+    try:
+        openapi_service_configs = {}
+        all_openapi_configs: List[OpenAPIConfig] = await OpenAPIConfigDao.get_all_configs()
+        for openapi_config in all_openapi_configs:
+            openapi_service_configs[openapi_config.name] = {
+                "openapi_spec": json.dumps(openapi_config.openapi_spec, ensure_ascii=False),
+                "credentials": openapi_config.credentials
+            }
+        await function_calling_manager.update_openapi_services(openapi_service_configs)
+        logger_util.info("成功更新OpenAPI服务到函数调用管理器")
+    except Exception as e:
+        logger_util.error(f"更新OpenAPI服务到函数调用管理器失败: {str(e)}")
+
+
 @router.post(
     "/create",
     summary="创建OpenAPI配置",
     description="上传OpenAPI规范JSON，系统会自动解析并创建对应的API工具"
 )
 async def create_openapi_config(
-        request: OpenAPIConfigCreateRequest
+        request: OpenAPIConfigCreateRequest,
+        background_tasks: BackgroundTasks
 ):
     """创建OpenAPI配置并解析工具"""
     try:
@@ -38,14 +55,8 @@ async def create_openapi_config(
         base_url = result["base_url"]
         tools_count = result["tools_count"]
 
-        # 更新FC统一工具调用器
-        openapi_service_configs = {}
-        all_openapi_configs: List[OpenAPIConfig] = await OpenAPIConfigDao.get_all_configs()
-        for openapi_config in all_openapi_configs:
-            openapi_service_configs[openapi_config.name] = {
-                "openapi_spec": json.dumps(openapi_config.openapi_spec, ensure_ascii=False)
-            }
-        await function_calling_manager.update_openapi_services(openapi_service_configs)
+        # 后台任务 - 更新FC统一工具调用器
+        background_tasks.add_task(update_openapi_services_to_function_calling_manager)
 
         # 获取配置的所有工具信息
         tools = await OpenAPIConfigService.get_config_tools(config.id)
@@ -88,8 +99,8 @@ async def create_openapi_config(
     description="获取系统中所有的OpenAPI配置列表"
 )
 async def get_all_openapi_configs(
-    page: int = None,
-    size: int = None
+        page: int = None,
+        size: int = None
 ) -> PageModel | ResponseModel:
     """获取所有OpenAPI配置"""
     try:
@@ -150,10 +161,16 @@ async def get_openapi_config(
     summary="删除OpenAPI配置",
     description="删除OpenAPI配置及其所有相关工具"
 )
-async def delete_openapi_config(config_id: str):
+async def delete_openapi_config(
+        config_id: str,
+        background_tasks: BackgroundTasks
+):
     """删除OpenAPI配置"""
     try:
         success = await OpenAPIConfigService.delete_config(config_id)
+
+        # 后台任务 - 更新FC统一工具调用器
+        background_tasks.add_task(update_openapi_services_to_function_calling_manager)
 
         if not success:
             return resp_500(404, f"未找到ID为 {config_id} 的配置")

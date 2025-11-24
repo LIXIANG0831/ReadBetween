@@ -88,7 +88,8 @@ async def init_function_calling_manager():
     all_openapi_configs: List[OpenAPIConfig] = await OpenAPIConfigDao.get_all_configs()
     for openapi_config in all_openapi_configs:
         openapi_service_configs[openapi_config.name] = {
-            "openapi_spec": json.dumps(openapi_config.openapi_spec, ensure_ascii=False)
+            "openapi_spec": json.dumps(openapi_config.openapi_spec, ensure_ascii=False),
+            "credentials": openapi_config.credentials
         }
     logger_util.debug(f"OpenAPI Config Init :: {openapi_service_configs}")
 

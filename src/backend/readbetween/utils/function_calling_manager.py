@@ -418,10 +418,24 @@ class UnifiedToolManager:
     async def cleanup(self):
         """清理资源"""
         try:
-            await self.exit_stack.aclose()
+            # 先关闭所有会话
+            for source_id, tool_source in list(self.tool_sources.items()):
+                if isinstance(tool_source, MCPSource):
+                    try:
+                        # 优雅关闭会话
+                        if hasattr(tool_source.session, 'aclose'):
+                            await tool_source.session.aclose()
+                    except Exception as e:
+                        logger_util.debug(f"关闭MCP会话失败 {source_id}: {e}")
+
+            # 清空数据结构
             self.tool_sources.clear()
             self.tool_mapping.clear()
             self.tool_definitions.clear()
+
+            # 最后清理退出栈
+            if hasattr(self.exit_stack, 'aclose'):
+                await self.exit_stack.aclose()
             logger_util.debug("所有工具资源已释放")
         except Exception as e:
             logger_util.error(f"清理工具资源时异常：{e}")
@@ -525,7 +539,8 @@ class FunctionCallingManager:
                 self._openapi_configs = new_openapi_configs
 
                 # 重新初始化工具管理器
-                await self._tool_manager.cleanup()
+                if self._tool_manager is not None:
+                    await self._tool_manager.cleanup()
                 self._tool_manager = UnifiedToolManager()
 
                 # 重新添加所有配置
