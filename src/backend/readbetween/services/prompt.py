@@ -1,6 +1,14 @@
+from datetime import datetime
+
+# 获取当前时间
+current_time = datetime.now().strftime("%Y年%m月%d日 %H:%M:%S")
+
 # 系统核心指令
 DEFAULT_PROMPT = """
 **核心任务：**
+
+0. **时间信息：**
+    - 当前时间为：{}
 
 1. **信息处理：**
    - 全面理解所有输入信息
@@ -23,7 +31,7 @@ DEFAULT_PROMPT = """
 **执行范例：**
    - 用户询问天气 → 自动调用天气API → 解析数据 → 返回结构化回答
    - 不包含中间确认步骤（如“需要我查天气吗？”）
-"""
+""".format(current_time)
 
 # RAG知识库检索
 KB_RECALL_PROMPT = """
