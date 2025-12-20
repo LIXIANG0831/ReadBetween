@@ -8,10 +8,11 @@ from typing import Dict, Any, List, Optional
 from enum import Enum
 
 import shortuuid
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
-from mcp import ClientSession, StdioServerParameters, stdio_client
+from mcp.client.stdio import stdio_client
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageFunctionToolCall, ChatCompletionMessageCustomToolCall, ChatCompletion
+from openai.types.chat import ChatCompletionMessageFunctionToolCall, ChatCompletionMessageCustomToolCall
 from openapi_llm.client.openapi_async import AsyncOpenAPIClient
 
 from readbetween.utils.logger_util import logger_util
@@ -21,6 +22,125 @@ class ToolType(Enum):
     """工具类型枚举"""
     MCP = "mcp"
     OPENAPI = "openapi"
+
+
+class MCPClientWrapper:
+    """
+    MCP 客户端包装器
+    负责单个 MCP 连接的生命周期管理（连接、保活、重连、工具调用）
+    """
+
+    def __init__(self, server_id: str, server_name: str, config: Dict[str, Any]):
+        self.server_id = server_id
+        self.server_name = server_name
+        self.config = config
+        self.session: Optional[ClientSession] = None
+        self.exit_stack: Optional[AsyncExitStack] = None
+        self._lock = asyncio.Lock()  # 确保重连时的线程安全
+
+    async def connect(self):
+        """建立连接"""
+        async with self._lock:
+            if self.session:
+                return  # 已连接
+
+            logger_util.info(f"[{self.server_name}] 正在初始化MCP连接...")
+            # 每个客户端拥有独立的 ExitStack，互不影响
+            self.exit_stack = AsyncExitStack()
+
+            try:
+                if self.config.get("command"):
+                    # Stdio 连接
+                    params = StdioServerParameters(
+                        command=self.config["command"],
+                        args=self.config.get("args", []),
+                        env=self.config.get("env", None)
+                    )
+                    connection_ctx = stdio_client(params)
+                elif self.config.get("url"):
+                    # SSE 连接
+                    connection_ctx = sse_client(
+                        url=self.config["url"],
+                        headers=self.config.get("headers", {})
+                    )
+                else:
+                    raise ValueError(f"[{self.server_name}] 配置缺少 command 或 url")
+
+                # 进入连接上下文
+                connection = await self.exit_stack.enter_async_context(connection_ctx)
+
+                # 创建并初始化 Session
+                session_ctx = ClientSession(connection[0], connection[1])
+                self.session = await self.exit_stack.enter_async_context(session_ctx)
+                await self.session.initialize()
+
+                logger_util.info(f"[{self.server_name}] MCP连接建立成功")
+
+            except Exception as e:
+                logger_util.error(f"[{self.server_name}] 连接失败: {e}")
+                await self._cleanup_stack()  # 清理可能的半僵死状态
+                raise e
+
+    async def ensure_connected(self):
+        """确保连接可用，如果断开则重连"""
+        if not self.session:
+            await self.connect()
+
+    async def list_tools(self):
+        """获取工具列表"""
+        await self.ensure_connected()
+        if self.session:
+            return await self.session.list_tools()
+        return None
+
+    async def call_tool(self, tool_name: str, arguments: dict):
+        """调用工具，包含自动重试逻辑"""
+        try:
+            await self.ensure_connected()
+            if not self.session:
+                raise ConnectionError(f"[{self.server_name}] 无法连接到服务器")
+
+            # 设置超时时间
+            read_timeout_seconds = timedelta(minutes=2)
+            return await self.session.call_tool(tool_name, arguments, read_timeout_seconds)
+
+        except Exception as e:
+            logger_util.warning(f"[{self.server_name}] 工具调用失败，尝试重连并重试... 错误: {e}")
+
+            # 尝试重启连接
+            try:
+                await self.restart()
+            except Exception as restart_error:
+                logger_util.error(f"[{self.server_name}] 重连失败: {restart_error}")
+                raise e  # 抛出原始异常
+
+            # 重连成功后重试一次
+            if self.session:
+                logger_util.info(f"[{self.server_name}] 重连成功，正在重试工具调用...")
+                read_timeout_seconds = timedelta(minutes=2)
+                return await self.session.call_tool(tool_name, arguments, read_timeout_seconds)
+            else:
+                raise e
+
+    async def close(self):
+        """关闭连接"""
+        async with self._lock:
+            await self._cleanup_stack()
+
+    async def _cleanup_stack(self):
+        """内部清理逻辑"""
+        if self.exit_stack:
+            try:
+                await self.exit_stack.aclose()
+            except Exception as e:
+                logger_util.error(f"[{self.server_name}] 关闭连接资源异常: {e}")
+        self.session = None
+        self.exit_stack = None
+
+    async def restart(self):
+        """重启连接"""
+        await self.close()
+        await self.connect()
 
 
 class ToolSource:
@@ -33,11 +153,11 @@ class ToolSource:
 
 
 class MCPSource(ToolSource):
-    """MCP 工具来源"""
+    """MCP 工具来源 - 持有 ClientWrapper"""
 
-    def __init__(self, server_id: str, server_name: str, session: ClientSession):
+    def __init__(self, server_id: str, server_name: str, client_wrapper: MCPClientWrapper):
         super().__init__(ToolType.MCP, server_id, server_name)
-        self.session = session
+        self.client_wrapper = client_wrapper
 
 
 class OpenAPISource(ToolSource):
@@ -57,7 +177,7 @@ class UnifiedToolManager:
         self.tool_sources: Dict[str, ToolSource] = {}  # K: source_id -> V: ToolSource
         self.tool_mapping: Dict[str, tuple] = {}  # K: prefixed_tool_name -> V: (source_id, original_tool_name)
         self.tool_definitions: Dict[str, Dict] = {}  # K: prefixed_tool_name -> V: tool_definition
-        self.exit_stack = AsyncExitStack()
+        # 注意：不再使用全局 AsyncExitStack，改由 MCPClientWrapper 自行管理
 
     async def add_mcp_server(self, server_configs: Dict[str, Dict[str, Any]]) -> Dict[str, str]:
         """
@@ -69,7 +189,7 @@ class UnifiedToolManager:
         server_id_to_name = {}
 
         for server_name, config in server_configs.items():
-            # 创建标准化的配置字典，确保所有字段都存在
+            # 创建标准化的配置字典
             standardized_config = {
                 "command": config.get("command"),
                 "args": config.get("args"),
@@ -87,62 +207,26 @@ class UnifiedToolManager:
                 logger_util.debug(f"[{server_name}] MCP服务器已存在，跳过重复添加")
                 continue
 
+            client_wrapper = None
             try:
-                if not config.get("url") and not config.get("command"):
-                    logger_util.error(f"[{server_name}] 无法判断MCP服务器类型")
-                    continue
+                # 1. 创建 Wrapper
+                client_wrapper = MCPClientWrapper(server_id, server_name, standardized_config)
 
-                if config.get("command") and not config.get("url"):
-                    # 处理 stdio 连接
-                    params = StdioServerParameters(
-                        command=config["command"],
-                        args=config.get("args", []),
-                        env=config.get("env", None)
-                    )
-                    try:
-                        connection_ctx = stdio_client(params)
-                        connection = await self.exit_stack.enter_async_context(connection_ctx)
-                        session_ctx = ClientSession(*connection)
-                        session = await self.exit_stack.enter_async_context(session_ctx)
-                        await session.initialize()
+                # 2. 尝试连接 (异步初始化)
+                await client_wrapper.connect()
 
-                        # 创建 MCP 工具源
-                        mcp_source = MCPSource(server_id, server_name, session)
-                        self.tool_sources[server_id] = mcp_source
+                # 3. 创建 MCP 工具源
+                mcp_source = MCPSource(server_id, server_name, client_wrapper)
+                self.tool_sources[server_id] = mcp_source
 
-                        # 获取工具列表并建立映射
-                        await self._update_mcp_tool_mapping(server_id, mcp_source)
-                        logger_util.debug(f"[{server_name}] MCP服务器添加成功")
-
-                    except Exception as e:
-                        logger_util.error(f"[{server_name}] stdio连接初始化失败: {e}")
-                        continue
-
-                elif not config.get("command") and config.get("url"):
-                    try:
-                        connection_ctx = sse_client(
-                            url=config["url"],
-                            headers=config.get("headers", {})
-                        )
-                        connection = await self.exit_stack.enter_async_context(connection_ctx)
-                        session_ctx = ClientSession(*connection)
-                        session = await self.exit_stack.enter_async_context(session_ctx)
-                        await session.initialize()
-
-                        # 创建 MCP 工具源
-                        mcp_source = MCPSource(server_id, server_name, session)
-                        self.tool_sources[server_id] = mcp_source
-
-                        # 获取工具列表并建立映射
-                        await self._update_mcp_tool_mapping(server_id, mcp_source)
-                        logger_util.debug(f"[{server_name}] MCP服务器添加成功")
-
-                    except Exception as e:
-                        logger_util.error(f"[{server_name}] SSE连接初始化失败: {e}")
-                        continue
+                # 4. 获取工具列表并建立映射
+                await self._update_mcp_tool_mapping(server_id, mcp_source)
 
             except Exception as e:
                 logger_util.error(f"[{server_name}] MCP服务器添加失败：{e}")
+                # 如果初始化失败，确保资源被清理
+                if client_wrapper:
+                    await client_wrapper.close()
                 continue
 
         return server_id_to_name
@@ -150,9 +234,6 @@ class UnifiedToolManager:
     async def add_openapi_service(self, service_configs: Dict[str, Dict[str, Any]]) -> Dict[str, str]:
         """
         添加 OpenAPI 服务
-
-        :param service_configs: OpenAPI 服务配置
-        :return: 服务ID到名称的映射
         """
         service_id_to_name = {}
 
@@ -160,8 +241,8 @@ class UnifiedToolManager:
             service_id_dict = {service_name: config}
             service_id = json.dumps(service_id_dict, ensure_ascii=False, sort_keys=True)
             service_id_to_name[service_id] = service_name
+            logger_util.info(f"[{service_name}] 正在初始化OpenAPI连接...")
 
-            # 如果已经存在相同的服务ID，跳过重复添加
             if service_id in self.tool_sources:
                 logger_util.debug(f"[{service_name}] OpenAPI服务已存在，跳过重复添加")
                 continue
@@ -186,7 +267,7 @@ class UnifiedToolManager:
 
                 # 获取工具列表并建立映射
                 await self._update_openapi_tool_mapping(service_id, openapi_source)
-                logger_util.debug(f"[{service_name}] OpenAPI服务添加成功")
+                logger_util.info(f"[{service_name}] OpenAPI服务添加成功")
 
             except Exception as e:
                 logger_util.error(f"[{service_name}] OpenAPI服务添加失败：{e}")
@@ -197,7 +278,8 @@ class UnifiedToolManager:
     async def _update_mcp_tool_mapping(self, server_id: str, mcp_source: MCPSource):
         """更新 MCP 工具映射"""
         try:
-            response = await mcp_source.session.list_tools()
+            # 通过 wrapper 获取工具
+            response = await mcp_source.client_wrapper.list_tools()
             short_id_8 = shortuuid.ShortUUID().random(length=8)
 
             for tool in response.tools:
@@ -221,7 +303,6 @@ class UnifiedToolManager:
         try:
             for tool_definition in openapi_source.api_client.tool_definitions:
                 original_name = tool_definition['function']['name']
-                # 对于OpenAPI工具，使用原始名称，不添加前缀
                 prefixed_name = original_name
 
                 self.tool_mapping[prefixed_name] = (service_id, original_name)
@@ -240,11 +321,7 @@ class UnifiedToolManager:
             logger_util.error(f"更新OpenAPI工具映射失败: {e}")
 
     def get_all_tool_definitions(self) -> List[Dict[str, Any]]:
-        """
-        获取所有工具的定义，用于传递给 LLM
-
-        :return: OpenAI 格式的工具定义列表
-        """
+        """获取所有工具定义"""
         openai_tools = []
         for tool_def in self.tool_definitions.values():
             openai_tools.append({
@@ -292,14 +369,15 @@ class UnifiedToolManager:
                     })
         return tools
 
-    async def execute_tools(self, tool_calls: list[ChatCompletionMessageFunctionToolCall | ChatCompletionMessageCustomToolCall | dict] | None) -> Dict[str, Any]:
+    async def execute_tools(self, tool_calls: list[
+                                                  ChatCompletionMessageFunctionToolCall | ChatCompletionMessageCustomToolCall | dict] | None) -> \
+    Dict[str, Any]:
         """
         执行工具调用
-
-        :param tool_calls: OpenAI 响应的工具列表
-        :return: 执行结果
         """
         results = {}
+        if not tool_calls:
+            return results
 
         for i, tool_call in enumerate(tool_calls):
             # 统一处理不同格式的工具调用
@@ -353,10 +431,11 @@ class UnifiedToolManager:
 
             try:
                 if tool_source.source_type == ToolType.MCP:
-                    # 执行 MCP 工具 - 使用原始工具名称
+                    # 执行 MCP 工具 - 使用 Wrapper 处理（包含自动重试）
                     mcp_source: MCPSource = tool_source
-                    read_timeout_seconds = timedelta(minutes=1)
-                    result = await mcp_source.session.call_tool(original_tool_name, tool_args, read_timeout_seconds)
+
+                    # 调用 Wrapper 的 call_tool，它会自动处理连接状态
+                    result = await mcp_source.client_wrapper.call_tool(original_tool_name, tool_args)
 
                     results[result_key] = {
                         "success": True,
@@ -369,16 +448,13 @@ class UnifiedToolManager:
                     }
 
                 elif tool_source.source_type == ToolType.OPENAPI:
-                    # 执行 OpenAPI 工具 - 构建正确的 function_payload
+                    # 执行 OpenAPI 工具
                     openapi_source: OpenAPISource = tool_source
-
-                    # 构建符合 SDK 要求的 function_payload
                     function_payload = {
-                        "name": original_tool_name,  # 使用原始工具名称
-                        "arguments": tool_args  # 直接使用解析后的参数
+                        "name": original_tool_name,
+                        "arguments": tool_args
                     }
 
-                    # 使用 OpenAPI 客户端执行工具
                     async with openapi_source.api_client as api:
                         service_response = await api.invoke(function_payload)
                         logger_util.debug(f"OpenAPI 工具执行结果: {service_response=}")
@@ -393,10 +469,7 @@ class UnifiedToolManager:
                         }
 
             except Exception as e:
-                # 获取完整的堆栈跟踪
                 stack_trace = traceback.format_exc()
-
-                # 记录详细错误
                 logger_util.error(f"工具 {mapped_tool_name} 执行失败:\n"
                                   f"错误: {str(e)}\n"
                                   f"堆栈跟踪:\n{stack_trace}\n"
@@ -418,25 +491,23 @@ class UnifiedToolManager:
     async def cleanup(self):
         """清理资源"""
         try:
-            # 先关闭所有会话
-            for source_id, tool_source in list(self.tool_sources.items()):
-                if isinstance(tool_source, MCPSource):
-                    try:
-                        # 优雅关闭会话
-                        if hasattr(tool_source.session, 'aclose'):
-                            await tool_source.session.aclose()
-                    except Exception as e:
-                        logger_util.debug(f"关闭MCP会话失败 {source_id}: {e}")
+            logger_util.info("开始清理工具资源...")
+            tasks = []
 
-            # 清空数据结构
+            # 收集所有 MCP 关闭任务
+            for source in self.tool_sources.values():
+                if isinstance(source, MCPSource):
+                    # 优雅关闭 Wrapper
+                    tasks.append(source.client_wrapper.close())
+
+            # 并发执行关闭，提高效率
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
             self.tool_sources.clear()
             self.tool_mapping.clear()
             self.tool_definitions.clear()
-
-            # 最后清理退出栈
-            if hasattr(self.exit_stack, 'aclose'):
-                await self.exit_stack.aclose()
-            logger_util.debug("所有工具资源已释放")
+            logger_util.info("所有工具资源已释放")
         except Exception as e:
             logger_util.error(f"清理工具资源时异常：{e}")
 
@@ -461,55 +532,43 @@ class FunctionCallingManager:
             mcp_server_configs: Optional[Dict] = None,
             openapi_service_configs: Optional[Dict] = None
     ) -> UnifiedToolManager:
-        """
-        初始化工具管理器
-
-        :param mcp_server_configs: MCP 服务器配置
-        :param openapi_service_configs: OpenAPI 服务配置
-        :return: 工具管理器实例
-        """
+        """初始化工具管理器"""
         async with self._lock:
+            # 如果存在旧实例，先清理
             if self._tool_manager is not None:
                 await self._tool_manager.cleanup()
 
             self._tool_manager = UnifiedToolManager()
 
-            # 保存配置
             self._mcp_configs = mcp_server_configs or {}
             self._openapi_configs = openapi_service_configs or {}
 
-            # 添加 MCP 服务器
-            if mcp_server_configs:
-                await self._tool_manager.add_mcp_server(mcp_server_configs)
+            # 并发初始化可以进一步优化启动速度，但为了逻辑简单这里按顺序添加
+            if self._mcp_configs:
+                await self._tool_manager.add_mcp_server(self._mcp_configs)
 
-            # 添加 OpenAPI 服务
-            if openapi_service_configs:
-                await self._tool_manager.add_openapi_service(openapi_service_configs)
+            if self._openapi_configs:
+                await self._tool_manager.add_openapi_service(self._openapi_configs)
 
             logger_util.info("FunctionCallingManager 初始化完成")
             return self._tool_manager
 
     async def update_mcp_servers(self, new_mcp_configs: Dict) -> bool:
-        """
-        更新 MCP 服务器配置
-
-        :param new_mcp_configs: 新的 MCP 服务器配置
-        :return: 是否成功更新
-        """
+        """更新 MCP 服务器配置"""
         async with self._lock:
             if self._tool_manager is None:
                 logger_util.error("工具管理器未初始化")
                 return False
 
             try:
-                # 更新配置
+                # 记录旧配置
                 self._mcp_configs = new_mcp_configs
 
-                # 重新初始化工具管理器
+                # 全量重置策略：清理旧的，重新初始化
+                # 优化策略提示：在生产环境中，可以比对配置差异，只增删改变动的部分，而不是全量重建
                 await self._tool_manager.cleanup()
                 self._tool_manager = UnifiedToolManager()
 
-                # 重新添加所有配置
                 if self._mcp_configs:
                     await self._tool_manager.add_mcp_server(self._mcp_configs)
                 if self._openapi_configs:
@@ -517,33 +576,23 @@ class FunctionCallingManager:
 
                 logger_util.info("MCP 服务器配置更新成功")
                 return True
-
             except Exception as e:
                 logger_util.error(f"更新 MCP 服务器配置失败: {e}")
                 return False
 
     async def update_openapi_services(self, new_openapi_configs: Dict) -> bool:
-        """
-        更新 OpenAPI 服务配置
-
-        :param new_openapi_configs: 新的 OpenAPI 服务配置
-        :return: 是否成功更新
-        """
+        """更新 OpenAPI 服务配置"""
         async with self._lock:
             if self._tool_manager is None:
                 logger_util.error("工具管理器未初始化")
                 return False
 
             try:
-                # 更新配置
                 self._openapi_configs = new_openapi_configs
 
-                # 重新初始化工具管理器
-                if self._tool_manager is not None:
-                    await self._tool_manager.cleanup()
+                await self._tool_manager.cleanup()
                 self._tool_manager = UnifiedToolManager()
 
-                # 重新添加所有配置
                 if self._mcp_configs:
                     await self._tool_manager.add_mcp_server(self._mcp_configs)
                 if self._openapi_configs:
@@ -551,21 +600,17 @@ class FunctionCallingManager:
 
                 logger_util.info("OpenAPI 服务配置更新成功")
                 return True
-
             except Exception as e:
                 logger_util.error(f"更新 OpenAPI 服务配置失败: {e}")
                 return False
 
     def get_tool_manager(self) -> Optional[UnifiedToolManager]:
-        """获取工具管理器实例"""
         return self._tool_manager
 
     def get_mcp_configs(self) -> Dict:
-        """获取当前 MCP 配置"""
         return self._mcp_configs
 
     def get_openapi_configs(self) -> Dict:
-        """获取当前 OpenAPI 配置"""
         return self._openapi_configs
 
     async def cleanup(self):
@@ -585,11 +630,6 @@ function_calling_manager = FunctionCallingManager()
 
 # 使用示例
 async def example_usage():
-    # Notice:
-    # function_calling_manager.initialize 相当于执行器，加载全部的可调用MCP和OpenAPI的工具
-    # 输入给LLM的 tool_definitions 包含2部分：1. 配置到会话的mcp_server; 2. 直接挂载到会话的OpenAPI的tool_definition;
-    # LLM输出工具调用Response使用tool_manager.execute_tools自动执行
-
     # MCP 服务器配置
     mcp_configs = {
         "高德地图": {
@@ -600,10 +640,10 @@ async def example_usage():
     # OpenAPI 服务配置
     openapi_configs = {
         "空压工具": {
-            "openapi_spec": "{\r\n    \"openapi\": \"3.1.0\",\r\n    \"info\": {\r\n        \"title\": \"空压分析工具\",\r\n        \"description\": \"空压站能耗、能效、流量、压力等分析工具接口\",\r\n        \"version\": \"v1.0.0\"\r\n    },\r\n    \"servers\": [\r\n        {\r\n            \"url\": \"https:\/\/emat.t.cosmoplat.cn\/dev-api\"\r\n        }\r\n    ],\r\n    \"paths\": {\r\n        \"\/tool\/v1\/compressor\/getEnergyStatistics\": {\r\n            \"post\": {\r\n                \"description\": \"能耗统计，包含空压站的流量、功率、压力、用电量、总电费、能耗等信息。\",\r\n                \"operationId\": \"getEnergyStatistics\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getEfficiencyAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"能效分析，包含空压站日总电量、日总流量、平均压力、单位能耗等信息\",\r\n                \"operationId\": \"getEfficiencyAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getAirCompressorAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站下空压机的详细信息，包含设备名称、额定功率、运行模式（0-工频 1-变频）、工频（加载率\/变频：负荷率（%））耗电量占比等信息。\",\r\n                \"operationId\": \"getAirCompressorAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getFlowAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站流量分析，包含流量最值、流量类型（1-产气标况流量 2-用气标况流量）等信息。\",\r\n                \"operationId\": \"getFlowAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"device_name\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"根据指标筛选返回数据，可用的device_name包括：总产气量、总用气量\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getFlowRangeDistribution\": {\r\n            \"post\": {\r\n                \"description\": \"空压站的产气流量范围分布，包含在范围内的流量占比、流量最值、平均值。\",\r\n                \"operationId\": \"getFlowRangeDistribution\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    },\r\n                                    \"block\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"分块数量，不传则由最大值决定\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getPressureAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站的压力分析，包含压力最值、平均值、压力类型（1-产气压力 2-用气压力）等。\",\r\n                \"operationId\": \"getPressureAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getPressureDropAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站的压降分析，包含压降最值、平均值等。\",\r\n                \"operationId\": \"getPressureDropAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        }\r\n    },\r\n    \"components\": {\r\n        \"schemas\": {}\r\n    }\r\n}"
+            "openapi_spec": "{\r\n    \"openapi\": \"3.1.0\",\r\n    \"info\": {\r\n        \"title\": \"空压分析工具\",\r\n        \"description\": \"空压站能耗、能效、流量、压力等分析工具接口\",\r\n        \"version\": \"v1.0.0\"\r\n    },\r\n    \"servers\": [\r\n        {\r\n            \"url\": \"https:\/\/ema.cosmoplat.cn\/dev-api\"\r\n        }\r\n    ],\r\n    \"paths\": {\r\n        \"\/tool\/v1\/compressor\/getEnergyStatistics\": {\r\n            \"post\": {\r\n                \"description\": \"能耗统计，包含空压站的流量、功率、压力、用电量、总电费、能耗等信息。\",\r\n                \"operationId\": \"getEnergyStatistics\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getEfficiencyAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"能效分析，包含空压站日总电量、日总流量、平均压力、单位能耗等信息\",\r\n                \"operationId\": \"getEfficiencyAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getAirCompressorAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站下空压机的详细信息，包含设备名称、额定功率、运行模式（0-工频 1-变频）、工频（加载率\/变频：负荷率（%））耗电量占比等信息。\",\r\n                \"operationId\": \"getAirCompressorAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getFlowAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站流量分析，包含流量最值、流量类型（1-产气标况流量 2-用气标况流量）等信息。\",\r\n                \"operationId\": \"getFlowAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"device_name\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"根据指标筛选返回数据，可用的device_name包括：总产气量、总用气量\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getFlowRangeDistribution\": {\r\n            \"post\": {\r\n                \"description\": \"空压站的产气流量范围分布，包含在范围内的流量占比、流量最值、平均值。\",\r\n                \"operationId\": \"getFlowRangeDistribution\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    },\r\n                                    \"block\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"分块数量，不传则由最大值决定\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getPressureAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站的压力分析，包含压力最值、平均值、压力类型（1-产气压力 2-用气压力）等。\",\r\n                \"operationId\": \"getPressureAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        },\r\n        \"\/tool\/v1\/compressor\/getPressureDropAnalysis\": {\r\n            \"post\": {\r\n                \"description\": \"空压站的压降分析，包含压降最值、平均值等。\",\r\n                \"operationId\": \"getPressureDropAnalysis\",\r\n                \"requestBody\": {\r\n                    \"content\": {\r\n                        \"application\/json\": {\r\n                            \"schema\": {\r\n                                \"type\": \"object\",\r\n                                \"properties\": {\r\n                                    \"start_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"开始时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"end_date\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"结束时间，格式yyyy-MM-dd\"\r\n                                    },\r\n                                    \"config_type\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"配置类型，固定为2\"\r\n                                    },\r\n                                    \"station_id\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"空压站id\"\r\n                                    },\r\n                                    \"time_type\": {\r\n                                        \"type\": \"string\",\r\n                                        \"description\": \"时间类型：second-秒 minute-分钟 hour-小时 day-天\"\r\n                                    },\r\n                                    \"time_value\": {\r\n                                        \"type\": \"integer\",\r\n                                        \"description\": \"时间值，时间粒度 = 时间类型 + 时间值，例：time_type为minute，time_value为60，则时间粒度为60分钟\"\r\n                                    }\r\n                                },\r\n                                \"required\": [\"start_date\", \"end_date\", \"config_type\", \"station_id\", \"time_type\", \"time_value\"]\r\n                            }\r\n                        }\r\n                    }\r\n                },\r\n                \"responses\": {\r\n                    \"200\": {\r\n                        \"description\": \"成功响应\"\r\n                    }\r\n                }\r\n            }\r\n        }\r\n    },\r\n    \"components\": {\r\n        \"schemas\": {}\r\n    }\r\n}"
         },
         "天气工具": {
-            "openapi_spec": "{\r\n    \"openapi\": \"3.1.0\",\r\n    \"info\":\r\n    {\r\n        \"title\": \"天气数据MCP\",\r\n        \"description\": \"获取本周天气情况（温度范围、降雨天数）\",\r\n        \"version\": \"v1.0.0\"\r\n    },\r\n    \"servers\": [\r\n    {\r\n        \"url\": \"https:\/\/mock.apipost.net\/mock\"\r\n    }],\r\n    \"paths\":\r\n    {\r\n        \"\/4ff3871fcc1c000\/?apipost_id=11f435e9fbc086\":\r\n        {\r\n            \"get\":\r\n            {\r\n                \"description\": \"天气情况\",\r\n                \"operationId\": \"getWeather\"\r\n            }\r\n        }\r\n    },\r\n    \"components\":\r\n    {\r\n        \"schemas\":\r\n        {}\r\n    }\r\n}"
+            "openapi_spec": "{\"openapi\":\"3.1.0\",\"info\":{\"title\":\"天气数据MCP\",\"description\":\"获取本周天气情况\",\"version\":\"v1.0.0\"},\"servers\":[{\"url\":\"https://mock.apipost.net/mock\"}],\"paths\":{\"/4ff3871fcc1c000/?apipost_id=11f435e9fbc086\":{\"get\":{\"description\":\"天气情况\",\"operationId\":\"getWeather\"}}},\"components\":{\"schemas\":{}}}"
         }
     }
 
@@ -618,33 +658,62 @@ async def example_usage():
 
     # 获取所有工具定义（用于传递给 LLM）
     tool_definitions = tool_manager.get_all_tool_definitions()
-    # print(f"可用工具: {[tool['function']['name'] for tool in tool_definitions]}")
+    print(f"可用工具数量: {len(tool_definitions)}")
 
-    # 执行工具调用
+    # 模拟 LLM 调用
     client = AsyncOpenAI(
         base_url=os.getenv("MEMORY__LLM__BASE_URL"),
         api_key=os.getenv("MEMORY__LLM__API_KEY")
     )
-    response = await client.chat.completions.create(
-        model="COSMO-Mind",
-        # messages=[{"role": "user", "content": "空压机794在2025-11-11日的能效信息"}],  # OpenAPI调用 - 通过
-        # messages=[{"role": "user", "content": "获取今天的天气信息"}],  # OpenAPI调用 - 通过
-        # messages=[{"role": "user", "content": "青岛琴屿路的地理坐标"}],  # MCP调用 - 通过
-        # messages=[{"role": "user", "content": "青岛琴屿路的地理坐标和上海东华大学的地理坐标"}],  # 多MCP调用 - 通过
-        # messages=[{"role": "user", "content": "先查询，空压机794在2025-11-11日的能效信息。再查询，今天的天气。"}],  # 多OpenAPI混合调用
-        # messages=[{"role": "user", "content": "一次性完成工具调用。先查询，青岛琴屿路的地理坐标。再查询，空压机794在2025-11-11日的能效信息"}],  # MCP/OpenAPI混合调用
-        messages=[{"role": "user", "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],  # MCP/OpenAPI混合调用
-        tools=tool_definitions
-    )
-    print("=== LLM Call API Response ===")
-    print(response)
-    tool_calls = response.choices[0].message.tool_calls
-    results = await tool_manager.execute_tools(tool_calls)
-    print(f"\n执行结果: {results}")
+
+    print("====== 第一次调用开始 ======")
+    try:
+        response = await client.chat.completions.create(
+            model="COSMO-Mind",
+            # messages=[{"role": "user", "content": "青岛琴屿路的地理坐标"}],
+            messages=[{"role": "user", "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],  # MCP/OpenAPI混合调用
+            tools=tool_definitions
+        )
+        print("=== LLM Call API Response ===")
+        # print(response)
+
+        tool_calls = response.choices[0].message.tool_calls
+        if tool_calls:
+            print(f"触发工具调用: {len(tool_calls)} 个")
+            results = await tool_manager.execute_tools(tool_calls)
+            print(f"\n执行结果: {results}")
+    except Exception as e:
+        print(f"LLM调用测试失败: {e}")
+    print("====== 第一次调用结束 ======")
+
+    print("====== 模拟空闲开始 ======")
+    await asyncio.sleep(60 * 5)
+    print("====== 模拟空闲结束 ======")
+
+    print("====== 第二次调用开始 ======")
+    try:
+        response = await client.chat.completions.create(
+            model="COSMO-Mind",
+            # messages=[{"role": "user", "content": "青岛琴屿路的地理坐标"}],
+            messages=[{"role": "user", "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],  # MCP/OpenAPI混合调用
+            tools=tool_definitions
+        )
+        print("=== LLM Call API Response ===")
+        # print(response)
+
+        tool_calls = response.choices[0].message.tool_calls
+        if tool_calls:
+            print(f"触发工具调用: {len(tool_calls)} 个")
+            results = await tool_manager.execute_tools(tool_calls)
+            print(f"\n执行结果: {results}")
+    except Exception as e:
+        print(f"LLM调用测试失败: {e}")
+    print("====== 第二次调用结束 ======")
+
 
     # 清理资源
     await function_calling_manager.cleanup()
 
 
-# 运行示例
-# asyncio.run(example_usage())
+if __name__ == "__main__":
+    asyncio.run(example_usage())
