@@ -1,13 +1,13 @@
 <template>
   <div class="common-layout">
-    <h2>📑 知识库文件列表</h2>
+    <h3>📚 知识库文件列表</h3>
 
     <div class="action-bar">
       <t-button theme="primary" @click="goBack" class="action-btn">
         <template #icon><t-icon name="chevron-left" /></template>
         返回
       </t-button>
-      <t-button theme="success" @click="openUploadDialog" class="action-btn">
+      <t-button theme="primary" @click="openUploadDialog" class="action-btn">
         <template #icon><t-icon name="upload" /></template>
         上传文件
       </t-button>
@@ -39,13 +39,13 @@
 
     <!-- 上传文件弹窗 -->
     <t-dialog
-      header="🚀 上传文件"
+      header="上传文件"
       v-model:visible="uploadDialogVisible"
       :on-cancel="resetUploadForm"
       class="dialog-size-xl"
     >
       <t-form layout="vertical">
-        <t-form-item label="📤文件上传" class="form-item-spacing" label-width="120px">
+        <t-form-item label="文件上传" class="form-item-spacing" label-width="120px">
           <t-upload
             v-model="uploadForm.fileList"
             :before-upload="beforeUpload"
@@ -61,16 +61,16 @@
         </t-form-item>
         <!-- 显示已上传文件列表 -->
         <div class="uploaded-files" v-if="uploadForm.uploadedFiles.length > 0">
-          <h4 class="uploaded-title">📁 已上传文件</h4>
+          <h4 class="uploaded-title">已上传文件</h4>
           <div class="file-list-container">
             <div v-for="(file, index) in uploadForm.uploadedFiles" :key="index" class="file-item">
               <div class="file-info">
                 <t-icon name="file" class="file-icon" />
                 <span class="file-name">{{ file.file_name }}</span>
               </div>
-              <t-button 
-                variant="text" 
-                theme="danger" 
+              <t-button
+                variant="text"
+                theme="danger"
                 @click="removeUploadedFile(index)"
                 class="remove-btn"
               >
@@ -80,18 +80,18 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 其他表单项目保持不变 -->
-        <t-form-item label="🍕切片大小" class="form-item-spacing" label-width="120px">
+        <t-form-item label="切片大小" class="form-item-spacing" label-width="120px">
           <t-input-number v-model="uploadForm.chunkSize" :min="100" :max="10000" />
         </t-form-item>
-        <t-form-item label="🔄🍕重复切片大小" class="form-item-spacing" label-width="120px">
+        <t-form-item label="重复切片大小" class="form-item-spacing" label-width="120px">
           <t-input-number v-model="uploadForm.repeatSize" :min="100" :max="10000" />
         </t-form-item>
-        <t-form-item label="⚡分隔符" class="form-item-spacing" label-width="120px">
+        <t-form-item label="分隔符" class="form-item-spacing" label-width="120px">
           <t-input v-model="uploadForm.separator" placeholder="请输入分隔符，例如：\n\n" />
         </t-form-item>
-        <t-form-item label="🤖自动执行" class="form-item-spacing" label-width="120px">
+        <t-form-item label="自动执行" class="form-item-spacing" label-width="120px">
           <t-switch v-model="uploadForm.auto" />
         </t-form-item>
       </t-form>
@@ -197,11 +197,11 @@ const getStatusTheme = (status: number) => {
 const getStatusText = (status: number) => {
   switch (status) {
     case 1:
-      return '🎉 解析完成';
+      return '解析完成';
     case -1:
-      return '❌ 解析失败';
+      return '解析失败';
     default:
-      return '🔍 未解析';
+      return '未解析';
   }
 };
 
@@ -365,14 +365,9 @@ onUnmounted(() => {
 }
 
 .action-btn {
-  border-radius: 8px;
-  padding: 8px 24px;
-  height: auto;
-  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: bold;
 }
 
 .file-table {

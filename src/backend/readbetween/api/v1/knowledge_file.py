@@ -11,7 +11,7 @@ from readbetween.models.dao.knowledge import Knowledge
 from readbetween.models.dao.knowledge_file import KnowledgeFile
 from readbetween.models.v1.knowledge import KnowledgeInfo
 from readbetween.models.v1.knowledge_file import KnowledgeFileExecute, KnowledgeFileVectorizeTasks
-from readbetween.services.tasks import celery_text_vectorize #bg_text_vectorize
+from readbetween.services.tasks import celery_embed_document
 from readbetween.utils.minio_util import MinioUtil
 from readbetween.models.schemas.response import resp_200, resp_500
 from readbetween.utils.logger_util import logger_util
@@ -156,7 +156,7 @@ async def execute_knowledge_file(knowledge_file_execute: KnowledgeFileExecute,
             # celery执行任务
             new_task_dict = new_task.dict()
             logger_util.info(f"调用Celery任务，参数: {new_task_dict}")
-            celery_text_vectorize.delay(new_task_dict)
+            celery_embed_document.delay(new_task_dict)
             logger_util.info(f"任务已提交Celery，参数: {new_task_dict}")
 
             return resp_200(result)

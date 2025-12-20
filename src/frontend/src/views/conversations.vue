@@ -11,10 +11,18 @@
           :expanded="[]"
           @change="handleConversationClick"
         >
-          <t-button theme="primary" @click="isCreateDialogVisible = true" style="width: 200px;margin-bottom: 16px;">
+          <t-button theme="primary" @click="isCreateDialogVisible = true" class="create-button">
+          <!-- style="width: 200px;margin-bottom: 16px;"> -->
+            <template #icon><t-icon name="add" /></template>
             新建渠道
           </t-button>
-          <t-menu-item v-for="item in conversation_items" :key="item.id" :value="item.id" class="menu-item">
+          <t-menu-item
+            v-for="item in conversation_items"
+            :key="item.id"
+            :value="item.id"
+            class="menu-item"
+            :class="{ 't-is-active': activeKey.includes(item.id) }"
+          >
             <template #icon>
               <t-icon name="chat" />
             </template>
@@ -1447,6 +1455,13 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 </script>
 
 <style scoped>
+
+.create-button {
+  border-radius: 8px;
+  font-weight: bold;
+  width: 290px;
+  margin-bottom: 16px;
+}
 .chat-image-container {
   margin: 12px 0;
   display: flex;
@@ -1644,6 +1659,22 @@ watch(() => availableModelStore.llmAvailableModelCfg, (newVal) => {
 .t-menu:not(.t-menu--dark) .t-menu-item.t-is-active {
   transform: none;
   transition: none;
+  /* 添加明确的选中样式 */
+  background-color: var(--td-brand-color-light) !important;
+  color: var(--td-text-color-brand) !important;
+  border-radius: 8px;
+}
+
+.t-menu:not(.t-menu--dark) .t-menu-item.t-is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 70%;
+  background-color: var(--td-brand-color);
+  border-radius: 0 4px 4px 0;
 }
 
 /* 禁用菜单的整体动画 */

@@ -1,5 +1,5 @@
 from readbetween.models.dao import *  # 确保执行任务时已加载全部DAO
-from readbetween.core.celery_app import celery as ywjz_celery
+from readbetween.core.celery_app import celery
 from readbetween.models.dao.knowledge_file import KnowledgeFile
 from readbetween.models.schemas.es.save_document import SaveDocument
 from readbetween.models.v1.knowledge_file import KnowledgeFileVectorizeTasks
@@ -19,7 +19,7 @@ from celery.utils.log import get_task_logger
 logger_util = get_task_logger("ReadBetween")
 
 
-@ywjz_celery.task(
+@celery.task(
     bind=True,
     autoretry_for=(Exception,),  # 自动重试所有异常
     max_retries=3,  # 最大重试次数
@@ -37,7 +37,7 @@ def celery_add_memory(self, query: str, user_id: str):
         logger_util.error(f"任务失败: {e}，正在重试，重试次数：{self.request.retries}")
 
 
-@ywjz_celery.task(
+@celery.task(
     bind=True,
     autoretry_for=(Exception,),  # 自动重试所有异常
     max_retries=3,  # 最大重试次数
@@ -45,7 +45,7 @@ def celery_add_memory(self, query: str, user_id: str):
     retry_backoff_max=30,  # 最大重试间隔为 30 秒
     retry_backoff_factor=2  # 退避因子为 2
 )
-def celery_text_vectorize(self, task_json):
+def celery_embed_document(self, task_json):
     knowledge_file_vectorize_task = KnowledgeFileVectorizeTasks.parse_obj(task_json)
     file_vectorize_err_msg = ""  # 记录异常信息
     logger_util.info("====》Celery 文档向量化任务开始执行")
@@ -81,8 +81,11 @@ def celery_text_vectorize(self, task_json):
             # 文档切片向量化 组织数据结构
             extract_results = []
             if enable_layout_flag == 1:  # 布局识别
-                # TODO 启用布局识别
-                pass
+                # TODO 启用布局识别 暂不处理布局识别
+                pdf_extractor = PdfExtractTool(file_save_path,
+                                               chunk_size=knowledge_file_vectorize_task.chunk_size,
+                                               repeat_size=knowledge_file_vectorize_task.repeat_size)
+                extract_results = pdf_extractor.extract()  # pdf切片结果返回
             elif enable_layout_flag == 0:  # 不进行布局识别
                 # 实例化pdf工具
                 pdf_extractor = PdfExtractTool(file_save_path,

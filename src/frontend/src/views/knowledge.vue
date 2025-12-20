@@ -75,7 +75,7 @@
     <!-- 创建知识库弹窗 -->
     <t-dialog
       v-model:visible="isCreateDialogVisible"
-      header="📚 创建知识库"
+      header="创建知识库"
       :on-cancel="() => isCreateDialogVisible = false"
       class="modal-size-lg"
     >
