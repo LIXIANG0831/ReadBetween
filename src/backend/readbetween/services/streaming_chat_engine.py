@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 from datetime import datetime
 from typing import Generator, List, Dict, Optional
@@ -294,7 +295,7 @@ class StreamingChatEngine:
         if not is_recursion:
             current_message = [{'role': 'user', 'content': final_query}]
             messages = system_prompt + history_messages[:-1] + current_message
-            cls._log_request_messages(messages, current_message, final_query)
+            cls._log_request_messages(messages)
         else:
             messages = system_prompt + history_messages
             logger_util.debug(f"工具递归调用中...\n模型请求信息:\n{messages}")
@@ -302,25 +303,36 @@ class StreamingChatEngine:
         return messages
 
     @classmethod
-    def _log_request_messages(cls, full_messages, current_message, final_query):
+    def _log_request_messages(cls, full_messages):
         """记录请求消息日志"""
-        if isinstance(final_query, list):
-            sanitized_message = []
-            for item in final_query:
-                if isinstance(item, dict) and item.get('type') == 'image_url' and 'image_url' in item:
-                    sanitized_item = item.copy()
-                    sanitized_item['image_url'] = {'url': '图片的Base64'}
-                    sanitized_message.append(sanitized_item)
-                else:
-                    sanitized_message.append(item)
+        # 深度复制 full_messages 以避免修改原始数据
+        sanitized_full_messages = copy.deepcopy(full_messages) if hasattr(copy, 'deepcopy') else json.loads(
+            json.dumps(full_messages))
 
-            logger_util.debug(
-                f"\n完整模型请求信息:\n{json.dumps(full_messages, indent=2, ensure_ascii=False)}")
-            logger_util.debug(
-                f"\n本次模型请求信息:\n{json.dumps(sanitized_message, indent=2, ensure_ascii=False)}")
-        else:
-            logger_util.debug(f"\n完整模型请求信息:\n{json.dumps(full_messages, indent=2, ensure_ascii=False)}")
-            logger_util.debug(f"\n本次模型请求信息:\n{json.dumps(current_message, indent=2, ensure_ascii=False)}")
+        # 处理 full_messages 中的每个消息
+        for message in sanitized_full_messages:
+            if isinstance(message, dict) and 'content' in message:
+                content = message['content']
+
+                # 如果 content 是列表，处理其中的 image_url 元素
+                if isinstance(content, list):
+                    sanitized_content = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            # 处理嵌套的字典结构
+                            if item.get('type') == 'image_url' and 'image_url' in item:
+                                sanitized_item = item.copy()
+                                sanitized_item['image_url'] = {'url': '[img_base_64 or img_url]'}
+                                sanitized_content.append(sanitized_item)
+                            else:
+                                sanitized_content.append(item)
+                        else:
+                            sanitized_content.append(item)
+                    message['content'] = sanitized_content
+
+        # 打印处理后的 full_messages
+        logger_util.debug(
+            f"\n完整模型请求信息:\n{json.dumps(sanitized_full_messages, indent=2, ensure_ascii=False)}")
 
     @classmethod
     async def _execute_stream_chat(
