@@ -15,9 +15,9 @@ class MinioUtil:
     def __init__(self, endpoint=None, access_key=None, secret_key=None, secure=None):
         self.secure = secure or settings.storage.minio.secure
         self.endpoint = endpoint or settings.storage.minio.endpoint
-        access_key = access_key or settings.storage.minio.access_key
-        secret_key = secret_key or settings.storage.minio.secret_key
-        self.client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+        self.access_key = access_key or settings.storage.minio.access_key
+        self.secret_key = secret_key or settings.storage.minio.secret_key
+        self.client = Minio(self.endpoint, access_key=self.access_key, secret_key=self.secret_key, secure=self.secure)
 
     def bucket_exists(self, bucket_name: str) -> bool:
         """检查桶是否存在"""
