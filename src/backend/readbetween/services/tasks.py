@@ -73,7 +73,7 @@ def celery_embed_document(self, task_json):
         file_name = file_info["file_name"]
         file_id = file_info["file_id"]
         file_object_name = file_info["file_object_name"]
-        logger_util.info(f"====》开始向量化文件{file_name}")
+        logger_util.info(f"========》{file_name}: 开始向量化 《========")
         try:
             if file_save_path == "": raise Exception("文件下载失败")
             # TODO 没有对separator进行支持
@@ -116,7 +116,7 @@ def celery_embed_document(self, task_json):
 
                 # 创建索引
                 es_client.save_document(save_document)
-            logger_util.info("====》ES插入完成")
+            logger_util.info(f"========》{file_name}: ES插入完成 《========")
             """
             插入Milvus
             bbox | start_page[chunk片段最小页码] | source | title | chunk_index[分片索引] | extra | file_id | knowledge_id | text | vector | pk[auto_id]
@@ -149,15 +149,14 @@ def celery_embed_document(self, task_json):
             milvus_client.insert_data(target_collection_name, insert_data)
             # Desperate----- 创建Collection时已完成索引创建
             # milvus_client.create_index_on_field(target_collection_name, "vector", milvus_default_index_params)
-            logger_util.info("====》Milvus插入完成")
+            logger_util.info(f"========》{file_name}: Milvus插入完成 《========")
+
 
             # 完成向量化修改状态
             update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)
             update_file.status = 1
             KnowledgeFileService.update_file(update_file)
-            logger_util.info("====》数据库数据更新状态")
-            logger_util.info("====》Celery 文档向量化任务执行结束")
-            return "ok"
+            logger_util.info(f"========》{file_name}: 向量化完成 《========")
         except Exception as e:
             logger_util.error(f"任务失败，正在重试，重试次数：{self.request.retries}")
 

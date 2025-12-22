@@ -38,27 +38,37 @@ DEFAULT_PROMPT = """
 
 # RAG Knowledge Base Recall
 KB_RECALL_PROMPT = """
-**Knowledge Base Information:** The following content is retrieved from the knowledge base and may contain the answer or relevant background knowledge:
+**Knowledge Base Information:**
+**Note:** If the below information includes Markdown-format image links (e.g., ![](...)), when organizing the final answer, these images should be presented clearly and accurately in an appropriate form (such as direct embedding, providing accessible links with descriptions) to ensure the completeness of the information. 
+The following content is retrieved from the knowledge base and may contain the answer or relevant background information:
+---
 {kb_recall_content}
+---
 """
 
 # Web Search Information
 WEB_SEARCH_PROMPT = """
 **Web Search Information:** The following is the latest information or diverse perspectives obtained from the internet:
+---
 {web_search_content}
+---
 """
 
 # User Memory Information
 MEMORY_PROMPT = """
 **User Memory Information:** The following is recorded information based on historical conversations and user preferences, which may help better understand user needs:
+---
 {memory_recall_content}
+---
 **Note:** Reference this **only if and when** the recorded information is relevant to the user's current question. Do not mention it if it is irrelevant.
 """
 
 # Web Link Text Extraction
 WEB_LINK_PROMPT = """
 **Web Link**: [{web_link}], contains the following text content:
+---
 {web_link_content}
+---
 """
 
 WEB_LINK_ERROR_PROMPT = """
