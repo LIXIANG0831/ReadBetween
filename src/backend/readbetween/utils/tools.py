@@ -1,11 +1,15 @@
 import asyncio
 import base64
 import binascii
+import mimetypes
+import tempfile
 import time
+import uuid
 from typing import List, Dict, Optional
 import re
 import aiohttp
 from DrissionPage._pages.session_page import SessionPage
+from pathlib import Path
 
 from readbetween.services.constant import SALT, JINA_BASE_URL
 from cryptography.fernet import Fernet, InvalidToken
@@ -13,9 +17,10 @@ import hashlib
 import copy
 import os
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTTextBox, LTTextLine
+from pdfminer.layout import LTTextBox, LTTextLine, LTImage, LTFigure
 from readbetween.core.context import file_open
 from readbetween.utils.logger_util import logger_util
+from readbetween.utils.minio_util import MinioUtil
 
 
 class BaseTool:
@@ -54,12 +59,59 @@ class BaseTool:
             logger_util.error("Error fetching webpage text with Jina:", e)
             return ""
 
+    @staticmethod
+    def format_md_image_url(image_url, title="相关图片", optional_title=None):
+        if optional_title:
+            return f"![{title}]({image_url} \"{optional_title}\")"
+        else:
+            return f"![{title}]({image_url})"
+
 
 class PdfExtractTool(BaseTool):
     def __init__(self, pdf_file, chunk_size=1000, repeat_size=200):
         self.pdf_file = pdf_file
         self.chunk_size = chunk_size
         self.repeat_size = repeat_size
+        # 初始化MinioUtil
+        self.minio_util = MinioUtil()
+
+    def _handle_figure(self, element: LTImage | LTFigure, page_number, file_name=None):
+        """处理LTFigure元素（可能包含图片）"""
+        if isinstance(element, LTImage):
+            # 保存图片
+            image_data = element.stream.get_data()
+            if file_name is None:
+                file_name = f"page{page_number:06d}_img_{uuid.uuid4().hex}.png"
+            else:
+                file_name = f"{file_name}_page{page_number:06d}_img_{uuid.uuid4().hex}.png"
+            object_name = f"knowledge_image/{file_name}"
+            ext = Path(file_name).suffix
+
+            # 创建临时文件
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext if ext else '.tmp') as tmp_file:
+                tmp_file.write(image_data)
+                tmp_path = tmp_file.name
+                try:
+                    try:
+                        image_url = self.minio_util.upload_file_get_permanent_url(tmp_path, object_name)
+                        return image_url if image_url is not None else ""
+                    except Exception as e:
+                        logger_util.error(f"上传图片到MinIO失败: {e}")
+                        return ""
+                finally:
+                    # 确保临时文件被删除
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                        logger_util.debug(f"临时文件已删除: {tmp_path}")
+
+        for sub_element in element:
+            if isinstance(sub_element, LTImage):
+                # 递归处理image
+                return self._handle_figure(sub_element, page_number, file_name)
+            elif isinstance(sub_element, LTFigure):
+                # 递归处理嵌套的figure
+                return self._handle_figure(sub_element, page_number, file_name)
+        return ""
 
     def extract(self):
         file_name = os.path.basename(self.pdf_file)
@@ -77,6 +129,20 @@ class PdfExtractTool(BaseTool):
                 for element in page_layout:
                     if len(chunk_bboxes) == 0:
                         start_page = page_number  # 记录chunk信息起始页
+
+                    # 检查是否是图片
+                    if isinstance(element, LTImage) or isinstance(element, LTFigure):
+                        bbox = element.bbox
+                        bbox_int = tuple(round(coord) for coord in bbox)
+                        # 图片上传OSS返回图片链接
+                        images_url = self._handle_figure(element, page_number, file_name)
+                        images_url = self.format_md_image_url(images_url)
+                        chunk += f"{images_url}\n"
+                        chunk_bboxes.append({
+                            "page_no": page_number,
+                            "bbox": list(bbox_int)
+                        })
+
                     if isinstance(element, LTTextBox) or isinstance(element, LTTextLine):
                         text = element.get_text()
                         bbox = element.bbox
@@ -278,40 +344,40 @@ class WebSearchTool:
 
 # 示例使用
 if __name__ == "__main__":
-    encryption_tool = EncryptionTool()  # 创建实例
+    # encryption_tool = EncryptionTool()  # 创建实例
     # 加密密码
-    password = "你好"
-    encrypted = encryption_tool.encrypt(password)
-    print(f"Encrypted: {encrypted}")
+    # password = "你好"
+    # encrypted = encryption_tool.encrypt(password)
+    # print(f"Encrypted: {encrypted}")
 
     # 解密密码
-    decrypted = encryption_tool.decrypt(encrypted)
-    print(f"Decrypted: {decrypted}")
+    # decrypted = encryption_tool.decrypt(encrypted)
+    # print(f"Decrypted: {decrypted}")
 
-    text = """
-    帮我识别下面的网页内容，并进行总结：
-    https://news.sina.com.cn/w/2025-10-02/doc-infsncvw0643322.shtml今天是个好日子啊
-    http://www.sdzk.cn/NewsInfo呵呵你能识别吗.aspx?NewsID=7029
-    https://example.com/path/to/page?param=value&another=param
-    ftp://files.example.com/download.zip
-    http://www.sdzk.cn/NewsInfo呵呵你能识别吗.aspx?NewsID=7029 https://example.com/path/to/page?param=value&another=param
-    还有普通文本。
-    """
-    text2 = "xxxaa"
+    # text = """
+    # 帮我识别下面的网页内容，并进行总结：
+    # https://news.sina.com.cn/w/2025-10-02/doc-infsncvw0643322.shtml今天是个好日子啊
+    # http://www.sdzk.cn/NewsInfo呵呵你能识别吗.aspx?NewsID=7029
+    # https://example.com/path/to/page?param=value&another=param
+    # ftp://files.example.com/download.zip
+    # http://www.sdzk.cn/NewsInfo呵呵你能识别吗.aspx?NewsID=7029 https://example.com/path/to/page?param=value&another=param
+    # 还有普通文本。
+    # """
+    # text2 = "xxxaa"
 
-    urls, cnt = BaseTool.extract_urls(text2)
-    print(cnt)
-    for url in urls:
-        print(url)
-        # print(asyncio.run(BaseTool.fetch_webpage_text_async(url)))
+    # urls, cnt = BaseTool.extract_urls(text2)
+    # print(cnt)
+    # for url in urls:
+    # print(url)
+    # print(asyncio.run(BaseTool.fetch_webpage_text_async(url)))
 
     # PDF 解析
-    # pdf_file_path = '/Users/lixiang/Documents/Test_Material/普通.pdf'
-    # pdf_extract = PdfExtractTool(pdf_file_path)
-    # results = asyncio.run(pdf_extract.extract())
-    # for result in results:
-    #     print(result)
-    #     print("\n")
+    pdf_file_path = '/Users/lixiang/Documents/Test_Material/普通.pdf'
+    pdf_extract = PdfExtractTool(pdf_file_path)
+    results = pdf_extract.extract()
+    for result in results:
+        print(result)
+        print("\n")
 
     # 示例：搜索百度并获取网页详情
     # search_tool = WebSearchTool()
