@@ -43,7 +43,9 @@ RedisMCPServerDetailKey = "mcp_server_detail_info"
 """
 Milvus 默认配置项
 """
-milvus_default_fields_1024 = [
+MILVUS_COLLECTION_NAME_PREFIX = "c_readbetween_"
+MILVUS_EMBEDDING_FIELD_NAME = "vector"
+MILVUS_DEFAULT_FIELDS_1024 = [
     FieldSchema(name="bbox", dtype=DataType.VARCHAR, max_length=65535),
     FieldSchema(name="start_page", dtype=DataType.INT64),
     FieldSchema(name="source", dtype=DataType.VARCHAR, max_length=65535),
@@ -54,10 +56,10 @@ milvus_default_fields_1024 = [
     FieldSchema(name="knowledge_id", dtype=DataType.VARCHAR, max_length=65535, is_partition_key=True),
     FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
     FieldSchema(name="pk", dtype=DataType.INT64, is_primary=True, auto_id=True),
-    FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=1024)
+    FieldSchema(name=MILVUS_EMBEDDING_FIELD_NAME, dtype=DataType.FLOAT_VECTOR, dim=1024)
 ]
 
-milvus_default_fields_768 = [
+MILVUS_DEFAULT_FIELDS_768 = [
     FieldSchema(name="bbox", dtype=DataType.VARCHAR, max_length=65535),
     FieldSchema(name="start_page", dtype=DataType.INT64),
     FieldSchema(name="source", dtype=DataType.VARCHAR, max_length=65535),
@@ -68,13 +70,11 @@ milvus_default_fields_768 = [
     FieldSchema(name="knowledge_id", dtype=DataType.VARCHAR, max_length=65535, is_partition_key=True),
     FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
     FieldSchema(name="pk", dtype=DataType.INT64, is_primary=True, auto_id=True),
-    FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=768)
+    FieldSchema(name=MILVUS_EMBEDDING_FIELD_NAME, dtype=DataType.FLOAT_VECTOR, dim=768)
 ]
 
-"""
-Milvus 索引参数
-"""
-milvus_default_index_params = {
+# Milvus 索引参数
+MILVUS_DEFAULT_INDEX_PARAMS = {
     "index_type": "HNSW",
     "metric_type": "L2",
     "params": {
@@ -82,7 +82,10 @@ milvus_default_index_params = {
         "efConstruction": 64
     }
 }
-
+"""
+ES 相关默认常量
+"""
+ES_INDEX_NAME_PREFIX = "i_readbetween_"
 """
 常量
 """

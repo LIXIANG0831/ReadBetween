@@ -7,8 +7,10 @@ from readbetween.models.dao.knowledge import KnowledgeDao, Knowledge
 from readbetween.utils.elasticsearch_util import ElasticSearchUtil
 from readbetween.utils.milvus_util import MilvusUtil
 from readbetween.utils.redis_util import RedisUtil
-from readbetween.services.constant import milvus_default_index_params, milvus_default_fields_768, milvus_default_fields_1024, \
-    PrefixRedisKnowledge, System_Embedding_Name
+from readbetween.services.constant import MILVUS_DEFAULT_INDEX_PARAMS, MILVUS_DEFAULT_FIELDS_768, \
+    MILVUS_DEFAULT_FIELDS_1024, \
+    PrefixRedisKnowledge, System_Embedding_Name, MILVUS_EMBEDDING_FIELD_NAME, ES_INDEX_NAME_PREFIX, \
+    MILVUS_COLLECTION_NAME_PREFIX
 from fastapi import HTTPException
 import uuid
 from readbetween.services.constant import redis_default_model_key
@@ -32,16 +34,16 @@ class KnowledgeService(BaseService):
     @classmethod
     async def create_knowledge(cls, knowledge_create: KnowledgeCreate):
         # TODO 同时创建Milvus-Collection
-        new_milvus_collection_name = f"c_awsome_{uuid.uuid4().hex}"
-        new_elastic_index_name = f"i_awsome_{uuid.uuid4().hex}"
+        new_milvus_collection_name = f"{MILVUS_COLLECTION_NAME_PREFIX}{uuid.uuid4().hex}"
+        new_elastic_index_name = f"{ES_INDEX_NAME_PREFIX}{uuid.uuid4().hex}"
         try:
             # 创建MilvusCollection
             milvus_client.create_collection(new_milvus_collection_name,  # 集合名
-                                            milvus_default_fields_1024)  # 属性
+                                            MILVUS_DEFAULT_FIELDS_1024)  # 属性
             # 创建MilvusIndex
             milvus_client.create_index_on_field(new_milvus_collection_name,  # 集合名
-                                                "vector",  # 创建索引的属性
-                                                milvus_default_index_params)  # 索引参数
+                                                MILVUS_EMBEDDING_FIELD_NAME,  # 创建索引的属性
+                                                MILVUS_DEFAULT_INDEX_PARAMS)  # 索引参数
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"创建Milvus集合异常: {str(e)}")
 

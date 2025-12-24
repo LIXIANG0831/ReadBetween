@@ -72,11 +72,24 @@ class MinioUtil:
             logger_util.error(f"Error getting MD5 for object '{object_name}' in bucket '{bucket_name}': {e}")
             return ""
 
-    def download_file_to_temp(self, object_name: str, bucket_name: str = default_bucket_name):
+    def download_file_to_temp(self, object_name: str, bucket_name: str = default_bucket_name, keep_extension: bool = True) -> str:
         """同步从 MinIO 下载文件到本地临时文件夹，并返回文件路径"""
         try:
+            # 获取对象的元数据以了解文件类型
+            stat = self.client.stat_object(bucket_name, object_name)
+            content_type = stat.content_type if hasattr(stat, 'content_type') else None
+
+            # 确定文件扩展名
+            extension = ''
+            if keep_extension:
+                # 从对象名中提取扩展名
+                if '.' in object_name:
+                    extension = '.' + object_name.split('.')[-1]
+                # 或者从content_type推断扩展名
+                elif content_type:
+                    extension = mimetypes.guess_extension(content_type) or ''
             # 创建临时文件
-            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as tmp_file:
                 # 下载文件
                 self.client.fget_object(bucket_name, object_name, tmp_file.name)
                 logger_util.info(f"File '{object_name}' downloaded to '{tmp_file.name}'.")

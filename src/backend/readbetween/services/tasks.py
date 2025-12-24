@@ -1,3 +1,6 @@
+import json
+from typing import List
+
 from readbetween.models.dao import *  # 确保执行任务时已加载全部DAO
 from readbetween.core.celery_app import celery
 from readbetween.models.dao.knowledge_file import KnowledgeFile
@@ -5,16 +8,18 @@ from readbetween.models.schemas.es.save_document import SaveDocument
 from readbetween.models.v1.knowledge_file import KnowledgeFileVectorizeTasks
 from readbetween.models.v1.model_available_cfg import ModelAvailableCfgInfo
 from readbetween.utils.elasticsearch_util import ElasticSearchUtil
+from readbetween.utils.file_splitter import UnifiedFileSplitter
 from readbetween.utils.memory_util import MemoryUtil
 from readbetween.utils.milvus_util import MilvusUtil
 from readbetween.utils.minio_util import MinioUtil
 from readbetween.utils.model_factory import ModelFactory
 from readbetween.utils.tools import PdfExtractTool
-from readbetween.services.constant import (milvus_default_fields_768,  # 默认字段
-                                           milvus_default_index_params, milvus_default_fields_1024  # 默认索引配置
+from readbetween.services.constant import (MILVUS_DEFAULT_FIELDS_768,  # 默认字段
+                                           MILVUS_DEFAULT_INDEX_PARAMS, MILVUS_DEFAULT_FIELDS_1024  # 默认索引配置
                                            )
 from readbetween.services.knowledge_file import KnowledgeFileService
 from celery.utils.log import get_task_logger
+from langchain.docstore.document import Document
 
 logger_util = get_task_logger("ReadBetween")
 
@@ -79,19 +84,35 @@ def celery_embed_document(self, task_json):
             # TODO 没有对separator进行支持
 
             # 文档切片向量化 组织数据结构
-            extract_results = []
+            all_chunks = []
             if enable_layout_flag == 1:  # 布局识别
                 # TODO 启用布局识别 暂不处理布局识别
-                pdf_extractor = PdfExtractTool(file_save_path,
-                                               chunk_size=knowledge_file_vectorize_task.chunk_size,
-                                               repeat_size=knowledge_file_vectorize_task.repeat_size)
-                extract_results = pdf_extractor.extract()  # pdf切片结果返回
+                unified_splitter = UnifiedFileSplitter(
+                    chunk_size=knowledge_file_vectorize_task.chunk_size,
+                    chunk_overlap=knowledge_file_vectorize_task.repeat_size,
+                    is_embed_image=True
+                )
+                all_chunks = unified_splitter.load_and_split(file_save_path)
+
+                # Deprecated 弃用 PdfExtractTool, 使用最新实现多文件类型支持
+                # pdf_extractor = PdfExtractTool(file_save_path,
+                #                                chunk_size=knowledge_file_vectorize_task.chunk_size,
+                #                                repeat_size=knowledge_file_vectorize_task.repeat_size)
+                # extract_results = pdf_extractor.extract()  # pdf切片结果返回
             elif enable_layout_flag == 0:  # 不进行布局识别
+                unified_splitter = UnifiedFileSplitter(
+                    chunk_size=knowledge_file_vectorize_task.chunk_size,
+                    chunk_overlap=knowledge_file_vectorize_task.repeat_size,
+                    is_embed_image=True
+                )
+                all_chunks: List[Document] = unified_splitter.load_and_split(file_save_path)
+
+                # Deprecated 弃用 PdfExtractTool, 使用最新实现多文件类型支持
                 # 实例化pdf工具
-                pdf_extractor = PdfExtractTool(file_save_path,
-                                               chunk_size=knowledge_file_vectorize_task.chunk_size,
-                                               repeat_size=knowledge_file_vectorize_task.repeat_size)
-                extract_results = pdf_extractor.extract()  # pdf切片结果返回
+                # pdf_extractor = PdfExtractTool(file_save_path,
+                #                                chunk_size=knowledge_file_vectorize_task.chunk_size,
+                #                                repeat_size=knowledge_file_vectorize_task.repeat_size)
+                # extract_results = pdf_extractor.extract()  # pdf切片结果返回
 
             """
             插入ES
@@ -99,17 +120,17 @@ def celery_embed_document(self, task_json):
                     bbox | start_page[chunk片段最小页码] | source | title | chunk_index[分片索引] | extra | file_id | knowledge_id
                 - text
             """
-            for extra_result in extract_results:
+            for chunk in all_chunks:
                 save_document = SaveDocument()
 
                 save_document.index_name = target_index_name  # ***设置索引名称
                 # chunk
-                save_document.text = extra_result.get("chunk", "")
-                save_document.metadata.bbox = extra_result.get("chunk_bboxes", "")
-                save_document.metadata.start_page = extra_result.get("start_page", 0)
+                save_document.text = chunk.page_content or ""
+                save_document.metadata.bbox = json.dumps(chunk.metadata.get("chunk_bboxes", ""))
+                save_document.metadata.start_page = chunk.metadata.get("page", 0)
                 save_document.metadata.source = file_object_name
                 save_document.metadata.title = file_name
-                save_document.metadata.chunk_index = extra_result.get("chunk_index", 0)
+                save_document.metadata.chunk_index = chunk.metadata.get("chunk_id", 0)
                 save_document.metadata.extra = ""
                 save_document.metadata.file_id = file_id
                 save_document.metadata.knowledge_id = target_kb_id
@@ -123,24 +144,24 @@ def celery_embed_document(self, task_json):
             """
             if not milvus_client.check_collection_exists(target_collection_name):
                 logger_util.info(f"新建集合{target_index_name}")
-                milvus_client.create_collection(target_collection_name, milvus_default_fields_1024)
+                milvus_client.create_collection(target_collection_name, MILVUS_DEFAULT_FIELDS_1024)
                 logger_util.info(f"完成集合{target_index_name}新建")
             # milvus 插入数据
             insert_data = []
-            for m_extract_result in extract_results:
-                chunk_vector = embed_client.get_embeddings(inputs=[m_extract_result.get("chunk", "")])[0]
+            for chunk in all_chunks:
+                chunk_vector = embed_client.get_embeddings(inputs=[chunk.page_content or ""])[0]
 
                 data = {
-                    "bbox": str(m_extract_result.get("chunk_bboxes", "")),
-                    "start_page": m_extract_result.get("start_page", 0),
+                    "bbox": json.dumps(chunk.metadata.get("chunk_bboxes", "")),
+                    "start_page": chunk.metadata.get("page", 0),
                     "source": file_object_name,
                     "title": file_name,
-                    "chunk_index": m_extract_result.get("chunk_index", 0),
+                    "chunk_index": chunk.metadata.get("chunk_id", 0),
                     "extra": "",
                     "file_id": file_id,
                     "knowledge_id": target_kb_id,
                     # title + chunk
-                    "text": file_name + ":" + m_extract_result.get("chunk", ""),
+                    "text": file_name + ":" + (chunk.page_content or ""),
                     # 调用Embedding模型获取向量数据
                     "vector": chunk_vector
                 }
@@ -160,7 +181,7 @@ def celery_embed_document(self, task_json):
         except Exception as e:
             logger_util.error(f"任务失败，正在重试，重试次数：{self.request.retries}")
 
-            file_vectorize_err_msg += f"文件{file_name}解析异常:{e}\n"
+            file_vectorize_err_msg += f"文件「{file_name}」解析异常:「{e}」\n"
 
             # 回写异常信息
             update_file: KnowledgeFile = KnowledgeFileService.select_by_file_id(file_id)

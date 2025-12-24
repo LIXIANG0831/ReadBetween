@@ -7,8 +7,15 @@ from readbetween.utils.logger_util import logger_util
 import aiofiles
 from readbetween.config import settings
 
-database_client = DatabaseClient(settings.storage.mysql.uri)
+_database_client = None
 
+
+def get_database_client():
+    """获取或创建数据库客户端（懒加载）"""
+    global _database_client
+    if _database_client is None:
+        _database_client = DatabaseClient(settings.storage.mysql.uri)
+    return _database_client
 
 @asynccontextmanager
 async def async_session_getter() -> AsyncSession:
@@ -17,7 +24,8 @@ async def async_session_getter() -> AsyncSession:
     Yields:
         AsyncSession: 异步数据库会话实例。
     """
-    session = AsyncSession(database_client.async_engine)
+    client = get_database_client()
+    session = AsyncSession(client.async_engine)
     try:
         yield session
     except Exception as e:
@@ -32,7 +40,8 @@ async def async_session_getter() -> AsyncSession:
 @contextmanager
 def session_getter() -> Session:
     """轻量级session context"""
-    session = Session(database_client.engine)
+    client = get_database_client()
+    session = Session(client.engine)
     try:
         yield session
     except Exception as e:
