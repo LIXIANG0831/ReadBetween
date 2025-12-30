@@ -274,31 +274,25 @@ services:
           cpus: '1.5'
           memory: 2G
 
-#  # (可选) Kibana - ES可观测
-#  kibana:
-#    <<: *defaults
-#    container_name: readbetween-kibana
-#    image: kibana:8.12.0
-#    environment:
-#      - ELASTICSEARCH_HOSTS=http://es:9200
-#    ports:
-#      - "5601:5601"
-#    depends_on:
-#      es:
-#        condition: service_healthy
-
-#  # (可选) Attu - Milvus可观测
-#  attu:
-#    <<: *defaults
-#    container_name: readbetween-milvus-attu
-#    image: zilliz/attu:v2.4
-#    environment:
-#      MILVUS_URL: standalone:19530
-#    ports:
-#      - "8000:3000"
-#    depends_on:
-#      standalone:
-#        condition: service_healthy
+    # Piston 代码执行引擎服务
+  piston:
+    <<: *defaults
+    container_name: readbetween-piston
+    image: ghcr.io/engineer-man/piston:latest
+    privileged: true
+    ports:
+      - "2000:2000"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/piston/packages:/piston/packages
+    tmpfs:
+      - /tmp:exec
+    environment:
+      TZ: Asia/Shanghai
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
 
 # 网络定义
 networks:
