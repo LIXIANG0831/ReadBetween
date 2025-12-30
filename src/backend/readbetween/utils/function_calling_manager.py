@@ -54,6 +54,7 @@ class MCPClientWrapper:
                     params = StdioServerParameters(
                         command=self.config["command"],
                         args=self.config.get("args", []),
+                        cwd=self.config.get("cwd", None),
                         env=self.config.get("env", None)
                     )
                     connection_ctx = stdio_client(params)
