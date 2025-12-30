@@ -7,6 +7,7 @@ class McpServerConfig(BaseModel):
     command: str | None = None
     args: list[str] | None = None
     env: dict[str, str] | None = None
+    cwd: str | None = None
     url: str | None = None
     headers: dict[str, str] | None = None
 

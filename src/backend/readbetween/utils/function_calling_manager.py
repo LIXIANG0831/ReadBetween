@@ -15,6 +15,7 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageFunctionToolCall, ChatCompletionMessageCustomToolCall
 from openapi_llm.client.openapi_async import AsyncOpenAPIClient
 
+from readbetween.models.v1.mcp import McpServerConfig
 from readbetween.utils.logger_util import logger_util
 
 
@@ -191,15 +192,26 @@ class UnifiedToolManager:
 
         for server_name, config in server_configs.items():
             # 创建标准化的配置字典
-            standardized_config = {
-                "command": config.get("command"),
-                "args": config.get("args"),
-                "env": config.get("env"),
-                "url": config.get("url"),
-                "headers": config.get("headers")
-            }
+            # standardized_config = {
+            #     "command": config.get("command"),
+            #     "args": config.get("args"),
+            #     "env": config.get("env"),
+            #     "cwd": config.get("cwd"),
+            #     "url": config.get("url"),
+            #     "headers": config.get("headers")
+            # }
+            standardized_config = McpServerConfig(
+                command=config.get("command"),
+                args=config.get("args"),
+                env=config.get("env"),
+                cwd=config.get("cwd"),
+                url=config.get("url"),
+                headers=config.get("headers")
+            )
+            # 转字典
+            standardized_config_dict = standardized_config.dict()
 
-            server_id_dict = {server_name: standardized_config}
+            server_id_dict = {server_name: standardized_config_dict}
             server_id = json.dumps(server_id_dict, ensure_ascii=False, sort_keys=True)
             server_id_to_name[server_id] = server_name
 
@@ -211,7 +223,7 @@ class UnifiedToolManager:
             client_wrapper = None
             try:
                 # 1. 创建 Wrapper
-                client_wrapper = MCPClientWrapper(server_id, server_name, standardized_config)
+                client_wrapper = MCPClientWrapper(server_id, server_name, standardized_config_dict)
 
                 # 2. 尝试连接 (异步初始化)
                 await client_wrapper.connect()
@@ -345,15 +357,26 @@ class UnifiedToolManager:
         tools = []
         for source_name, source_config in source_configs.items():
             # 创建标准化的配置字典
-            standardized_config = {
-                "command": source_config.get("command"),
-                "args": source_config.get("args"),
-                "env": source_config.get("env"),
-                "url": source_config.get("url"),
-                "headers": source_config.get("headers")
-            }
+            # standardized_config = {
+            #     "command": source_config.get("command"),
+            #     "args": source_config.get("args"),
+            #     "env": source_config.get("env"),
+            #     "cwd": source_config.get("cwd"),
+            #     "url": source_config.get("url"),
+            #     "headers": source_config.get("headers")
+            # }
+            standardized_config = McpServerConfig(
+                command=source_config.get("command"),
+                args=source_config.get("args"),
+                env=source_config.get("env"),
+                cwd=source_config.get("cwd"),
+                url=source_config.get("url"),
+                headers=source_config.get("headers")
+            )
+            # 转字典
+            standardized_config_dict = standardized_config.dict()
 
-            target_source_id_dict = {source_name: standardized_config}
+            target_source_id_dict = {source_name: standardized_config_dict}
             target_source_id = json.dumps(target_source_id_dict, ensure_ascii=False, sort_keys=True)
 
             # 查找匹配的工具
@@ -372,7 +395,7 @@ class UnifiedToolManager:
 
     async def execute_tools(self, tool_calls: list[
                                                   ChatCompletionMessageFunctionToolCall | ChatCompletionMessageCustomToolCall | dict] | None) -> \
-    Dict[str, Any]:
+            Dict[str, Any]:
         """
         执行工具调用
         """
@@ -672,7 +695,9 @@ async def example_usage():
         response = await client.chat.completions.create(
             model="COSMO-Mind",
             # messages=[{"role": "user", "content": "青岛琴屿路的地理坐标"}],
-            messages=[{"role": "user", "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],  # MCP/OpenAPI混合调用
+            messages=[{"role": "user",
+                       "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],
+            # MCP/OpenAPI混合调用
             tools=tool_definitions
         )
         print("=== LLM Call API Response ===")
@@ -696,7 +721,9 @@ async def example_usage():
         response = await client.chat.completions.create(
             model="COSMO-Mind",
             # messages=[{"role": "user", "content": "青岛琴屿路的地理坐标"}],
-            messages=[{"role": "user", "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],  # MCP/OpenAPI混合调用
+            messages=[{"role": "user",
+                       "content": "一次性完成工具调用。先查询，空压机794在2025-11-11日的能效信息；再查询，青岛琴屿路的地理坐标；再查询，今天的天气。"}],
+            # MCP/OpenAPI混合调用
             tools=tool_definitions
         )
         print("=== LLM Call API Response ===")
@@ -710,7 +737,6 @@ async def example_usage():
     except Exception as e:
         print(f"LLM调用测试失败: {e}")
     print("====== 第二次调用结束 ======")
-
 
     # 清理资源
     await function_calling_manager.cleanup()
