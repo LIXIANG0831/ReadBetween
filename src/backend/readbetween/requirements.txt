@@ -44,8 +44,6 @@ neo4j==5.25.0
 nipype==1.8.6
 openapi-llm==0.4.3
 openapi-spec-validator==0.7.2
-paddleocr==2.9.0
-paddlepaddle==2.6.1
 pi-heif==0.18.0
 pikepdf==9.3.0
 pip-chill==1.0.3
